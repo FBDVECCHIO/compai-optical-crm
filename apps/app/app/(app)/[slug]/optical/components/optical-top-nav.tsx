@@ -7,6 +7,8 @@ import ListChecked from "@carbon/icons-react/es/ListChecked";
 import Bot from "@carbon/icons-react/es/Bot";
 import Settings from "@carbon/icons-react/es/Settings";
 import ShoppingCart from "@carbon/icons-react/es/ShoppingCart";
+import UserFollow from "@carbon/icons-react/es/UserFollow";
+import WarningAlt from "@carbon/icons-react/es/WarningAlt";
 import { Icon } from "@crm/ui/components/icon";
 import { cn } from "@crm/ui/lib/utils";
 
@@ -15,6 +17,8 @@ export type OpticalModuleTab =
 	| "conferencia"
 	| "log_vendas"
 	| "resumo"
+	| "medicos"
+	| "garantias"
 	| "auditoria"
 	| "catalogo"
 	| "config";
@@ -62,6 +66,16 @@ export function OpticalTopNav({
 			id: "resumo",
 			label: "Resumo Gerencial",
 			icon: Analytics,
+		},
+		{
+			id: "medicos",
+			label: "Resultado Médico",
+			icon: UserFollow,
+		},
+		{
+			id: "garantias",
+			label: "Garantias & Ocorrências",
+			icon: WarningAlt,
 		},
 		{
 			id: "auditoria",

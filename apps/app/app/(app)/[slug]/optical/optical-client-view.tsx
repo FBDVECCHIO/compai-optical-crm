@@ -18,11 +18,14 @@ import { OpticalCatalogView } from "./components/optical-catalog-view";
 import { OpticalConferenceView } from "./components/optical-conference-view";
 import { OpticalKanban } from "./components/optical-kanban";
 import { OpticalManagementSummaryView } from "./components/optical-management-summary-view";
+import { OpticalMedicalView } from "./components/optical-medical-view";
 import { OpticalOrderDetailSheet } from "./components/optical-order-detail-sheet";
 import { OpticalOrdersTable } from "./components/optical-orders-table";
 import { OpticalSalesLogView } from "./components/optical-sales-log-view";
+import { OpticalSettingsView } from "./components/optical-settings-view";
 import { OpticalSummaryCards } from "./components/optical-summary-cards";
 import { OpticalTopNav, type OpticalModuleTab } from "./components/optical-top-nav";
+import { OpticalWarrantiesView } from "./components/optical-warranties-view";
 import type { OpticalOrder } from "@/lib/optical/optical-types";
 import {
 	type OpticalTab,
@@ -208,44 +211,20 @@ export function OpticalClientView() {
 	{/* App Lentes: Resumo Gerencial de Lojas e Faturamento */}
 	{activeModule === "resumo" && <OpticalManagementSummaryView />}
 
+	{/* App Lentes: Resultado Médico & Visitas a Consultórios */}
+	{activeModule === "medicos" && <OpticalMedicalView />}
+
+	{/* App Lentes: Garantias, Devoluções & Ocorrências de Balcão */}
+	{activeModule === "garantias" && <OpticalWarrantiesView />}
+
 	{/* Comp AI: Auditoria de Receitas e Agente IA */}
 	{activeModule === "auditoria" && <OpticalAuditView />}
 
 	{/* App Lentes: Catálogo de Lentes & Estoque de Laboratório */}
 	{activeModule === "catalogo" && <OpticalCatalogView />}
 
-	{/* Configurações do Módulo Óptico */}
-	{activeModule === "config" && (
-		<div className="rounded-xl border bg-card p-6 shadow-xs flex flex-col gap-4">
-			<div>
-				<h3 className="text-base font-bold tracking-tight">Configurações de Óptica & Laboratórios</h3>
-				<p className="text-xs text-muted-foreground">
-					Parâmetros de tolerância ABNT NBR ISO, laboratórios credenciados e regras de SLA.
-				</p>
-			</div>
-			<div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-				<div className="rounded-lg border p-4 flex flex-col gap-2">
-					<span className="font-semibold text-foreground">Tolerâncias Dióptricas (ABNT ISO 8980-1/2)</span>
-					<ul className="list-disc pl-4 text-muted-foreground space-y-1">
-						<li>Esférico: ±0.12 D (até 6.00 D)</li>
-						<li>Cilíndrico: ±0.12 D (cilindros comuns)</li>
-						<li>Eixo: ±2° para cil &gt; 1.50, ±5° para cil &lt; 0.75</li>
-						<li>DNP horizontal: ±1.0 mm por olho</li>
-						<li>Altura vertical de montagem: ±1.0 mm</li>
-					</ul>
-				</div>
-				<div className="rounded-lg border p-4 flex flex-col gap-2">
-					<span className="font-semibold text-foreground">Laboratórios Parceiros Ativos</span>
-					<ul className="list-disc pl-4 text-muted-foreground space-y-1">
-						<li>Essilor (Varilux, Crizal, Transitions) - SLA 5 dias</li>
-						<li>Zeiss (SmartLife, DuraVision) - SLA 6 dias</li>
-						<li>Hoya (Hoyalux iD, LongLife) - SLA 5 dias</li>
-						<li>Personality (Digital Freeform) - SLA 3 dias</li>
-					</ul>
-				</div>
-			</div>
-		</div>
-	)}
+	{/* App Lentes: Centro Avançado de Configurações (Lojas, Labs, Médicos, Técnicos, Comissões, ABNT) */}
+	{activeModule === "config" && <OpticalSettingsView />}
 			</div>
 
 			{/* Vertical Optical AI Copilot Sidecar (Right - Occupying full vertical height) */}

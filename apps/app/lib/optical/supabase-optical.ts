@@ -7,6 +7,84 @@ const SUPABASE_ANON_KEY =
 	process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
 	"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1uZ3dmZWFyd2prcGlzYXJhcmJlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1OTc5MzksImV4cCI6MjA5NjE3MzkzOX0.vk9Ol41NU2RI72-ZZKIcm7hzccYBjzPPptb6rZv_mKs";
 
+const defaultHeaders = {
+	apikey: SUPABASE_ANON_KEY,
+	Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+};
+
+export interface StoreItem {
+	id: number;
+	nome: string;
+}
+
+export interface LabItem {
+	id: number;
+	nome: string;
+	slaDias?: number;
+}
+
+export interface SellerItem {
+	id: number;
+	nome: string;
+	loja?: string;
+}
+
+export interface RepItem {
+	id: number;
+	nome: string;
+}
+
+export interface DoctorItem {
+	id?: number | string;
+	nome: string;
+	crm: string;
+	representante?: string;
+}
+
+export interface ClinicItem {
+	id?: number | string;
+	nome: string;
+	cidade?: string;
+	representante?: string;
+}
+
+export interface TechnicianItem {
+	nome: string;
+	whatsapp: string;
+	calendlyUrl: string;
+}
+
+export interface WarrantyItem {
+	id?: number;
+	os: string;
+	loja: string;
+	vendedor: string;
+	cliente_nome: string;
+	data: string;
+	motivo: string;
+	custo_adicional: number;
+	detalhes?: Record<string, any>;
+}
+
+export interface CommissionSettings {
+	medicoPerc: number;
+	repMetaVolume: number;
+	repPercAbaixo: number;
+	repPercAcima: number;
+	vendedorPerc: number;
+	gerentePerc: number;
+	lojaPerc: number;
+}
+
+export interface OpticalTolerances {
+	sphericalTolerance: number;
+	cylindricalTolerance: number;
+	axisToleranceHigh: number;
+	axisToleranceLow: number;
+	dnpTolerance: number;
+	heightTolerance: number;
+}
+
 interface SupabaseVendaRow {
 	id: number;
 	os_venda: string;
@@ -19,16 +97,15 @@ interface SupabaseVendaRow {
 	created_at?: string;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. ORDENS DE SERVIÇO / VENDAS
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function fetchRealOrdersFromSupabase(): Promise<OpticalOrder[]> {
 	try {
 		const res = await fetch(
-			`${SUPABASE_URL}/rest/v1/vendas?order=id.desc&limit=50`,
-			{
-				headers: {
-					apikey: SUPABASE_ANON_KEY,
-					Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-				},
-			},
+			`${SUPABASE_URL}/rest/v1/vendas?order=id.desc&limit=60`,
+			{ headers: defaultHeaders },
 		);
 
 		if (!res.ok) {
@@ -101,9 +178,8 @@ export async function saveOrderToSupabase(
 		const res = await fetch(`${SUPABASE_URL}/rest/v1/vendas`, {
 			method: "POST",
 			headers: {
+				...defaultHeaders,
 				"Content-Type": "application/json",
-				apikey: SUPABASE_ANON_KEY,
-				Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
 				Prefer: "return=representation",
 			},
 			body: JSON.stringify(payload),
@@ -120,11 +196,405 @@ export async function saveOrderToSupabase(
 	}
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. LOJAS / FILIAIS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function fetchSupabaseStores(): Promise<StoreItem[]> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/lojas?order=id.asc`, {
+			headers: defaultHeaders,
+		});
+		if (res.ok) return await res.json();
+	} catch (e) {
+		console.warn("Erro ao carregar lojas do Supabase:", e);
+	}
+	return [
+		{ id: 1, nome: "Conceição (Matriz)" },
+		{ id: 2, nome: "MN Nova Campinas" },
+		{ id: 3, nome: "MN Dpedro" },
+		{ id: 4, nome: "Qualy Vsion" },
+		{ id: 5, nome: "Di Capri" },
+	];
+}
+
+export async function createSupabaseStore(nome: string): Promise<boolean> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/lojas`, {
+			method: "POST",
+			headers: { ...defaultHeaders, "Content-Type": "application/json" },
+			body: JSON.stringify({ nome }),
+		});
+		return res.ok;
+	} catch {
+		return false;
+	}
+}
+
+export async function deleteSupabaseStore(id: number): Promise<boolean> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/lojas?id=eq.${id}`, {
+			method: "DELETE",
+			headers: defaultHeaders,
+		});
+		return res.ok;
+	} catch {
+		return false;
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. LABORATÓRIOS PARCEIROS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function fetchSupabaseLabs(): Promise<LabItem[]> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/laboratorios?order=id.asc`, {
+			headers: defaultHeaders,
+		});
+		if (res.ok) {
+			const rows = await res.json();
+			return rows.map((r: any) => ({
+				id: r.id,
+				nome: r.nome,
+				slaDias: r.sla_dias || 5,
+			}));
+		}
+	} catch (e) {
+		console.warn("Erro ao carregar laboratorios do Supabase:", e);
+	}
+	return [
+		{ id: 13, nome: "Sorolab", slaDias: 4 },
+		{ id: 14, nome: "Alex LP", slaDias: 3 },
+		{ id: 15, nome: "Visionex", slaDias: 5 },
+		{ id: 16, nome: "Zeiss", slaDias: 6 },
+		{ id: 17, nome: "Hoya", slaDias: 5 },
+		{ id: 18, nome: "Essilor", slaDias: 5 },
+	];
+}
+
+export async function createSupabaseLab(nome: string, slaDias = 5): Promise<boolean> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/laboratorios`, {
+			method: "POST",
+			headers: { ...defaultHeaders, "Content-Type": "application/json" },
+			body: JSON.stringify({ nome, sla_dias: slaDias }),
+		});
+		return res.ok;
+	} catch {
+		return false;
+	}
+}
+
+export async function deleteSupabaseLab(id: number): Promise<boolean> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/laboratorios?id=eq.${id}`, {
+			method: "DELETE",
+			headers: defaultHeaders,
+		});
+		return res.ok;
+	} catch {
+		return false;
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. VENDEDORES
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function fetchSupabaseSellers(): Promise<SellerItem[]> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/vendedores?order=id.asc`, {
+			headers: defaultHeaders,
+		});
+		if (res.ok) return await res.json();
+	} catch (e) {
+		console.warn("Erro ao carregar vendedores:", e);
+	}
+	return [
+		{ id: 1, nome: "Fabio Del Vecchio", loja: "Conceição (Matriz)" },
+		{ id: 2, nome: "Paloma", loja: "MN Nova Campinas" },
+		{ id: 3, nome: "Fabiano", loja: "MN Dpedro" },
+		{ id: 4, nome: "Andreza", loja: "Qualy Vsion" },
+		{ id: 5, nome: "Demetrius", loja: "Conceição (Matriz)" },
+	];
+}
+
+export async function createSupabaseSeller(nome: string, loja?: string): Promise<boolean> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/vendedores`, {
+			method: "POST",
+			headers: { ...defaultHeaders, "Content-Type": "application/json" },
+			body: JSON.stringify({ nome, loja }),
+		});
+		return res.ok;
+	} catch {
+		return false;
+	}
+}
+
+export async function deleteSupabaseSeller(id: number): Promise<boolean> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/vendedores?id=eq.${id}`, {
+			method: "DELETE",
+			headers: defaultHeaders,
+		});
+		return res.ok;
+	} catch {
+		return false;
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. REPRESENTANTES MÉDICOS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function fetchSupabaseReps(): Promise<RepItem[]> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/representantes?order=id.asc`, {
+			headers: defaultHeaders,
+		});
+		if (res.ok) return await res.json();
+	} catch (e) {
+		console.warn("Erro ao carregar representantes:", e);
+	}
+	return [
+		{ id: 1, nome: "Juliana Representante" },
+		{ id: 2, nome: "Marcos Consultor" },
+	];
+}
+
+export async function createSupabaseRep(nome: string): Promise<boolean> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/representantes`, {
+			method: "POST",
+			headers: { ...defaultHeaders, "Content-Type": "application/json" },
+			body: JSON.stringify({ nome }),
+		});
+		return res.ok;
+	} catch {
+		return false;
+	}
+}
+
+export async function deleteSupabaseRep(id: number): Promise<boolean> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/representantes?id=eq.${id}`, {
+			method: "DELETE",
+			headers: defaultHeaders,
+		});
+		return res.ok;
+	} catch {
+		return false;
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. CONFIG SETTINGS (CHAVE/VALOR NO SUPABASE)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function fetchConfigSetting<T = any>(key: string, defaultValue: T): Promise<T> {
+	try {
+		const res = await fetch(
+			`${SUPABASE_URL}/rest/v1/config_settings?key=eq.${encodeURIComponent(key)}`,
+			{ headers: defaultHeaders },
+		);
+		if (res.ok) {
+			const data = await res.json();
+			if (data && data.length > 0) {
+				const raw = data[0].value;
+				try {
+					return JSON.parse(raw);
+				} catch {
+					return raw as unknown as T;
+				}
+			}
+		}
+	} catch (e) {
+		console.warn(`Erro ao carregar config ${key}:`, e);
+	}
+	return defaultValue;
+}
+
+export async function saveConfigSetting(key: string, value: any): Promise<boolean> {
+	try {
+		const strValue = typeof value === "string" ? value : JSON.stringify(value);
+		const check = await fetch(
+			`${SUPABASE_URL}/rest/v1/config_settings?key=eq.${encodeURIComponent(key)}`,
+			{ headers: defaultHeaders },
+		);
+		const exists = check.ok ? (await check.json()).length > 0 : false;
+
+		if (exists) {
+			const patchRes = await fetch(
+				`${SUPABASE_URL}/rest/v1/config_settings?key=eq.${encodeURIComponent(key)}`,
+				{
+					method: "PATCH",
+					headers: { ...defaultHeaders, "Content-Type": "application/json" },
+					body: JSON.stringify({ value: strValue }),
+				},
+			);
+			return patchRes.ok;
+		}
+
+		const postRes = await fetch(`${SUPABASE_URL}/rest/v1/config_settings`, {
+			method: "POST",
+			headers: { ...defaultHeaders, "Content-Type": "application/json" },
+			body: JSON.stringify({ key, value: strValue }),
+		});
+		return postRes.ok;
+	} catch (e) {
+		console.warn(`Erro ao gravar config ${key}:`, e);
+		return false;
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. MÉDICOS, CLÍNICAS & TÉCNICOS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function fetchSupabaseDoctors(): Promise<DoctorItem[]> {
+	return await fetchConfigSetting<DoctorItem[]>("medicos", [
+		{ nome: "Dr. Thiago de Souza Queiroz", crm: "151798/SP", representante: "Juliana Representante" },
+		{ nome: "Dra. Camila Ribeiro", crm: "162400/SP", representante: "Marcos Consultor" },
+		{ nome: "Dr. Roberto Mendonça", crm: "144920/SP", representante: "Juliana Representante" },
+	]);
+}
+
+export async function saveSupabaseDoctors(doctors: DoctorItem[]): Promise<boolean> {
+	return await saveConfigSetting("medicos", doctors);
+}
+
+export async function fetchSupabaseClinics(): Promise<ClinicItem[]> {
+	return await fetchConfigSetting<ClinicItem[]>("clinicas", [
+		{ nome: "Clínica Olhar Certo", cidade: "Campinas", representante: "Juliana Representante" },
+		{ nome: "Hospital de Olhos Campinas", cidade: "Campinas", representante: "Marcos Consultor" },
+		{ nome: "Instituto da Visão", cidade: "Valinhos", representante: "Juliana Representante" },
+	]);
+}
+
+export async function saveSupabaseClinics(clinics: ClinicItem[]): Promise<boolean> {
+	return await saveConfigSetting("clinicas", clinics);
+}
+
+export async function fetchSupabaseTechnicians(): Promise<TechnicianItem[]> {
+	return await fetchConfigSetting<TechnicianItem[]>("tecnicos", [
+		{
+			nome: "Fabio Del Vecchio",
+			whatsapp: "19971113013",
+			calendlyUrl: "https://calendly.com/fbdv1202",
+		},
+	]);
+}
+
+export async function saveSupabaseTechnicians(tecnicos: TechnicianItem[]): Promise<boolean> {
+	return await saveConfigSetting("tecnicos", tecnicos);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. COMISSÕES, FORMAS DE PAGAMENTO E PARÂMETROS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const DEFAULT_COMMISSIONS: CommissionSettings = {
+	medicoPerc: 10,
+	repMetaVolume: 50000,
+	repPercAbaixo: 3,
+	repPercAcima: 5,
+	vendedorPerc: 4,
+	gerentePerc: 2,
+	lojaPerc: 1.5,
+};
+
+export async function fetchCommissionSettings(): Promise<CommissionSettings> {
+	return await fetchConfigSetting<CommissionSettings>("comissaoParams", DEFAULT_COMMISSIONS);
+}
+
+export async function saveCommissionSettings(settings: CommissionSettings): Promise<boolean> {
+	return await saveConfigSetting("comissaoParams", settings);
+}
+
+export async function fetchPaymentMethods(): Promise<string[]> {
+	return await fetchConfigSetting<string[]>("formasPagamento", [
+		"Dinheiro",
+		"Pix",
+		"Cartão de Crédito",
+		"Cartão de Débito",
+		"Crediário",
+		"Depósito/Transferência",
+	]);
+}
+
+export async function savePaymentMethods(methods: string[]): Promise<boolean> {
+	return await saveConfigSetting("formasPagamento", methods);
+}
+
+export const DEFAULT_TOLERANCES: OpticalTolerances = {
+	sphericalTolerance: 0.12,
+	cylindricalTolerance: 0.12,
+	axisToleranceHigh: 2,
+	axisToleranceLow: 5,
+	dnpTolerance: 1.0,
+	heightTolerance: 1.0,
+};
+
+export async function fetchOpticalTolerances(): Promise<OpticalTolerances> {
+	return await fetchConfigSetting<OpticalTolerances>("opticalTolerances", DEFAULT_TOLERANCES);
+}
+
+export async function saveOpticalTolerances(tol: OpticalTolerances): Promise<boolean> {
+	return await saveConfigSetting("opticalTolerances", tol);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9. GARANTIAS & OCORRÊNCIAS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function fetchSupabaseWarranties(): Promise<WarrantyItem[]> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/ocorrencias?order=id.desc&limit=50`, {
+			headers: defaultHeaders,
+		});
+		if (res.ok) return await res.json();
+	} catch (e) {
+		console.warn("Erro ao buscar ocorrencias no Supabase:", e);
+	}
+	return [
+		{
+			id: 1,
+			os: "1045A",
+			loja: "Conceição (Matriz)",
+			vendedor: "Flavia",
+			cliente_nome: "MARIA SOUZA DE OLIVEIRA",
+			data: "2026-09-10",
+			motivo: "Erro de Dioptria / Não Adaptação",
+			custo_adicional: 180,
+			detalhes: { lab: "Essilor", tipo: "Garantia Fabricante" },
+		},
+	];
+}
+
+export async function createSupabaseWarranty(item: Omit<WarrantyItem, "id">): Promise<boolean> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/ocorrencias`, {
+			method: "POST",
+			headers: { ...defaultHeaders, "Content-Type": "application/json" },
+			body: JSON.stringify(item),
+		});
+		return res.ok;
+	} catch {
+		return false;
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAPEADOR INTERNO DE VENDA SUPABASE -> OPTICAL ORDER
+// ─────────────────────────────────────────────────────────────────────────────
+
 function mapVendaToOpticalOrder(row: SupabaseVendaRow): OpticalOrder {
 	const d = row.detalhes || {};
 	const total = Number(row.total_venda) || 0;
 	const paid = Number(d.valorPago) || (d.tipoPagamento === "Integral" ? total : total * 0.5);
-	const residual = Number(d.valorResidual) ?? (total - paid);
+	const residual = Number(d.valorResidual) ?? Math.max(0, total - paid);
 
 	let status: OpticalOrderStatus = "DIGITADA";
 	if (d.conferido === true || d.status === "PRONTA_LOJA") {
@@ -270,3 +740,129 @@ function mapVendaToOpticalOrder(row: SupabaseVendaRow): OpticalOrder {
 		updatedAt: new Date().toISOString(),
 	};
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 12. OCORRÊNCIAS, GARANTIAS & ASSISTÊNCIA TÉCNICA
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface OcorrenciaDetalhes {
+	lab?: string;
+	lente?: string;
+	precoLente?: number;
+	semTratamento?: boolean;
+	tratamento?: string;
+	precoTratamento?: number;
+	qtdd?: number;
+	obs?: string;
+	bonificacao?: boolean;
+	cortesia?: boolean;
+	beneficioObs?: string;
+	labOriginal?: string;
+	lenteOriginal?: string;
+	precoLenteOriginal?: number;
+	tratamentoOriginal?: string;
+	precoTratamentoOriginal?: number;
+	custoOriginalTotal?: number;
+}
+
+export interface OcorrenciaItem {
+	id?: number;
+	os: string;
+	loja: string;
+	vendedor: string;
+	cliente_nome: string;
+	data: string;
+	motivo: string;
+	custo_adicional: number;
+	detalhes: string | OcorrenciaDetalhes;
+	created_at?: string;
+}
+
+export async function fetchSupabaseOcorrencias(): Promise<OcorrenciaItem[]> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/ocorrencias?order=data.desc,id.desc`, {
+			headers: defaultHeaders,
+		});
+		if (res.ok) {
+			const rows = await res.json();
+			return rows.map((r: any) => ({
+				id: r.id,
+				os: r.os || "",
+				loja: r.loja || "",
+				vendedor: r.vendedor || "",
+				cliente_nome: r.cliente_nome || "",
+				data: r.data || "",
+				motivo: r.motivo || "",
+				custo_adicional: Number(r.custo_adicional) || 0,
+				detalhes: typeof r.detalhes === "string" ? r.detalhes : JSON.stringify(r.detalhes || {}),
+				created_at: r.created_at,
+			}));
+		}
+	} catch (e) {
+		console.warn("Erro ao buscar ocorrências no Supabase:", e);
+	}
+	return [];
+}
+
+export async function saveSupabaseOcorrencia(record: OcorrenciaItem): Promise<boolean> {
+	try {
+		const payload = {
+			os: record.os || "",
+			loja: record.loja || "",
+			vendedor: record.vendedor || "",
+			cliente_nome: record.cliente_nome || "",
+			data: record.data,
+			motivo: record.motivo || "",
+			custo_adicional: Number(record.custo_adicional) || 0.0,
+			detalhes: typeof record.detalhes === "object" ? JSON.stringify(record.detalhes) : (record.detalhes || "{}"),
+		};
+
+		if (record.id) {
+			const res = await fetch(`${SUPABASE_URL}/rest/v1/ocorrencias?id=eq.${record.id}`, {
+				method: "PATCH",
+				headers: { ...defaultHeaders, "Content-Type": "application/json" },
+				body: JSON.stringify(payload),
+			});
+			return res.ok;
+		} else {
+			const res = await fetch(`${SUPABASE_URL}/rest/v1/ocorrencias`, {
+				method: "POST",
+				headers: { ...defaultHeaders, "Content-Type": "application/json" },
+				body: JSON.stringify(payload),
+			});
+			return res.ok;
+		}
+	} catch (e) {
+		console.error("Erro ao salvar ocorrência no Supabase:", e);
+		return false;
+	}
+}
+
+export async function deleteSupabaseOcorrencia(id: number): Promise<boolean> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/ocorrencias?id=eq.${id}`, {
+			method: "DELETE",
+			headers: defaultHeaders,
+		});
+		return res.ok;
+	} catch (e) {
+		console.error("Erro ao excluir ocorrência no Supabase:", e);
+		return false;
+	}
+}
+
+export async function deleteSupabaseOcorrenciasBulk(ids: number[]): Promise<boolean> {
+	if (!ids || ids.length === 0) return true;
+	try {
+		const idsStr = ids.join(",");
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/ocorrencias?id=in.(${idsStr})`, {
+			method: "DELETE",
+			headers: defaultHeaders,
+		});
+		return res.ok;
+	} catch (e) {
+		console.error("Erro ao excluir ocorrências em massa no Supabase:", e);
+		return false;
+	}
+}
+
