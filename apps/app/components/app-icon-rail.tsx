@@ -10,6 +10,7 @@ import { Button } from "@crm/ui/components/button";
 import type { CarbonIcon } from "@crm/ui/components/icon";
 import { Icon } from "@crm/ui/components/icon";
 import Bot from "@crm/ui/components/icons/bot";
+import Glasses from "@crm/ui/components/icons/glasses";
 import {
 	Sheet,
 	SheetContent,
@@ -41,6 +42,13 @@ type RailItem = {
 
 const ITEMS: RailItem[] = [
 	{ title: "Overview", href: "/", icon: Dashboard, match: "exact" },
+	{
+		title: "Balcão Óptico",
+		href: "/optical",
+		icon: Glasses,
+		iconClassName: "size-5",
+		match: "prefix",
+	},
 	{
 		title: "Chat",
 		href: "/chat",
