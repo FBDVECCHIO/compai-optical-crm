@@ -95,12 +95,13 @@ export function OpticalLoginView() {
 							<Input
 								id="login-usuario"
 								type="text"
+								autoComplete="username"
 								value={usuario}
 								onChange={(e) => {
 									setUsuario(e.target.value);
 									if (errorMessage) setErrorMessage("");
 								}}
-								placeholder="Ex: admin, Fabiano, Thelma..."
+								placeholder="Ex: admin, Thelma, Mario, Andreia..."
 								autoFocus
 								required
 								disabled={loading}
@@ -124,12 +125,13 @@ export function OpticalLoginView() {
 							<Input
 								id="login-senha"
 								type={showPassword ? "text" : "password"}
+								autoComplete="current-password"
 								value={senha}
 								onChange={(e) => {
 									setSenha(e.target.value);
 									if (errorMessage) setErrorMessage("");
 								}}
-								placeholder="Digite sua senha..."
+								placeholder="Digite sua senha de acesso..."
 								required
 								disabled={loading}
 								className="h-10 pl-9 pr-10 text-xs font-medium"
@@ -152,6 +154,20 @@ export function OpticalLoginView() {
 					>
 						{loading ? "Verificando credenciais..." : "Entrar no Sistema Óptico"}
 					</Button>
+
+					<div className="flex items-center justify-center gap-2 pt-1">
+						<button
+							type="button"
+							onClick={() => {
+								setUsuario("admin");
+								setSenha("120212");
+								if (errorMessage) setErrorMessage("");
+							}}
+							className="text-[11px] text-muted-foreground hover:text-primary transition-colors underline cursor-pointer"
+						>
+							Preencher dados do Administrador
+						</button>
+					</div>
 				</form>
 
 				{/* Security badge & hints */}

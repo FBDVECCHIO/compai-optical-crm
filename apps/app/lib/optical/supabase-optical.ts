@@ -966,7 +966,7 @@ export async function authenticateOpticalUser(
 		}
 
 		const res = await fetch(
-			`${SUPABASE_URL}/rest/v1/usuarios?usuario=eq.${encodeURIComponent(cleanUser)}&limit=1`,
+			`${SUPABASE_URL}/rest/v1/usuarios?usuario=ilike.${encodeURIComponent(cleanUser)}&limit=1`,
 			{ headers: defaultHeaders }
 		);
 
