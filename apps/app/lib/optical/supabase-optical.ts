@@ -866,3 +866,215 @@ export async function deleteSupabaseOcorrenciasBulk(ids: number[]): Promise<bool
 	}
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 13. CONTROLE DE ACESSO, AUTENTICAÇÃO E USUÁRIOS (SUPABASE)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface OpticalUserPermissions {
+	balcao: boolean;
+	conferencia: boolean;
+	log_vendas: boolean;
+	resumo: boolean;
+	medicos: boolean;
+	garantias: boolean;
+	auditoria: boolean;
+	catalogo: boolean;
+	config: boolean;
+}
+
+export interface OpticalUserSession {
+	id: number;
+	usuario: string;
+	nome: string;
+	loja: string;
+	isAdmin: boolean;
+	permissions: OpticalUserPermissions;
+	authenticatedAt: string;
+}
+
+export interface OpticalUserRecord {
+	id?: number;
+	usuario: string;
+	senha: string;
+	nome: string;
+	status: "ATIVO" | "INATIVO";
+	loja: string;
+	conferencia: "ATIVO" | "INATIVO";
+	registros?: "ATIVO" | "INATIVO";
+	dashboard: "ATIVO" | "INATIVO";
+	auditoria: "ATIVO" | "INATIVO";
+	configuracoes: "ATIVO" | "INATIVO";
+	logs?: "ATIVO" | "INATIVO";
+	venda: "ATIVO" | "INATIVO";
+	log_vendas: "ATIVO" | "INATIVO";
+	resumo_vendas: "ATIVO" | "INATIVO";
+	medicos?: string;
+}
+
+export function decodeUserPermissions(user: OpticalUserRecord): OpticalUserPermissions {
+	const isAdmin = (user.usuario || "").toLowerCase().trim() === "admin";
+	if (isAdmin) {
+		return {
+			balcao: true,
+			conferencia: true,
+			log_vendas: true,
+			resumo: true,
+			medicos: true,
+			garantias: true,
+			auditoria: true,
+			catalogo: true,
+			config: true,
+		};
+	}
+
+	const medStr = user.medicos || "";
+	const hasMedicos =
+		medStr === "ATIVO" ||
+		medStr.includes("med") ||
+		medStr.includes("vis");
+	const hasGarantias =
+		medStr === "ATIVO" ||
+		medStr.includes("gar") ||
+		medStr.includes("dev") ||
+		medStr.includes("oco") ||
+		medStr.includes("ast");
+
+	return {
+		balcao: user.venda === "ATIVO",
+		conferencia: user.conferencia === "ATIVO",
+		log_vendas: user.log_vendas === "ATIVO" || user.venda === "ATIVO",
+		resumo: user.dashboard === "ATIVO" || user.resumo_vendas === "ATIVO",
+		medicos: hasMedicos,
+		garantias: hasGarantias,
+		auditoria: user.auditoria === "ATIVO",
+		catalogo: true, // Catálogo liberado para operadores ativos
+		config: user.configuracoes === "ATIVO",
+	};
+}
+
+export async function authenticateOpticalUser(
+	usuarioInput: string,
+	senhaInput: string
+): Promise<{ success: boolean; session?: OpticalUserSession; error?: string }> {
+	try {
+		const cleanUser = usuarioInput.trim();
+		if (!cleanUser || !senhaInput) {
+			return { success: false, error: "Informe usuário e senha." };
+		}
+
+		const res = await fetch(
+			`${SUPABASE_URL}/rest/v1/usuarios?usuario=eq.${encodeURIComponent(cleanUser)}&limit=1`,
+			{ headers: defaultHeaders }
+		);
+
+		if (!res.ok) {
+			return { success: false, error: "Erro de conexão com o banco de dados." };
+		}
+
+		const rows: OpticalUserRecord[] = await res.json();
+		if (!rows || rows.length === 0) {
+			return { success: false, error: "Usuário não encontrado." };
+		}
+
+		const user = rows[0];
+		if (!user) {
+			return { success: false, error: "Usuário não encontrado." };
+		}
+
+		if (user.senha !== senhaInput) {
+			return { success: false, error: "Senha incorreta." };
+		}
+
+		if (user.status !== "ATIVO") {
+			return { success: false, error: "Este usuário está desativado. Contate o administrador." };
+		}
+
+		const isAdmin = (user.usuario || "").toLowerCase().trim() === "admin";
+		const permissions = decodeUserPermissions(user);
+
+		const session: OpticalUserSession = {
+			id: user.id || 0,
+			usuario: user.usuario,
+			nome: user.nome || user.usuario,
+			loja: user.loja || "Todos",
+			isAdmin,
+			permissions,
+			authenticatedAt: new Date().toISOString(),
+		};
+
+		return { success: true, session };
+	} catch (e) {
+		console.error("Erro no login óptico:", e);
+		return { success: false, error: "Falha de comunicação com o servidor." };
+	}
+}
+
+export async function fetchSupabaseUsers(): Promise<OpticalUserRecord[]> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/usuarios?order=id.asc`, {
+			headers: defaultHeaders,
+		});
+		if (res.ok) {
+			return await res.json();
+		}
+	} catch (e) {
+		console.warn("Erro ao buscar usuários no Supabase:", e);
+	}
+	return [];
+}
+
+export async function saveSupabaseUser(user: Partial<OpticalUserRecord>): Promise<boolean> {
+	try {
+		const payload = {
+			usuario: user.usuario?.trim(),
+			senha: user.senha,
+			nome: user.nome?.trim(),
+			status: user.status || "ATIVO",
+			loja: user.loja || "Todos",
+			conferencia: user.conferencia || "INATIVO",
+			registros: user.registros || "INATIVO",
+			dashboard: user.dashboard || "INATIVO",
+			auditoria: user.auditoria || "INATIVO",
+			configuracoes: user.configuracoes || "INATIVO",
+			logs: user.logs || "INATIVO",
+			venda: user.venda || "INATIVO",
+			log_vendas: user.log_vendas || "INATIVO",
+			resumo_vendas: user.resumo_vendas || "INATIVO",
+			medicos: user.medicos || "",
+		};
+
+		if (user.id) {
+			const res = await fetch(`${SUPABASE_URL}/rest/v1/usuarios?id=eq.${user.id}`, {
+				method: "PATCH",
+				headers: { ...defaultHeaders, "Content-Type": "application/json" },
+				body: JSON.stringify(payload),
+			});
+			return res.ok;
+		} else {
+			const res = await fetch(`${SUPABASE_URL}/rest/v1/usuarios`, {
+				method: "POST",
+				headers: { ...defaultHeaders, "Content-Type": "application/json" },
+				body: JSON.stringify(payload),
+			});
+			return res.ok;
+		}
+	} catch (e) {
+		console.error("Erro ao salvar usuário no Supabase:", e);
+		return false;
+	}
+}
+
+export async function deleteSupabaseUser(id: number): Promise<boolean> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/usuarios?id=eq.${id}`, {
+			method: "DELETE",
+			headers: defaultHeaders,
+		});
+		return res.ok;
+	} catch (e) {
+		console.error("Erro ao deletar usuário no Supabase:", e);
+		return false;
+	}
+}
+
+

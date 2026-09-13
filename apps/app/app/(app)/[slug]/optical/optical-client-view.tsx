@@ -9,14 +9,16 @@ import { Icon } from "@crm/ui/components/icon";
 import { Input } from "@crm/ui/components/input";
 import { Tabs, TabsList, TabsTrigger } from "@crm/ui/components/tabs";
 import { useQueryStates } from "nuqs";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useOpticalOrders } from "@/lib/optical/optical-store";
+import { useOpticalAuth } from "@/lib/optical/optical-auth-context";
 import { CreateOpticalOrderSheet } from "./components/create-optical-order-sheet";
 import { OpticalAgentSidecar } from "./components/optical-agent-sidecar";
 import { OpticalAuditView } from "./components/optical-audit-view";
 import { OpticalCatalogView } from "./components/optical-catalog-view";
 import { OpticalConferenceView } from "./components/optical-conference-view";
 import { OpticalKanban } from "./components/optical-kanban";
+import { OpticalLoginView } from "./components/optical-login-view";
 import { OpticalManagementSummaryView } from "./components/optical-management-summary-view";
 import { OpticalMedicalView } from "./components/optical-medical-view";
 import { OpticalOrderDetailSheet } from "./components/optical-order-detail-sheet";
@@ -34,11 +36,38 @@ import {
 } from "./optical-search-params";
 
 export function OpticalClientView() {
+	const { session, isAuthenticated, isLoading, logout, hasPermission } = useOpticalAuth();
 	const [{ q, tab, view }, setParams] = useQueryStates(opticalSearchParams);
 	const { orders, resetToDefaults } = useOpticalOrders();
 	const [activeModule, setActiveModule] = useState<OpticalModuleTab>("balcao");
 	const [localSearch, setLocalSearch] = useState(q);
 	const [selectedOrder, setSelectedOrder] = useState<OpticalOrder | null>(null);
+
+	// Redireciona caso o módulo atual não seja permitido para o usuário
+	useEffect(() => {
+		if (session && !session.isAdmin && !hasPermission(activeModule)) {
+			if (hasPermission("balcao")) setActiveModule("balcao");
+			else if (hasPermission("conferencia")) setActiveModule("conferencia");
+			else if (hasPermission("log_vendas")) setActiveModule("log_vendas");
+			else if (hasPermission("resumo")) setActiveModule("resumo");
+			else if (hasPermission("catalogo")) setActiveModule("catalogo");
+		}
+	}, [session, activeModule, hasPermission]);
+
+	if (isLoading) {
+		return (
+			<div className="flex flex-1 items-center justify-center min-h-screen bg-background">
+				<div className="flex flex-col items-center gap-3 text-muted-foreground text-xs font-semibold">
+					<span className="size-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+					<span>Carregando autenticação óptica...</span>
+				</div>
+			</div>
+		);
+	}
+
+	if (!isAuthenticated) {
+		return <OpticalLoginView />;
+	}
 
 	const pendingConferenceCount = orders.filter(
 		(o) =>
@@ -74,6 +103,8 @@ export function OpticalClientView() {
 				onSelectModule={setActiveModule}
 				pendingConferenceCount={pendingConferenceCount}
 				pendingResidualCount={pendingResidualCount}
+				userSession={session}
+				onLogout={logout}
 			/>
 
 			{/* Render active module view */}

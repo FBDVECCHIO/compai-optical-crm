@@ -45,7 +45,13 @@ export default function OpticalPage() {
 	);
 }
 
+import { OpticalAuthProvider } from "@/lib/optical/optical-auth-context";
+
 async function OpticalContent() {
 	await requireSession();
-	return <OpticalClientView />;
+	return (
+		<OpticalAuthProvider>
+			<OpticalClientView />
+		</OpticalAuthProvider>
+	);
 }

@@ -17,12 +17,25 @@ import TrashCan from "@carbon/icons-react/es/TrashCan";
 import UserFollow from "@carbon/icons-react/es/UserFollow";
 import UserSpeaker from "@carbon/icons-react/es/UserSpeaker";
 import UserMultiple from "@carbon/icons-react/es/UserMultiple";
+import User from "@carbon/icons-react/es/User";
+import Locked from "@carbon/icons-react/es/Locked";
+import Password from "@carbon/icons-react/es/Password";
+import Security from "@carbon/icons-react/es/Security";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
 import { Icon } from "@crm/ui/components/icon";
 import { Input } from "@crm/ui/components/input";
 import { Tabs, TabsList, TabsTrigger } from "@crm/ui/components/tabs";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@crm/ui/components/dialog";
 import { toast } from "sonner";
+import { useOpticalAuth } from "@/lib/optical/optical-auth-context";
 import {
 	type ClinicItem,
 	type CommissionSettings,
@@ -40,6 +53,11 @@ import {
 	fetchSupabaseSellers,
 	fetchSupabaseStores,
 	fetchSupabaseTechnicians,
+	fetchSupabaseUsers,
+	saveSupabaseUser,
+	deleteSupabaseUser,
+	decodeUserPermissions,
+	type OpticalUserRecord,
 	createSupabaseLab,
 	createSupabaseRep,
 	createSupabaseSeller,
@@ -71,7 +89,8 @@ type SettingsSubTab =
 	| "comissoes"
 	| "tecnicos"
 	| "apoio"
-	| "tolerancias";
+	| "tolerancias"
+	| "usuarios";
 
 export function OpticalSettingsView() {
 	const [activeTab, setActiveTab] = useState<SettingsSubTab>("lojas");
@@ -119,6 +138,27 @@ export function OpticalSettingsView() {
 	const [bulkRepSelected, setBulkRepSelected] = useState("");
 	const [selectedDoctorIndexes, setSelectedDoctorIndexes] = useState<number[]>([]);
 
+	// Usuários & Acessos
+	const { session } = useOpticalAuth();
+	const [usersList, setUsersList] = useState<OpticalUserRecord[]>([]);
+	const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+	const [editingUser, setEditingUser] = useState<OpticalUserRecord | null>(null);
+
+	// Form Usuário
+	const [uUsuario, setUUsuario] = useState("");
+	const [uSenha, setUSenha] = useState("");
+	const [uNome, setUNome] = useState("");
+	const [uStatus, setUStatus] = useState<"ATIVO" | "INATIVO">("ATIVO");
+	const [uLoja, setULoja] = useState("Todos");
+	const [uPermBalcao, setUPermBalcao] = useState(true);
+	const [uPermConferencia, setUPermConferencia] = useState(false);
+	const [uPermLogVendas, setUPermLogVendas] = useState(true);
+	const [uPermResumo, setUPermResumo] = useState(false);
+	const [uPermMedicos, setUPermMedicos] = useState(false);
+	const [uPermGarantias, setUPermGarantias] = useState(false);
+	const [uPermAuditoria, setUPermAuditoria] = useState(false);
+	const [uPermConfig, setUPermConfig] = useState(false);
+
 	useEffect(() => {
 		async function loadAll() {
 			setLoading(true);
@@ -140,6 +180,7 @@ export function OpticalSettingsView() {
 					cap,
 					tTec,
 					tConf,
+					uList,
 				] = await Promise.all([
 					fetchSupabaseStores(),
 					fetchSupabaseLabs(),
@@ -182,6 +223,7 @@ export function OpticalSettingsView() {
 						"assistTemplateClienteConfirmado",
 						"Olá {cliente}! Seu atendimento de assistência técnica foi CONFIRMADO por nosso técnico para o dia {data} às {hora}. Esperamos você!",
 					),
+					fetchSupabaseUsers(),
 				]);
 
 				setStores(s);
@@ -200,6 +242,7 @@ export function OpticalSettingsView() {
 				setLeadCapturers(cap);
 				setTemplateTecnico(tTec);
 				setTemplateClienteConf(tConf);
+				setUsersList(uList);
 				if (s.length > 0) setNewSellerStore(s[0]?.nome || "");
 			} catch (e) {
 				console.warn("Erro ao carregar configurações:", e);
@@ -209,6 +252,114 @@ export function OpticalSettingsView() {
 		}
 		loadAll();
 	}, []);
+
+	// Handlers de Usuários
+	const handleOpenCreateUser = () => {
+		setEditingUser(null);
+		setUUsuario("");
+		setUSenha("12345");
+		setUNome("");
+		setUStatus("ATIVO");
+		setULoja(stores[0]?.nome || "Todos");
+		setUPermBalcao(true);
+		setUPermConferencia(false);
+		setUPermLogVendas(true);
+		setUPermResumo(false);
+		setUPermMedicos(false);
+		setUPermGarantias(false);
+		setUPermAuditoria(false);
+		setUPermConfig(false);
+		setIsUserModalOpen(true);
+	};
+
+	const handleOpenEditUser = (user: OpticalUserRecord) => {
+		setEditingUser(user);
+		setUUsuario(user.usuario);
+		setUSenha(user.senha);
+		setUNome(user.nome);
+		setUStatus(user.status);
+		setULoja(user.loja || "Todos");
+		const perms = decodeUserPermissions(user);
+		setUPermBalcao(perms.balcao);
+		setUPermConferencia(perms.conferencia);
+		setUPermLogVendas(perms.log_vendas);
+		setUPermResumo(perms.resumo);
+		setUPermMedicos(perms.medicos);
+		setUPermGarantias(perms.garantias);
+		setUPermAuditoria(perms.auditoria);
+		setUPermConfig(perms.config);
+		setIsUserModalOpen(true);
+	};
+
+	const handleSaveUser = async () => {
+		if (!uUsuario.trim() || !uSenha.trim() || !uNome.trim()) {
+			toast.error("Preencha usuário, senha e nome.");
+			return;
+		}
+
+		const extraParts: string[] = [];
+		if (uPermMedicos) extraParts.push("med", "vis");
+		if (uPermGarantias) extraParts.push("gar", "dev", "oco", "ast");
+		extraParts.push("orc", "osl");
+		const medicosStr = uUsuario.toLowerCase().trim() === "admin" ? "ATIVO" : extraParts.join(",");
+
+		const record: Partial<OpticalUserRecord> = {
+			id: editingUser?.id,
+			usuario: uUsuario.trim(),
+			senha: uSenha.trim(),
+			nome: uNome.trim(),
+			status: uStatus,
+			loja: uLoja,
+			venda: uPermBalcao ? "ATIVO" : "INATIVO",
+			conferencia: uPermConferencia ? "ATIVO" : "INATIVO",
+			log_vendas: uPermLogVendas ? "ATIVO" : "INATIVO",
+			dashboard: uPermResumo ? "ATIVO" : "INATIVO",
+			resumo_vendas: uPermResumo ? "ATIVO" : "INATIVO",
+			auditoria: uPermAuditoria ? "ATIVO" : "INATIVO",
+			configuracoes: uPermConfig ? "ATIVO" : "INATIVO",
+			medicos: medicosStr,
+		};
+
+		const ok = await saveSupabaseUser(record);
+		if (ok) {
+			toast.success(
+				editingUser
+					? `Usuário "${record.usuario}" atualizado!`
+					: `Usuário "${record.usuario}" criado com sucesso!`,
+			);
+			setIsUserModalOpen(false);
+			const refreshed = await fetchSupabaseUsers();
+			setUsersList(refreshed);
+		} else {
+			toast.error("Erro ao salvar usuário no Supabase.");
+		}
+	};
+
+	const handleToggleUserStatus = async (user: OpticalUserRecord) => {
+		const nextStatus = user.status === "ATIVO" ? "INATIVO" : "ATIVO";
+		const ok = await saveSupabaseUser({ id: user.id, status: nextStatus });
+		if (ok) {
+			toast.success(`Usuário ${user.usuario} agora está ${nextStatus}.`);
+			setUsersList((prev) =>
+				prev.map((u) => (u.id === user.id ? { ...u, status: nextStatus } : u)),
+			);
+		}
+	};
+
+	const handleDeleteUserAction = async (user: OpticalUserRecord) => {
+		if (user.usuario.toLowerCase() === "admin") {
+			toast.error("O usuário administrador não pode ser excluído.");
+			return;
+		}
+		if (!confirm(`Deseja excluir o usuário "${user.usuario}"?`)) return;
+		if (user.id) {
+			const ok = await deleteSupabaseUser(user.id);
+			if (ok) {
+				toast.success("Usuário removido.");
+				setUsersList((prev) => prev.filter((u) => u.id !== user.id));
+			}
+		}
+	};
 
 	// Handlers de Ações
 	const handleAddStore = async () => {
@@ -452,6 +603,10 @@ export function OpticalSettingsView() {
 						<TabsTrigger value="apoio" className="text-xs font-semibold px-3 gap-1.5">
 							<Icon icon={Events} className="size-3.5" />
 							Tabelas de Apoio
+						</TabsTrigger>
+						<TabsTrigger value="usuarios" className="text-xs font-semibold px-3 gap-1.5">
+							<Icon icon={User} className="size-3.5" />
+							Usuários & Acessos ({usersList.length})
 						</TabsTrigger>
 					</TabsList>
 				</Tabs>
@@ -1368,6 +1523,317 @@ export function OpticalSettingsView() {
 					</div>
 				</div>
 			)}
+
+			{activeTab === "usuarios" && (
+				<div className="flex flex-col gap-5">
+					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+						<div>
+							<h3 className="text-sm font-bold tracking-tight flex items-center gap-2">
+								<Icon icon={User} className="size-4 text-primary" />
+								Gestão de Usuários, Senhas & Acessos
+							</h3>
+							<p className="text-xs text-muted-foreground">
+								Base oficial de operadores do Supabase ({usersList.length} cadastrados). Defina senhas, filiais e permissões por tela.
+							</p>
+						</div>
+						<Button
+							size="sm"
+							onClick={handleOpenCreateUser}
+							className="h-8 text-xs font-bold gap-1.5 bg-primary text-primary-foreground shadow-xs self-start sm:self-auto"
+						>
+							<Icon icon={Add} className="size-3.5" />
+							Novo Usuário
+						</Button>
+					</div>
+
+					<div className="rounded-xl border bg-card shadow-xs overflow-hidden">
+						<div className="overflow-x-auto">
+							<table className="w-full text-left text-xs border-collapse">
+								<thead>
+									<tr className="border-b bg-muted/40 text-muted-foreground font-semibold">
+										<th className="p-3">Usuário</th>
+										<th className="p-3">Nome</th>
+										<th className="p-3">Loja Vinculada</th>
+										<th className="p-3 text-center">Status</th>
+										<th className="p-3">Módulos Autorizados</th>
+										<th className="p-3 text-center">Ações</th>
+									</tr>
+								</thead>
+								<tbody className="divide-y">
+									{usersList.length === 0 ? (
+										<tr>
+											<td colSpan={6} className="p-8 text-center text-muted-foreground">
+												Nenhum usuário encontrado na tabela do Supabase.
+											</td>
+										</tr>
+									) : (
+										usersList.map((usr) => {
+											const isAdm = usr.usuario.toLowerCase().trim() === "admin";
+											const perms = decodeUserPermissions(usr);
+
+											return (
+												<tr key={usr.id || usr.usuario} className="hover:bg-muted/30 transition-colors">
+													<td className="p-3 font-bold text-foreground">
+														<div className="flex items-center gap-2">
+															<span>{usr.usuario}</span>
+															{isAdm && (
+																<Badge variant="default" className="text-[9px] px-1.5 py-0 h-4 bg-primary text-primary-foreground font-bold">
+																	ADMIN
+																</Badge>
+															)}
+														</div>
+													</td>
+													<td className="p-3 font-medium text-foreground">
+														{usr.nome || "—"}
+													</td>
+													<td className="p-3 text-muted-foreground font-medium whitespace-nowrap">
+														{usr.loja || "Todos"}
+													</td>
+													<td className="p-3 text-center whitespace-nowrap">
+														<Badge
+															variant={usr.status === "ATIVO" ? "default" : "secondary"}
+															className={`text-[10px] font-bold ${
+																usr.status === "ATIVO"
+																	? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+																	: "bg-muted text-muted-foreground"
+															}`}
+														>
+															{usr.status}
+														</Badge>
+													</td>
+													<td className="p-3">
+														<div className="flex flex-wrap items-center gap-1">
+															{isAdm ? (
+																<Badge variant="outline" className="text-[10px] font-semibold text-primary">
+																	Acesso Irrestrito (Todos os Módulos)
+																</Badge>
+															) : (
+																<>
+																	{perms.balcao && <Badge variant="outline" className="text-[9px]">Balcão</Badge>}
+																	{perms.conferencia && <Badge variant="outline" className="text-[9px]">Conferência</Badge>}
+																	{perms.log_vendas && <Badge variant="outline" className="text-[9px]">Log Vendas</Badge>}
+																	{perms.resumo && <Badge variant="outline" className="text-[9px]">Resumo</Badge>}
+																	{perms.medicos && <Badge variant="outline" className="text-[9px]">Médicos</Badge>}
+																	{perms.garantias && <Badge variant="outline" className="text-[9px]">Garantias</Badge>}
+																	{perms.auditoria && <Badge variant="outline" className="text-[9px]">Auditoria</Badge>}
+																	{perms.config && <Badge variant="outline" className="text-[9px] text-amber-500">Config</Badge>}
+																</>
+															)}
+														</div>
+													</td>
+													<td className="p-3 text-center whitespace-nowrap">
+														<div className="flex items-center justify-center gap-1">
+															<Button
+																variant="outline"
+																size="sm"
+																className="h-7 px-2.5 text-xs font-semibold gap-1"
+																onClick={() => handleOpenEditUser(usr)}
+																title="Editar permissões ou alterar senha"
+															>
+																<Icon icon={Edit} className="size-3" />
+																Editar / Senha
+															</Button>
+															<Button
+																variant="ghost"
+																size="sm"
+																className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+																onClick={() => handleToggleUserStatus(usr)}
+																title={usr.status === "ATIVO" ? "Desativar operador" : "Ativar operador"}
+															>
+																{usr.status === "ATIVO" ? "Desativar" : "Ativar"}
+															</Button>
+															{!isAdm && usr.id && (
+																<Button
+																	variant="ghost"
+																	size="sm"
+																	className="h-7 px-2 text-xs text-rose-500 hover:text-rose-600"
+																	onClick={() => handleDeleteUserAction(usr)}
+																	title="Excluir usuário"
+																>
+																	<Icon icon={TrashCan} className="size-3" />
+																</Button>
+															)}
+														</div>
+													</td>
+												</tr>
+											);
+										})
+									)}
+								</tbody>
+							</table>
+						</div>
+					</div>
+				</div>
+			)}
+
+			{/* Modal de Criação / Edição de Usuário & Senha */}
+			<Dialog open={isUserModalOpen} onOpenChange={setIsUserModalOpen}>
+				<DialogContent className="max-w-lg">
+					<DialogHeader>
+						<DialogTitle className="text-base font-bold flex items-center gap-2">
+							<Icon icon={Locked} className="size-4 text-primary" />
+							{editingUser ? `Editar Usuário: ${editingUser.usuario}` : "Cadastrar Novo Operador"}
+						</DialogTitle>
+						<DialogDescription className="text-xs">
+							Defina os dados de acesso, senha e permissões de telas para este operador.
+						</DialogDescription>
+					</DialogHeader>
+
+					<div className="flex flex-col gap-4 py-2 text-xs">
+						<div className="grid grid-cols-2 gap-3">
+							<div>
+								<label className="text-[11px] font-semibold text-foreground">Usuário (Login)</label>
+								<Input
+									value={uUsuario}
+									onChange={(e) => setUUsuario(e.target.value)}
+									disabled={Boolean(editingUser)}
+									placeholder="Ex: vendedor1"
+									className="h-8 text-xs font-bold mt-1"
+								/>
+							</div>
+							<div>
+								<label className="text-[11px] font-semibold text-foreground">Senha de Acesso</label>
+								<Input
+									value={uSenha}
+									onChange={(e) => setUSenha(e.target.value)}
+									placeholder="Defina a senha..."
+									className="h-8 text-xs font-mono mt-1"
+								/>
+							</div>
+						</div>
+
+						<div>
+							<label className="text-[11px] font-semibold text-foreground">Nome Completo</label>
+							<Input
+								value={uNome}
+								onChange={(e) => setUNome(e.target.value)}
+								placeholder="Nome de exibição no balcão"
+								className="h-8 text-xs mt-1"
+							/>
+						</div>
+
+						<div className="grid grid-cols-2 gap-3">
+							<div>
+								<label className="text-[11px] font-semibold text-foreground">Loja de Atendimento</label>
+								<select
+									value={uLoja}
+									onChange={(e) => setULoja(e.target.value)}
+									className="h-8 w-full rounded-lg border bg-background px-2.5 text-xs mt-1"
+								>
+									<option value="Todos">Todas as Lojas</option>
+									{stores.map((s) => (
+										<option key={s.id} value={s.nome}>
+											{s.nome}
+										</option>
+									))}
+								</select>
+							</div>
+
+							<div>
+								<label className="text-[11px] font-semibold text-foreground">Status do Usuário</label>
+								<select
+									value={uStatus}
+									onChange={(e) => setUStatus(e.target.value as "ATIVO" | "INATIVO")}
+									className="h-8 w-full rounded-lg border bg-background px-2.5 text-xs font-semibold mt-1"
+								>
+									<option value="ATIVO">ATIVO</option>
+									<option value="INATIVO">INATIVO</option>
+								</select>
+							</div>
+						</div>
+
+						{/* Permissões de Módulos */}
+						<div className="rounded-xl border bg-muted/20 p-3 flex flex-col gap-2">
+							<span className="text-[11px] font-bold text-foreground">
+								Permissões de Módulos (Telas Autorizadas)
+							</span>
+							<div className="grid grid-cols-2 gap-2 text-xs">
+								<label className="flex items-center gap-2 cursor-pointer">
+									<input
+										type="checkbox"
+										checked={uPermBalcao}
+										onChange={(e) => setUPermBalcao(e.target.checked)}
+										className="rounded"
+									/>
+									<span>Balcão & Vendas</span>
+								</label>
+								<label className="flex items-center gap-2 cursor-pointer">
+									<input
+										type="checkbox"
+										checked={uPermConferencia}
+										onChange={(e) => setUPermConferencia(e.target.checked)}
+										className="rounded"
+									/>
+									<span>Conferência Lab</span>
+								</label>
+								<label className="flex items-center gap-2 cursor-pointer">
+									<input
+										type="checkbox"
+										checked={uPermLogVendas}
+										onChange={(e) => setUPermLogVendas(e.target.checked)}
+										className="rounded"
+									/>
+									<span>Log de Vendas & Resíduos</span>
+								</label>
+								<label className="flex items-center gap-2 cursor-pointer">
+									<input
+										type="checkbox"
+										checked={uPermResumo}
+										onChange={(e) => setUPermResumo(e.target.checked)}
+										className="rounded"
+									/>
+									<span>Resumo Gerencial</span>
+								</label>
+								<label className="flex items-center gap-2 cursor-pointer">
+									<input
+										type="checkbox"
+										checked={uPermMedicos}
+										onChange={(e) => setUPermMedicos(e.target.checked)}
+										className="rounded"
+									/>
+									<span>Resultado Médico</span>
+								</label>
+								<label className="flex items-center gap-2 cursor-pointer">
+									<input
+										type="checkbox"
+										checked={uPermGarantias}
+										onChange={(e) => setUPermGarantias(e.target.checked)}
+										className="rounded"
+									/>
+									<span>Garantias & Ocorrências</span>
+								</label>
+								<label className="flex items-center gap-2 cursor-pointer">
+									<input
+										type="checkbox"
+										checked={uPermAuditoria}
+										onChange={(e) => setUPermAuditoria(e.target.checked)}
+										className="rounded"
+									/>
+									<span>Auditoria & Agente IA</span>
+								</label>
+								<label className="flex items-center gap-2 cursor-pointer text-amber-500 font-semibold">
+									<input
+										type="checkbox"
+										checked={uPermConfig}
+										onChange={(e) => setUPermConfig(e.target.checked)}
+										className="rounded"
+									/>
+									<span>Configurações do Sistema</span>
+								</label>
+							</div>
+						</div>
+					</div>
+
+					<DialogFooter>
+						<Button variant="outline" size="sm" onClick={() => setIsUserModalOpen(false)}>
+							Cancelar
+						</Button>
+						<Button size="sm" onClick={handleSaveUser} className="font-bold">
+							Salvar Usuário
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }
