@@ -40,7 +40,7 @@ export default defineTool({
 		// 1. Fetch Order with Relations
 		let order: any = null;
 		try {
-			order = await db.opticalOrder.findFirst({
+			order = await (db as any).opticalOrder.findFirst({
 				where: {
 					OR: [{ id: input.orderId }, { orderNumber: input.orderId }],
 				},
@@ -220,7 +220,7 @@ export default defineTool({
 		// 6. Record Activity in CRM
 		if (input.recordActivity) {
 			try {
-				await db.activity.create({
+				await (db.activity as any).create({
 					data: {
 						type: "OPTICAL_RESIDUAL_REMINDER" as any,
 						subject: `Aviso de retirada OS #${order.orderNumber} (${isFullyPaid ? "Quitado" : "Saldo " + formatCurrency(residualAmount)})`,

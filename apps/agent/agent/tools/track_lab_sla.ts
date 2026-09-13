@@ -63,7 +63,7 @@ export default defineTool({
 		// 1. Query Orders from Prisma
 		let orders: any[] = [];
 		try {
-			orders = await db.opticalOrder.findMany({
+			orders = await (db as any).opticalOrder.findMany({
 				where: {
 					...(input.orderId
 						? {
@@ -242,7 +242,7 @@ export default defineTool({
 			if (input.createAlerts && (risk === "CRITICAL" || risk === "WARNING")) {
 				try {
 					// 1. Create CRM Activity
-					await db.activity.create({
+					await (db.activity as any).create({
 						data: {
 							type: "OPTICAL_LAB_STATUS_CHANGE" as any,
 							subject: `[Alerta SLA - ${risk}] OS #${order.orderNumber} - Risco de atraso`,
@@ -257,7 +257,7 @@ export default defineTool({
 					});
 
 					// 2. Schedule AgentTask for store follow-up
-					await db.agentTask.create({
+					await (db.agentTask as any).create({
 						data: {
 							opticalOrderId: order.id,
 							contactId: order.customerId,

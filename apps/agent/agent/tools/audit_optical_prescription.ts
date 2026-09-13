@@ -189,7 +189,7 @@ export default defineTool({
 					const expiresAt = new Date(validDate);
 					expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
-					await tx.opticalPrescription.create({
+					await (tx as any).opticalPrescription.create({
 						data: {
 							patientId: input.patientId,
 							doctorId: input.doctorId ?? null,

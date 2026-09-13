@@ -166,7 +166,7 @@ export default defineTool({
 		let compatibleLenses: AvailableLens[] = [];
 
 		try {
-			const dbLenses = await db.opticalLensCatalog.findMany({
+			const dbLenses = await (db as any).opticalLensCatalog.findMany({
 				where: {
 					isActive: true,
 					lensType: targetLensType as any,
@@ -183,7 +183,7 @@ export default defineTool({
 				take: 10,
 			});
 
-			compatibleLenses = dbLenses.map((lens) => {
+			compatibleLenses = dbLenses.map((lens: any) => {
 				const isRecommended =
 					lens.refractiveIndex.toFixed(2) === recommendation.recommendedIndex;
 				const isFragileCR39 =
