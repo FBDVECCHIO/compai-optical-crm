@@ -875,6 +875,7 @@ export interface OpticalUserPermissions {
 	conferencia: boolean;
 	log_vendas: boolean;
 	resumo: boolean;
+	visita_medica: boolean;
 	medicos: boolean;
 	garantias: boolean;
 	auditoria: boolean;
@@ -919,6 +920,7 @@ export function decodeUserPermissions(user: OpticalUserRecord): OpticalUserPermi
 			conferencia: true,
 			log_vendas: true,
 			resumo: true,
+			visita_medica: true,
 			medicos: true,
 			garantias: true,
 			auditoria: true,
@@ -944,6 +946,7 @@ export function decodeUserPermissions(user: OpticalUserRecord): OpticalUserPermi
 		conferencia: user.conferencia === "ATIVO",
 		log_vendas: user.log_vendas === "ATIVO" || user.venda === "ATIVO",
 		resumo: user.dashboard === "ATIVO" || user.resumo_vendas === "ATIVO",
+		visita_medica: hasMedicos,
 		medicos: hasMedicos,
 		garantias: hasGarantias,
 		auditoria: user.auditoria === "ATIVO",
@@ -1076,5 +1079,395 @@ export async function deleteSupabaseUser(id: number): Promise<boolean> {
 		return false;
 	}
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 12. CONFERÊNCIAS DE LABORATÓRIO
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ConferenciaItem {
+	id?: number;
+	data: string;
+	loja: string;
+	osLoja: string;
+	idLab: string;
+	labPedido: string;
+	lente: string;
+	precoLente: number;
+	tratamento: string;
+	precoTratamento: number;
+	qtyLente: number;
+	semTratamento: string;
+	labEfetivo: string;
+	lenteEfetiva: string;
+	precoLenteEfetiva: number;
+	tratEfetivo: string;
+	precoTratEfetivo: number;
+	qtyLenteEfetiva: number;
+	semTratamentoEf: string;
+	confDobro: string;
+	osLoja2?: string;
+	idLab2?: string;
+	lente2?: string;
+	precoLente2?: number;
+	tratamento2?: string;
+	precoTratamento2?: number;
+	qtyLente2?: number;
+	semTratamento2?: string;
+	lenteEfetiva2?: string;
+	precoLenteEfetiva2?: number;
+	tratEfetivo2?: string;
+	precoTratEfetivo2?: number;
+	qtyLenteEfetiva2?: number;
+	semTratamentoEf2?: string;
+	confBeneficio?: string;
+	confBeneficioCodigo?: string;
+	status?: "CONFERIDO" | "PENDENTE" | "OCORRENCIA";
+	created_at?: string;
+}
+
+const LOCAL_CONF_KEY = "compai_optical_conferencias_cache";
+
+export async function fetchSupabaseConferencias(): Promise<ConferenciaItem[]> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/conferencias?order=id.desc`, {
+			headers: defaultHeaders,
+		});
+		if (res.ok) {
+			const data = await res.json();
+			if (Array.isArray(data) && data.length > 0) {
+				return data;
+			}
+		}
+	} catch (e) {
+		console.warn("Tabela de conferências remota inacessível, usando cache local:", e);
+	}
+
+	try {
+		const cached = localStorage.getItem(LOCAL_CONF_KEY);
+		if (cached) return JSON.parse(cached);
+	} catch {}
+
+	return [
+		{
+			id: 101,
+			data: new Date().toISOString().slice(0, 10),
+			loja: "MN Barão",
+			osLoja: "OS-8198",
+			idLab: "LAB-4401",
+			labPedido: "Essilor",
+			lente: "Varilux Comfort Max 1.60",
+			precoLente: 890.0,
+			tratamento: "Crizal Sapphire",
+			precoTratamento: 220.0,
+			qtyLente: 1,
+			semTratamento: "NÃO",
+			labEfetivo: "Visionex",
+			lenteEfetiva: "Personality Advance 1.60",
+			precoLenteEfetiva: 410.0,
+			tratEfetivo: "AR Satin Clean",
+			precoTratEfetivo: 90.0,
+			qtyLenteEfetiva: 1,
+			semTratamentoEf: "NÃO",
+			confDobro: "NÃO",
+			status: "CONFERIDO",
+		},
+		{
+			id: 102,
+			data: new Date().toISOString().slice(0, 10),
+			loja: "MN Nova Campinas",
+			osLoja: "OS-8205",
+			idLab: "LAB-4412",
+			labPedido: "Hoya",
+			lente: "Hoyalux ID MyStyle V+ 1.67",
+			precoLente: 1450.0,
+			tratamento: "LongLife BlueControl",
+			precoTratamento: 280.0,
+			qtyLente: 1,
+			semTratamento: "NÃO",
+			labEfetivo: "Hoya",
+			lenteEfetiva: "Hoyalux ID MyStyle V+ 1.67",
+			precoLenteEfetiva: 1450.0,
+			tratEfetivo: "LongLife BlueControl",
+			precoTratEfetivo: 280.0,
+			qtyLenteEfetiva: 1,
+			semTratamentoEf: "NÃO",
+			confDobro: "SIM",
+			osLoja2: "OS-8205-B",
+			idLab2: "LAB-4413",
+			lente2: "Hoyalux Balansis 1.60",
+			precoLente2: 650.0,
+			tratamento2: "LongLife",
+			precoTratamento2: 180.0,
+			qtyLente2: 1,
+			lenteEfetiva2: "Hoyalux Balansis 1.60",
+			precoLenteEfetiva2: 650.0,
+			tratEfetivo2: "LongLife",
+			precoTratEfetivo2: 180.0,
+			qtyLenteEfetiva2: 1,
+			status: "CONFERIDO",
+		},
+	];
+}
+
+export async function saveSupabaseConferencia(item: ConferenciaItem): Promise<boolean> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/conferencias`, {
+			method: "POST",
+			headers: { ...defaultHeaders, "Content-Type": "application/json" },
+			body: JSON.stringify(item),
+		});
+		if (res.ok) return true;
+	} catch (e) {
+		console.warn("Erro ao salvar no Supabase, mantendo localmente:", e);
+	}
+
+	try {
+		const current = await fetchSupabaseConferencias();
+		const newItem = { ...item, id: item.id || Date.now() };
+		const updated = [newItem, ...current.filter((c) => c.id !== newItem.id)];
+		localStorage.setItem(LOCAL_CONF_KEY, JSON.stringify(updated));
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+export async function deleteSupabaseConferencia(id: number): Promise<boolean> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/conferencias?id=eq.${id}`, {
+			method: "DELETE",
+			headers: defaultHeaders,
+		});
+		if (res.ok) return true;
+	} catch (e) {
+		console.warn("Erro ao deletar conferencia no Supabase:", e);
+	}
+
+	try {
+		const current = await fetchSupabaseConferencias();
+		const updated = current.filter((c) => c.id !== id);
+		localStorage.setItem(LOCAL_CONF_KEY, JSON.stringify(updated));
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 13. VISITAS MÉDICAS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface MedicalVisitItem {
+	id?: number;
+	data: string;
+	hora?: string;
+	medico: string;
+	crm?: string;
+	clinica?: string;
+	representante: string;
+	assunto: string;
+	status: "EFETIVA" | "AUSENTE" | "REAGENDADA";
+	observacoes?: string;
+	created_at?: string;
+}
+
+const LOCAL_VISITAS_KEY = "compai_optical_visitas_medicas_cache";
+
+export async function fetchSupabaseMedicalVisits(): Promise<MedicalVisitItem[]> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/visitas_medicas?order=id.desc`, {
+			headers: defaultHeaders,
+		});
+		if (res.ok) {
+			const data = await res.json();
+			if (Array.isArray(data) && data.length > 0) return data;
+		}
+	} catch (e) {
+		console.warn("Tabela visitas_medicas remota inacessível, usando cache:", e);
+	}
+
+	try {
+		const cached = localStorage.getItem(LOCAL_VISITAS_KEY);
+		if (cached) return JSON.parse(cached);
+	} catch {}
+
+	return [
+		{
+			id: 1,
+			data: new Date().toISOString().slice(0, 10),
+			hora: "10:30",
+			medico: "Dr. Thiago de Souza Queiroz",
+			crm: "151798/SP",
+			clinica: "Clínica Olhar Certo",
+			representante: "Juliana Representante",
+			assunto: "Apresentação Lentes Personality Advance",
+			status: "EFETIVA",
+			observacoes: "Médico receptivo ao material técnico, solicitou bloco de receituário.",
+		},
+		{
+			id: 2,
+			data: new Date(Date.now() - 86400000).toISOString().slice(0, 10),
+			hora: "14:00",
+			medico: "Dra. Camila Ribeiro",
+			crm: "162400/SP",
+			clinica: "Hospital de Olhos Campinas",
+			representante: "Marcos Consultor",
+			assunto: "Alinhamento de Tratamento Antirreflexo",
+			status: "EFETIVA",
+			observacoes: "Discutidas queixas de reflexo residual em lentes convencionais.",
+		},
+		{
+			id: 3,
+			data: new Date(Date.now() - 172800000).toISOString().slice(0, 10),
+			hora: "16:15",
+			medico: "Dr. Roberto Mendonça",
+			crm: "144920/SP",
+			clinica: "Instituto da Visão",
+			representante: "Juliana Representante",
+			assunto: "Apresentação Catálogo 2026",
+			status: "AUSENTE",
+			observacoes: "Médico em cirurgia de urgência. Visita remarcada para próxima terça.",
+		},
+	];
+}
+
+export async function saveSupabaseMedicalVisit(visit: MedicalVisitItem): Promise<boolean> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/visitas_medicas`, {
+			method: "POST",
+			headers: { ...defaultHeaders, "Content-Type": "application/json" },
+			body: JSON.stringify(visit),
+		});
+		if (res.ok) return true;
+	} catch (e) {
+		console.warn("Erro ao salvar visita no Supabase, gravando localmente:", e);
+	}
+
+	try {
+		const current = await fetchSupabaseMedicalVisits();
+		const newItem = { ...visit, id: visit.id || Date.now() };
+		const updated = [newItem, ...current.filter((v) => v.id !== newItem.id)];
+		localStorage.setItem(LOCAL_VISITAS_KEY, JSON.stringify(updated));
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+export async function deleteSupabaseMedicalVisit(id: number): Promise<boolean> {
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/visitas_medicas?id=eq.${id}`, {
+			method: "DELETE",
+			headers: defaultHeaders,
+		});
+		if (res.ok) return true;
+	} catch (e) {
+		console.warn("Erro ao deletar visita médica:", e);
+	}
+
+	try {
+		const current = await fetchSupabaseMedicalVisits();
+		const updated = current.filter((v) => v.id !== id);
+		localStorage.setItem(LOCAL_VISITAS_KEY, JSON.stringify(updated));
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 14. TABELAS DE APOIO DO APP LENTES (CAPTADORES, MOTIVOS, TEMPLATES)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function fetchLeadCaptadores(): Promise<string[]> {
+	return await fetchConfigSetting<string[]>("captadores", [
+		"Tráfego Pago Instagram",
+		"Google Ads",
+		"Indicação Médica",
+		"Passante / Vitrine",
+		"WhatsApp Campanha",
+		"Parceria Empresa",
+	]);
+}
+
+export async function saveLeadCaptadores(captadores: string[]): Promise<boolean> {
+	return await saveConfigSetting("captadores", captadores);
+}
+
+export async function fetchMotivosPerda(): Promise<string[]> {
+	return await fetchConfigSetting<string[]>("motivos_perda", [
+		"Preço / Achou caro",
+		"Não gostou da armação",
+		"Vai pesquisar concorrente",
+		"Sem limite no cartão",
+		"Prazo de entrega longo",
+		"Apenas pesquisando",
+	]);
+}
+
+export async function saveMotivosPerda(motivos: string[]): Promise<boolean> {
+	return await saveConfigSetting("motivos_perda", motivos);
+}
+
+export async function fetchMotivosOcorrencia(): Promise<string[]> {
+	return await fetchConfigSetting<string[]>("motivos_ocorrencia", [
+		"Erro de Digitação de Dioptria",
+		"Quebra na Montagem de Loja",
+		"Erro de Gravação no Laboratório",
+		"Não Adaptação Médica",
+		"Atraso Inaceitável do Fornecedor",
+		"Vício Oculto na Armação",
+		"Defeito no Tratamento Antirreflexo",
+	]);
+}
+
+export async function saveMotivosOcorrencia(motivos: string[]): Promise<boolean> {
+	return await saveConfigSetting("motivos_ocorrencia", motivos);
+}
+
+export async function fetchAssuntosVisita(): Promise<string[]> {
+	return await fetchConfigSetting<string[]>("assuntos_visita", [
+		"Apresentação de Novo Catálogo",
+		"Lançamento de Lentes Multifocais",
+		"Demonstração de Antirreflexo",
+		"Alinhamento de Comissões e Campanhas",
+		"Entrega de Receituários",
+		"Feedback de Pacientes",
+		"Cortesia e Relacionamento",
+	]);
+}
+
+export async function saveAssuntosVisita(assuntos: string[]): Promise<boolean> {
+	return await saveConfigSetting("assuntos_visita", assuntos);
+}
+
+export interface AssistenciaTemplates {
+	tecnicoMsg: string;
+	clientePendenteMsg: string;
+	clienteConfirmadoMsg: string;
+}
+
+export const DEFAULT_ASSIST_TEMPLATES: AssistenciaTemplates = {
+	tecnicoMsg:
+		"Olá {tecnico}, temos uma assistência técnica aberta para a OS {os} do cliente {cliente} na loja {loja}. Motivo: {motivo}.",
+	clientePendenteMsg:
+		"Olá {cliente}, recebemos sua solicitação de assistência da OS {os}. Nosso técnico especializado está avaliando o caso e retornaremos em breve.",
+	clienteConfirmadoMsg:
+		"Olá {cliente}, seu atendimento de assistência técnica da OS {os} foi confirmado para {data} às {hora} na loja {loja}.",
+};
+
+export async function fetchAssistenciaTemplates(): Promise<AssistenciaTemplates> {
+	return await fetchConfigSetting<AssistenciaTemplates>(
+		"templates_assistencia",
+		DEFAULT_ASSIST_TEMPLATES,
+	);
+}
+
+export async function saveAssistenciaTemplates(
+	templates: AssistenciaTemplates,
+): Promise<boolean> {
+	return await saveConfigSetting("templates_assistencia", templates);
+}
+
 
 

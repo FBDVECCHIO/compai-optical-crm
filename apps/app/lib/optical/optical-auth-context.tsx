@@ -86,8 +86,8 @@ export function OpticalAuthProvider({ children }: { children: ReactNode }) {
 					return session.permissions.resumo;
 				case "medicos":
 					return session.permissions.medicos;
-				case "garantias":
-					return session.permissions.garantias;
+				case "visita_medica":
+					return session.permissions.medicos;
 				case "auditoria":
 					return session.permissions.auditoria;
 				case "catalogo":

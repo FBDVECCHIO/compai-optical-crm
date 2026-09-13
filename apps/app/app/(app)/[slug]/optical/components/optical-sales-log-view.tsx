@@ -1,5 +1,6 @@
 "use client";
 
+import DocumentExport from "@carbon/icons-react/es/DocumentExport";
 import Money from "@carbon/icons-react/es/Money";
 import Phone from "@carbon/icons-react/es/Phone";
 import Search from "@carbon/icons-react/es/Search";
@@ -14,6 +15,7 @@ import { generateWhatsAppLink } from "@/lib/optical/optical-mock-data";
 import { useOpticalOrders } from "@/lib/optical/optical-store";
 import type { OpticalOrder } from "@/lib/optical/optical-types";
 import { OpticalOrderDetailSheet } from "./optical-order-detail-sheet";
+import { printOpticalReport } from "@/lib/optical/optical-print-report";
 
 export function OpticalSalesLogView() {
 	const { orders } = useOpticalOrders();
@@ -40,6 +42,46 @@ export function OpticalSalesLogView() {
 		const url = generateWhatsAppLink(order);
 		window.open(url, "_blank", "noopener,noreferrer");
 		toast.success(`WhatsApp aberto para ${order.patient.name}!`);
+	};
+
+	const handleExportPDF = () => {
+		const totalVendido = filtered.reduce((acc, o) => acc + o.financials.totalAmount, 0);
+		const totalRecebido = filtered.reduce((acc, o) => acc + o.financials.paidAmount, 0);
+		const totalResidual = filtered.reduce((acc, o) => acc + o.financials.residualAmount, 0);
+
+		printOpticalReport({
+			title: "Relatório de Vendas e Ordens de Serviço (Balcão)",
+			subtitle: "Histórico Operacional de Pedidos, Faturamento e Saldos Residuais",
+			period: "Período Geral",
+			kpis: [
+				{ label: "Total de Ordens", value: filtered.length },
+				{ label: "Faturamento Total", value: `R$ ${totalVendido.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, highlight: true },
+				{ label: "Entrada / Pago", value: `R$ ${totalRecebido.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` },
+				{ label: "Saldo a Receber", value: `R$ ${totalResidual.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` },
+			],
+			columns: [
+				{ header: "OS", key: "os", width: "90px" },
+				{ header: "Emissão", key: "emissao", width: "90px" },
+				{ header: "Paciente / Cliente", key: "paciente", width: "180px" },
+				{ header: "Loja", key: "loja", width: "120px" },
+				{ header: "Vendedor", key: "vendedor", width: "120px" },
+				{ header: "Valor Venda", key: "valorTotal", align: "right", width: "100px" },
+				{ header: "Recebido", key: "valorPago", align: "right", width: "100px" },
+				{ header: "Saldo Residual", key: "saldoResidual", align: "right", width: "100px" },
+				{ header: "Status", key: "status", align: "center", width: "90px" },
+			],
+			data: filtered.map((o) => ({
+				os: o.orderNumber,
+				emissao: new Date(o.createdAt).toLocaleDateString("pt-BR"),
+				paciente: `${o.patient.name} (${o.patient.cpf || "S/ CPF"})`,
+				loja: o.store.name,
+				vendedor: o.seller.name,
+				valorTotal: `R$ ${o.financials.totalAmount.toFixed(2)}`,
+				valorPago: `R$ ${o.financials.paidAmount.toFixed(2)}`,
+				saldoResidual: `R$ ${o.financials.residualAmount.toFixed(2)}`,
+				status: o.status,
+			})),
+		});
 	};
 
 	return (
@@ -77,6 +119,16 @@ export function OpticalSalesLogView() {
 							className="h-9 pl-8 text-xs"
 						/>
 					</div>
+
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={handleExportPDF}
+						className="h-9 gap-1.5 text-xs font-semibold cursor-pointer border-neutral-300 dark:border-neutral-700 shadow-2xs"
+					>
+						<Icon icon={DocumentExport} className="size-3.5" />
+						Exportar PDF
+					</Button>
 				</div>
 			</div>
 

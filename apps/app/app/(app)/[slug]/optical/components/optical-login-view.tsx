@@ -11,6 +11,7 @@ import { Icon } from "@crm/ui/components/icon";
 import { Input } from "@crm/ui/components/input";
 import { toast } from "sonner";
 import { useOpticalAuth } from "@/lib/optical/optical-auth-context";
+import { OpticalThemeToggle } from "./optical-theme-toggle";
 
 export function OpticalLoginView() {
 	const { login } = useOpticalAuth();
@@ -50,8 +51,13 @@ export function OpticalLoginView() {
 	}
 
 	return (
-		<div className="flex min-h-screen w-full items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
-			<div className="w-full max-w-md space-y-8 rounded-2xl border bg-card p-8 shadow-lg backdrop-blur-xs">
+		<div className="relative flex min-h-screen w-full items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
+			{/* Botão de Tema Light / Dark no canto superior */}
+			<div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+				<OpticalThemeToggle showLabel />
+			</div>
+
+			<div className="w-full max-w-md space-y-8 rounded-2xl border bg-card p-8 shadow-xl">
 				{/* Brand & Title */}
 				<div className="flex flex-col items-center text-center">
 					<div className="flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md mb-4">

@@ -21,6 +21,7 @@ import { OpticalKanban } from "./components/optical-kanban";
 import { OpticalLoginView } from "./components/optical-login-view";
 import { OpticalManagementSummaryView } from "./components/optical-management-summary-view";
 import { OpticalMedicalView } from "./components/optical-medical-view";
+import { OpticalMedicalVisitsView } from "./components/optical-medical-visits-view";
 import { OpticalOrderDetailSheet } from "./components/optical-order-detail-sheet";
 import { OpticalOrdersTable } from "./components/optical-orders-table";
 import { OpticalSalesLogView } from "./components/optical-sales-log-view";
@@ -242,11 +243,11 @@ export function OpticalClientView() {
 	{/* App Lentes: Resumo Gerencial de Lojas e Faturamento */}
 	{activeModule === "resumo" && <OpticalManagementSummaryView />}
 
-	{/* App Lentes: Resultado Médico & Visitas a Consultórios */}
-	{activeModule === "medicos" && <OpticalMedicalView />}
+	{/* App Lentes: Controle de Visitas Médicas */}
+	{activeModule === "visita_medica" && <OpticalMedicalVisitsView />}
 
-	{/* App Lentes: Garantias, Devoluções & Ocorrências de Balcão */}
-	{activeModule === "garantias" && <OpticalWarrantiesView />}
+	{/* App Lentes: Resultado Médico & Comissões */}
+	{activeModule === "medicos" && <OpticalMedicalView />}
 
 	{/* Comp AI: Auditoria de Receitas e Agente IA */}
 	{activeModule === "auditoria" && <OpticalAuditView />}

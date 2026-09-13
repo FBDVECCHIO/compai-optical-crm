@@ -133,6 +133,10 @@ export function OpticalSettingsView() {
 	const [newTechPhone, setNewTechPhone] = useState("");
 	const [newTechCalendly, setNewTechCalendly] = useState("");
 	const [newGenericItem, setNewGenericItem] = useState("");
+	const [newLossReason, setNewLossReason] = useState("");
+	const [newIncidentReason, setNewIncidentReason] = useState("");
+	const [newVisitTopic, setNewVisitTopic] = useState("");
+	const [newCaptador, setNewCaptador] = useState("");
 
 	// Vinculação em Massa de Médicos
 	const [bulkRepSelected, setBulkRepSelected] = useState("");
@@ -518,6 +522,70 @@ export function OpticalSettingsView() {
 			saveConfigSetting("assistTemplateClienteConfirmado", templateClienteConf),
 		]);
 		toast.success("Templates de WhatsApp salvos com sucesso!");
+	};
+
+	const handleAddLossReason = async () => {
+		if (!newLossReason.trim()) return;
+		const up = [...lossReasons, newLossReason.trim()];
+		setLossReasons(up);
+		setNewLossReason("");
+		toast.success(`Motivo de perda "${newLossReason.trim()}" adicionado.`);
+		await saveConfigSetting("motivos_perda", up);
+	};
+
+	const handleDeleteLossReason = async (idx: number) => {
+		const up = lossReasons.filter((_, i) => i !== idx);
+		setLossReasons(up);
+		toast.info("Motivo de perda removido.");
+		await saveConfigSetting("motivos_perda", up);
+	};
+
+	const handleAddIncidentReason = async () => {
+		if (!newIncidentReason.trim()) return;
+		const up = [...incidentReasons, newIncidentReason.trim()];
+		setIncidentReasons(up);
+		setNewIncidentReason("");
+		toast.success(`Motivo de ocorrência "${newIncidentReason.trim()}" adicionado.`);
+		await saveConfigSetting("motivos_ocorrencia", up);
+	};
+
+	const handleDeleteIncidentReason = async (idx: number) => {
+		const up = incidentReasons.filter((_, i) => i !== idx);
+		setIncidentReasons(up);
+		toast.info("Motivo de ocorrência removido.");
+		await saveConfigSetting("motivos_ocorrencia", up);
+	};
+
+	const handleAddVisitTopic = async () => {
+		if (!newVisitTopic.trim()) return;
+		const up = [...visitTopics, newVisitTopic.trim()];
+		setVisitTopics(up);
+		setNewVisitTopic("");
+		toast.success(`Pauta de visita "${newVisitTopic.trim()}" adicionada.`);
+		await saveConfigSetting("assuntos_visita", up);
+	};
+
+	const handleDeleteVisitTopic = async (idx: number) => {
+		const up = visitTopics.filter((_, i) => i !== idx);
+		setVisitTopics(up);
+		toast.info("Pauta de visita removida.");
+		await saveConfigSetting("assuntos_visita", up);
+	};
+
+	const handleAddCaptador = async () => {
+		if (!newCaptador.trim()) return;
+		const up = [...leadCapturers, { nome: newCaptador.trim() }];
+		setLeadCapturers(up);
+		setNewCaptador("");
+		toast.success(`Captador "${newCaptador.trim()}" cadastrado.`);
+		await saveConfigSetting("captadores", up);
+	};
+
+	const handleDeleteCaptador = async (idx: number) => {
+		const up = leadCapturers.filter((_, i) => i !== idx);
+		setLeadCapturers(up);
+		toast.info("Captador removido.");
+		await saveConfigSetting("captadores", up);
 	};
 
 	// Vinculação em Massa
@@ -1483,42 +1551,209 @@ export function OpticalSettingsView() {
 				</div>
 			)}
 
-			{/* CONTEÚDO DA ABA: TABELAS DE APOIO */}
+			{/* CONTEÚDO DA ABA: TABELAS DE APOIO & TEMPLATES */}
 			{activeTab === "apoio" && (
-				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-					{/* Motivos de Perda */}
-					<div className="rounded-xl border bg-card p-4 shadow-xs flex flex-col gap-3">
-						<span className="text-xs font-bold text-foreground">Motivos de Perda de Venda</span>
-						<div className="divide-y border rounded-md max-h-40 overflow-y-auto">
-							{lossReasons.map((m, idx) => (
-								<div key={idx} className="p-2 text-xs flex justify-between">
-									<span>{m}</span>
-								</div>
-							))}
+				<div className="flex flex-col gap-6">
+					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+						{/* 1. Captadores de Leads */}
+						<div className="rounded-xl border bg-card p-4 shadow-xs flex flex-col gap-3">
+							<div className="flex items-center justify-between border-b pb-2">
+								<span className="text-xs font-bold text-foreground">Captadores de Leads</span>
+								<Badge variant="secondary" className="text-[10px]">{leadCapturers.length}</Badge>
+							</div>
+							<div className="flex gap-1.5">
+								<Input
+									placeholder="Novo Captador..."
+									value={newCaptador}
+									onChange={(e) => setNewCaptador(e.target.value)}
+									className="text-xs h-8"
+								/>
+								<Button size="sm" onClick={handleAddCaptador} className="h-8 px-2.5">
+									<Icon icon={Add} className="size-3.5" />
+								</Button>
+							</div>
+							<div className="divide-y border rounded-md max-h-48 overflow-y-auto">
+								{leadCapturers.length === 0 ? (
+									<div className="p-3 text-[11px] text-muted-foreground text-center">Nenhum captador.</div>
+								) : (
+									leadCapturers.map((c, idx) => (
+										<div key={idx} className="p-2 text-xs flex items-center justify-between hover:bg-muted/30">
+											<span className="font-medium">{c.nome}</span>
+											<button
+												type="button"
+												onClick={() => handleDeleteCaptador(idx)}
+												className="text-muted-foreground hover:text-rose-600 p-1 cursor-pointer"
+												title="Remover"
+											>
+												<Icon icon={TrashCan} className="size-3" />
+											</button>
+										</div>
+									))
+								)}
+							</div>
+						</div>
+
+						{/* 2. Motivos de Perda */}
+						<div className="rounded-xl border bg-card p-4 shadow-xs flex flex-col gap-3">
+							<div className="flex items-center justify-between border-b pb-2">
+								<span className="text-xs font-bold text-foreground">Motivos de Perda de Venda</span>
+								<Badge variant="secondary" className="text-[10px]">{lossReasons.length}</Badge>
+							</div>
+							<div className="flex gap-1.5">
+								<Input
+									placeholder="Ex: Achou caro..."
+									value={newLossReason}
+									onChange={(e) => setNewLossReason(e.target.value)}
+									className="text-xs h-8"
+								/>
+								<Button size="sm" onClick={handleAddLossReason} className="h-8 px-2.5">
+									<Icon icon={Add} className="size-3.5" />
+								</Button>
+							</div>
+							<div className="divide-y border rounded-md max-h-48 overflow-y-auto">
+								{lossReasons.length === 0 ? (
+									<div className="p-3 text-[11px] text-muted-foreground text-center">Nenhum motivo.</div>
+								) : (
+									lossReasons.map((m, idx) => (
+										<div key={idx} className="p-2 text-xs flex items-center justify-between hover:bg-muted/30">
+											<span className="font-medium">{m}</span>
+											<button
+												type="button"
+												onClick={() => handleDeleteLossReason(idx)}
+												className="text-muted-foreground hover:text-rose-600 p-1 cursor-pointer"
+												title="Remover"
+											>
+												<Icon icon={TrashCan} className="size-3" />
+											</button>
+										</div>
+									))
+								)}
+							</div>
+						</div>
+
+						{/* 3. Motivos de Ocorrência Técnica */}
+						<div className="rounded-xl border bg-card p-4 shadow-xs flex flex-col gap-3">
+							<div className="flex items-center justify-between border-b pb-2">
+								<span className="text-xs font-bold text-foreground">Motivos de Ocorrência Lab</span>
+								<Badge variant="secondary" className="text-[10px]">{incidentReasons.length}</Badge>
+							</div>
+							<div className="flex gap-1.5">
+								<Input
+									placeholder="Ex: Erro de montagem..."
+									value={newIncidentReason}
+									onChange={(e) => setNewIncidentReason(e.target.value)}
+									className="text-xs h-8"
+								/>
+								<Button size="sm" onClick={handleAddIncidentReason} className="h-8 px-2.5">
+									<Icon icon={Add} className="size-3.5" />
+								</Button>
+							</div>
+							<div className="divide-y border rounded-md max-h-48 overflow-y-auto">
+								{incidentReasons.length === 0 ? (
+									<div className="p-3 text-[11px] text-muted-foreground text-center">Nenhum motivo.</div>
+								) : (
+									incidentReasons.map((m, idx) => (
+										<div key={idx} className="p-2 text-xs flex items-center justify-between hover:bg-muted/30">
+											<span className="font-medium">{m}</span>
+											<button
+												type="button"
+												onClick={() => handleDeleteIncidentReason(idx)}
+												className="text-muted-foreground hover:text-rose-600 p-1 cursor-pointer"
+												title="Remover"
+											>
+												<Icon icon={TrashCan} className="size-3" />
+											</button>
+										</div>
+									))
+								)}
+							</div>
+						</div>
+
+						{/* 4. Pautas de Visita Médica */}
+						<div className="rounded-xl border bg-card p-4 shadow-xs flex flex-col gap-3">
+							<div className="flex items-center justify-between border-b pb-2">
+								<span className="text-xs font-bold text-foreground">Pautas de Visita Médica</span>
+								<Badge variant="secondary" className="text-[10px]">{visitTopics.length}</Badge>
+							</div>
+							<div className="flex gap-1.5">
+								<Input
+									placeholder="Ex: Novo catálogo..."
+									value={newVisitTopic}
+									onChange={(e) => setNewVisitTopic(e.target.value)}
+									className="text-xs h-8"
+								/>
+								<Button size="sm" onClick={handleAddVisitTopic} className="h-8 px-2.5">
+									<Icon icon={Add} className="size-3.5" />
+								</Button>
+							</div>
+							<div className="divide-y border rounded-md max-h-48 overflow-y-auto">
+								{visitTopics.length === 0 ? (
+									<div className="p-3 text-[11px] text-muted-foreground text-center">Nenhuma pauta.</div>
+								) : (
+									visitTopics.map((m, idx) => (
+										<div key={idx} className="p-2 text-xs flex items-center justify-between hover:bg-muted/30">
+											<span className="font-medium">{m}</span>
+											<button
+												type="button"
+												onClick={() => handleDeleteVisitTopic(idx)}
+												className="text-muted-foreground hover:text-rose-600 p-1 cursor-pointer"
+												title="Remover"
+											>
+												<Icon icon={TrashCan} className="size-3" />
+											</button>
+										</div>
+									))
+								)}
+							</div>
 						</div>
 					</div>
 
-					{/* Motivos de Ocorrência */}
-					<div className="rounded-xl border bg-card p-4 shadow-xs flex flex-col gap-3">
-						<span className="text-xs font-bold text-foreground">Motivos de Ocorrência Técnica</span>
-						<div className="divide-y border rounded-md max-h-40 overflow-y-auto">
-							{incidentReasons.map((m, idx) => (
-								<div key={idx} className="p-2 text-xs flex justify-between">
-									<span>{m}</span>
-								</div>
-							))}
+					{/* 5. Templates de Mensagens WhatsApp */}
+					<div className="rounded-xl border bg-card p-5 shadow-xs space-y-4">
+						<div className="flex items-center justify-between border-b pb-3">
+							<div>
+								<h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+									<Icon icon={Phone} className="size-4 text-emerald-600" />
+									Templates de Mensagens (WhatsApp)
+								</h3>
+								<p className="text-xs text-muted-foreground mt-0.5">
+									Configure as mensagens padrão enviadas via WhatsApp. Use as tags dinâmicas: <strong>{'{cliente}'}</strong>, <strong>{'{os}'}</strong>, <strong>{'{data}'}</strong>, <strong>{'{hora}'}</strong>, <strong>{'{motivo}'}</strong>, <strong>{'{lente}'}</strong>, <strong>{'{tecnico}'}</strong>, <strong>{'{loja}'}</strong>.
+								</p>
+							</div>
+							<Button
+								size="sm"
+								onClick={handleSaveTemplates}
+								className="h-8 text-xs font-bold bg-primary text-primary-foreground shadow-xs cursor-pointer gap-1.5"
+							>
+								<Icon icon={Checkmark} className="size-3.5" />
+								Salvar Templates
+							</Button>
 						</div>
-					</div>
 
-					{/* Assuntos de Visita Médica */}
-					<div className="rounded-xl border bg-card p-4 shadow-xs flex flex-col gap-3">
-						<span className="text-xs font-bold text-foreground">Pautas de Visita Médica</span>
-						<div className="divide-y border rounded-md max-h-40 overflow-y-auto">
-							{visitTopics.map((m, idx) => (
-								<div key={idx} className="p-2 text-xs flex justify-between">
-									<span>{m}</span>
-								</div>
-							))}
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div className="space-y-1.5">
+								<label className="text-xs font-semibold text-foreground">
+									Mensagem para o Técnico (Abertura de Assistência)
+								</label>
+								<textarea
+									value={templateTecnico}
+									onChange={(e) => setTemplateTecnico(e.target.value)}
+									rows={4}
+									className="w-full rounded-md border bg-background p-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-hidden focus:ring-1 focus:ring-primary font-mono"
+								/>
+							</div>
+
+							<div className="space-y-1.5">
+								<label className="text-xs font-semibold text-foreground">
+									Mensagem para o Cliente (Agendamento Confirmado)
+								</label>
+								<textarea
+									value={templateClienteConf}
+									onChange={(e) => setTemplateClienteConf(e.target.value)}
+									rows={4}
+									className="w-full rounded-md border bg-background p-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-hidden focus:ring-1 focus:ring-primary font-mono"
+								/>
+							</div>
 						</div>
 					</div>
 				</div>

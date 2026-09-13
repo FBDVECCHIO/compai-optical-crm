@@ -43,6 +43,7 @@ import {
 	type TechnicianItem,
 } from "@/lib/optical/supabase-optical";
 import { useOpticalOrders } from "@/lib/optical/optical-store";
+import { printOpticalReport } from "@/lib/optical/optical-print-report";
 
 export function OpticalWarrantiesView() {
 	const { orders } = useOpticalOrders();
@@ -424,6 +425,50 @@ export function OpticalWarrantiesView() {
 		return `${maxMotivo} (${maxCount})`;
 	}, [filteredOcorrencias]);
 
+	const handleExportPDF = () => {
+		const totalCusto = filteredOcorrencias.reduce((acc, o) => acc + Number(o.custo_adicional || 0), 0);
+		const bonificadasCount = filteredOcorrencias.filter((o) => {
+			const d = typeof o.detalhes === "object" && o.detalhes !== null ? (o.detalhes as any) : undefined;
+			return d?.refBonificacao || d?.refCortesia;
+		}).length;
+		const taxaBonif = filteredOcorrencias.length > 0 ? (bonificadasCount / filteredOcorrencias.length) * 100 : 0;
+
+		printOpticalReport({
+			title: "Relatório de Ocorrências, Devoluções e Garantias",
+			subtitle: "Acompanhamento de Quebras, Erros de Montagem, Não Adaptação e Custos Adicionais",
+			period: startDateFilter && endDateFilter ? `${startDateFilter} até ${endDateFilter}` : "Período Geral",
+			kpis: [
+				{ label: "Total Ocorrências", value: filteredOcorrencias.length },
+				{ label: "Custo Adicional", value: `R$ ${totalCusto.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, highlight: true },
+				{ label: "Taxa Bonificada", value: `${taxaBonif.toFixed(1)}%` },
+				{ label: "Motivo Principal", value: motivoMaisFrequente },
+			],
+			columns: [
+				{ header: "Data", key: "data", width: "85px" },
+				{ header: "OS", key: "os", width: "90px" },
+				{ header: "Loja", key: "loja", width: "120px" },
+				{ header: "Cliente", key: "cliente", width: "160px" },
+				{ header: "Vendedor", key: "vendedor", width: "120px" },
+				{ header: "Motivo", key: "motivo", width: "180px" },
+				{ header: "Custo Adic.", key: "custo", align: "right", width: "90px" },
+				{ header: "Lab Efetivo", key: "labEfetivo", width: "110px" },
+			],
+			data: filteredOcorrencias.map((o) => {
+				const d = typeof o.detalhes === "object" && o.detalhes !== null ? (o.detalhes as any) : undefined;
+				return {
+					data: o.data,
+					os: o.os,
+					loja: o.loja,
+					cliente: o.cliente_nome,
+					vendedor: o.vendedor,
+					motivo: o.motivo,
+					custo: `R$ ${Number(o.custo_adicional || 0).toFixed(2)}`,
+					labEfetivo: d?.refLab || "-",
+				};
+			}),
+		});
+	};
+
 	return (
 		<div className="flex flex-col gap-6 w-full">
 			{/* Header */}
@@ -441,8 +486,17 @@ export function OpticalWarrantiesView() {
 					<Button
 						variant="outline"
 						size="sm"
+						onClick={handleExportPDF}
+						className="h-8 text-xs font-semibold gap-1.5 cursor-pointer border-neutral-300 dark:border-neutral-700 shadow-2xs"
+					>
+						<Icon icon={DocumentExport} className="size-3.5" />
+						Exportar PDF
+					</Button>
+					<Button
+						variant="outline"
+						size="sm"
 						onClick={loadData}
-						className="h-8 text-xs font-semibold gap-1.5"
+						className="h-8 text-xs font-semibold gap-1.5 cursor-pointer"
 					>
 						<Icon icon={Reset} className="size-3.5" />
 						Atualizar
@@ -450,7 +504,7 @@ export function OpticalWarrantiesView() {
 					<Button
 						size="sm"
 						onClick={openCreateForm}
-						className="h-8 text-xs font-bold gap-1.5 bg-primary text-primary-foreground shadow-xs"
+						className="h-8 text-xs font-bold gap-1.5 bg-primary text-primary-foreground shadow-xs cursor-pointer"
 					>
 						<Icon icon={Add} className="size-3.5" />
 						Nova Ocorrência

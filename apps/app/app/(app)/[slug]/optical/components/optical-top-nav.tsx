@@ -11,19 +11,21 @@ import ShoppingCart from "@carbon/icons-react/es/ShoppingCart";
 import UserAvatar from "@carbon/icons-react/es/UserAvatar";
 import UserFollow from "@carbon/icons-react/es/UserFollow";
 import WarningAlt from "@carbon/icons-react/es/WarningAlt";
+import Events from "@carbon/icons-react/es/Events";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
 import { Icon } from "@crm/ui/components/icon";
 import { cn } from "@crm/ui/lib/utils";
 import type { OpticalUserSession } from "@/lib/optical/supabase-optical";
+import { OpticalThemeToggle } from "./optical-theme-toggle";
 
 export type OpticalModuleTab =
 	| "balcao"
 	| "conferencia"
 	| "log_vendas"
 	| "resumo"
+	| "visita_medica"
 	| "medicos"
-	| "garantias"
 	| "auditoria"
 	| "catalogo"
 	| "config";
@@ -77,14 +79,14 @@ export function OpticalTopNav({
 			icon: Analytics,
 		},
 		{
+			id: "visita_medica",
+			label: "Visita Médica",
+			icon: Events,
+		},
+		{
 			id: "medicos",
 			label: "Resultado Médico",
 			icon: UserFollow,
-		},
-		{
-			id: "garantias",
-			label: "Garantias & Ocorrências",
-			icon: WarningAlt,
 		},
 		{
 			id: "auditoria",
@@ -172,6 +174,8 @@ export function OpticalTopNav({
 							</Badge>
 						)}
 					</div>
+
+					<OpticalThemeToggle size="sm" />
 
 					{onLogout && (
 						<Button
