@@ -3,5 +3,5 @@
 	"framework": "nextjs",
 	"buildCommand": "bun run build:vercel",
 	"outputDirectory": "apps/app/.next",
-	"installCommand": "bun install"
+	"installCommand": "bun install --no-frozen-lockfile"
 }

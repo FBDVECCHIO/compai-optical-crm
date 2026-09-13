@@ -4,7 +4,7 @@
 	"license": "MIT",
 	"version": "1.15.3",
 	"scripts": {
-		"prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
+		"prepare": "[ -n \"$VERCEL\" ] || git config core.hooksPath .githooks 2>/dev/null || true",
 		"build": "turbo run build",
 		"build:vercel": "bun run db:generate && bun run --filter=app build",
 		"dev": "turbo run dev",
