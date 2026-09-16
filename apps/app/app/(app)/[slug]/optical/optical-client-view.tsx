@@ -34,6 +34,7 @@ import { OpticalPostSalesView } from "./components/optical-post-sales-view";
 import { OpticalLensCatalogView } from "./components/optical-lens-catalog-view";
 import { OpticalFramesCatalogView } from "./components/optical-frames-catalog-view";
 import { OpticalBulkMessagingView } from "./components/optical-bulk-messaging-view";
+import { OpticalSalesPerformanceView } from "./components/optical-sales-performance-view";
 import type { OpticalOrder } from "@/lib/optical/optical-types";
 import {
 	type OpticalTab,
@@ -100,186 +101,66 @@ export function OpticalClientView() {
 	};
 
 	return (
-		<div className="flex flex-1 min-h-0 w-full h-full overflow-hidden">
-			{/* Main Workspace (Left, scrollable) */}
-			<div className="flex flex-col gap-6 p-4 sm:p-6 min-h-0 flex-1 overflow-y-auto">
-				{/* Top Navigation Hub: App Lentes + CRM Modules */}
-			<OpticalTopNav
-				activeModule={activeModule}
-				onSelectModule={setActiveModule}
-				pendingConferenceCount={pendingConferenceCount}
-				pendingResidualCount={pendingResidualCount}
-				userSession={session}
-				onLogout={logout}
-			/>
-
-			{/* Render active module view */}
-			{activeModule === "balcao" && (
-				<>
-					{/* Top KPI Cards */}
-					<OpticalSummaryCards />
-
-			{/* Filter & View Toolbar */}
-			<div className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-xs">
-				<div className="flex flex-wrap items-center justify-between gap-3">
-					{/* Status Tabs */}
-					<Tabs
-						value={tab}
-						onValueChange={handleTabChange}
-						className="w-full sm:w-auto"
-					>
-						<TabsList className="h-8 gap-1 bg-muted/60 p-0.5">
-							<TabsTrigger value="ALL" className="text-xs font-semibold px-2.5">
-								Todas as OSs
-							</TabsTrigger>
-							<TabsTrigger
-								value="EM_LABORATORIO"
-								className="text-xs font-semibold px-2.5"
-							>
-								No Lab
-							</TabsTrigger>
-							<TabsTrigger
-								value="EM_MONTAGEM"
-								className="text-xs font-semibold px-2.5"
-							>
-								Em Montagem
-							</TabsTrigger>
-							<TabsTrigger
-								value="CONFERIDA"
-								className="text-xs font-semibold px-2.5"
-							>
-								Conferidas
-							</TabsTrigger>
-							<TabsTrigger
-								value="PRONTA_LOJA"
-								className="text-xs font-semibold px-2.5"
-							>
-								Prontas na Loja
-							</TabsTrigger>
-							<TabsTrigger
-								value="RESIDUAL"
-								className="text-xs font-semibold px-2.5 text-rose-600 dark:text-rose-400"
-							>
-								Com Saldo Residual
-							</TabsTrigger>
-							<TabsTrigger
-								value="ENTREGUE"
-								className="text-xs font-semibold px-2.5"
-							>
-								Entregues
-							</TabsTrigger>
-						</TabsList>
-					</Tabs>
-
-					{/* View Mode Toggle (Table vs Kanban) */}
-					<div className="flex items-center gap-2">
-						<div className="flex items-center rounded-lg border bg-muted/40 p-0.5">
-							<Button
-								variant={view === "table" ? "secondary" : "ghost"}
-								size="sm"
-								className="h-7 px-2.5 text-xs font-semibold"
-								onClick={() => handleViewChange("table")}
-							>
-								<Icon icon={TableIcon} className="mr-1.5 size-3.5" />
-								Tabela
-							</Button>
-							<Button
-								variant={view === "kanban" ? "secondary" : "ghost"}
-								size="sm"
-								className="h-7 px-2.5 text-xs font-semibold"
-								onClick={() => handleViewChange("kanban")}
-							>
-								<Icon icon={Column} className="mr-1.5 size-3.5" />
-								Kanban
-							</Button>
-						</div>
-
-						<CreateOpticalOrderSheet />
-					</div>
+		<div className="flex flex-1 min-h-0 w-full h-full overflow-hidden bg-zinc-200 dark:bg-zinc-950">
+			{/* Main Workspace (Left) */}
+			<div className="flex flex-col min-h-0 flex-1 h-full overflow-hidden">
+				{/* Top Navigation Hub: ENGESSADO / FIXO NO TOPO */}
+				<div className="p-4 sm:p-5 pb-2 shrink-0 z-30">
+					<OpticalTopNav
+						activeModule={activeModule}
+						onSelectModule={setActiveModule}
+						userSession={session}
+						onLogout={logout}
+					/>
 				</div>
 
-				{/* Search Input Bar */}
-				<div className="flex items-center justify-between gap-3 pt-1 border-t">
-					<div className="relative flex-1 max-w-md">
-						<Icon
-							icon={Search}
-							className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none"
-						/>
-						<Input
-							value={localSearch}
-							onChange={(e) => handleSearchChange(e.target.value)}
-							placeholder="Buscar por OS, Paciente, CPF, Laboratório ou Armação..."
-							className="h-8 pl-8 text-xs font-medium"
-						/>
-					</div>
+				{/* Área Rolável Independente (Todos os demais itens da tela rolam aqui) */}
+				<div className="flex flex-col gap-6 px-4 sm:px-5 pb-8 min-h-0 flex-1 overflow-y-auto">
+					{/* Balcão & Vendas: Dashboard de Performance, Metas por Dias Úteis (Salesforce) e Lista de OSs */}
+					{activeModule === "balcao" && <OpticalSalesPerformanceView />}
 
-					<div className="flex items-center gap-2">
-						<Button
-							variant="ghost"
-							size="sm"
-							className="h-8 text-[11px] text-muted-foreground hover:text-foreground gap-1"
-							onClick={resetToDefaults}
-							title="Recarregar dados de demonstração da óptica"
-						>
-							<Icon icon={Reset} className="size-3" />
-							Restaurar Demo
-						</Button>
-					</div>
+					{/* MNOC-X: Jornada da OS (6 Etapas + Painel de Pedidos Lab) */}
+					{activeModule === "jornada_os" && <OpticalOsJourneyView />}
+
+					{/* MNOC-X: Gestão de Pós-Venda (Pós 7, Pós 30, Pós 90, Ativo Promo) */}
+					{activeModule === "pos_venda" && <OpticalPostSalesView />}
+
+					{/* MNOC-X: Catálogo Técnico de Lentes (Variação por olho OD/OE, Inserção em Lote) */}
+					{activeModule === "lentes" && <OpticalLensCatalogView />}
+
+					{/* MNOC-X: Catálogo de Peças (Armações e Solares, Aro, Ponte, Estoque) */}
+					{activeModule === "pecas" && <OpticalFramesCatalogView />}
+
+					{/* MNOC-X: Mensagens Padrão & Envio em Massa (WhatsApp) */}
+					{activeModule === "mensagens" && <OpticalBulkMessagingView />}
+
+					{/* MNOC-X: Garantias & Ocorrências */}
+					{activeModule === "garantias" && <OpticalWarrantiesView />}
+
+					{/* App Lentes: Conferência de Laboratório */}
+					{activeModule === "conferencia" && <OpticalConferenceView />}
+
+					{/* App Lentes: Log de Vendas e Cobrança de Resíduos */}
+					{activeModule === "log_vendas" && <OpticalSalesLogView />}
+
+					{/* App Lentes: Resumo Gerencial de Lojas e Faturamento */}
+					{activeModule === "resumo" && <OpticalManagementSummaryView />}
+
+					{/* App Lentes: Controle de Visitas Médicas */}
+					{activeModule === "visita_medica" && <OpticalMedicalVisitsView />}
+
+					{/* App Lentes: Resultado Médico & Comissões */}
+					{activeModule === "medicos" && <OpticalMedicalView />}
+
+					{/* Comp AI: Auditoria de Receitas e Agente IA */}
+					{activeModule === "auditoria" && <OpticalAuditView />}
+
+					{/* App Lentes: Catálogo de Lentes Legado & Estoque de Laboratório */}
+					{activeModule === "catalogo" && <OpticalCatalogView />}
+
+					{/* App Lentes: Centro Avançado de Configurações */}
+					{activeModule === "config" && <OpticalSettingsView />}
 				</div>
-			</div>
-
-			{/* Main Content: Table or Kanban */}
-			<div className="min-h-0 flex-1">
-				{view === "table" ? (
-					<OpticalOrdersTable searchQuery={q} statusFilter={tab} />
-				) : (
-					<OpticalKanban searchQuery={q} />
-				)}
-			</div>
-		</>
-	)}
-
-	{/* MNOC-X: Jornada da OS (6 Etapas + Painel de Pedidos Lab) */}
-	{activeModule === "jornada_os" && <OpticalOsJourneyView />}
-
-	{/* MNOC-X: Gestão de Pós-Venda (Pós 7, Pós 30, Pós 90, Ativo Promo) */}
-	{activeModule === "pos_venda" && <OpticalPostSalesView />}
-
-	{/* MNOC-X: Catálogo Técnico de Lentes (Variação por olho OD/OE, Inserção em Lote) */}
-	{activeModule === "lentes" && <OpticalLensCatalogView />}
-
-	{/* MNOC-X: Catálogo de Peças (Armações e Solares, Aro, Ponte, Estoque) */}
-	{activeModule === "pecas" && <OpticalFramesCatalogView />}
-
-	{/* MNOC-X: Mensagens Padrão & Envio em Massa (WhatsApp) */}
-	{activeModule === "mensagens" && <OpticalBulkMessagingView />}
-
-	{/* MNOC-X: Garantias & Ocorrências */}
-	{activeModule === "garantias" && <OpticalWarrantiesView />}
-
-	{/* App Lentes: Conferência de Laboratório */}
-	{activeModule === "conferencia" && <OpticalConferenceView />}
-
-	{/* App Lentes: Log de Vendas e Cobrança de Resíduos */}
-	{activeModule === "log_vendas" && <OpticalSalesLogView />}
-
-	{/* App Lentes: Resumo Gerencial de Lojas e Faturamento */}
-	{activeModule === "resumo" && <OpticalManagementSummaryView />}
-
-	{/* App Lentes: Controle de Visitas Médicas */}
-	{activeModule === "visita_medica" && <OpticalMedicalVisitsView />}
-
-	{/* App Lentes: Resultado Médico & Comissões */}
-	{activeModule === "medicos" && <OpticalMedicalView />}
-
-	{/* Comp AI: Auditoria de Receitas e Agente IA */}
-	{activeModule === "auditoria" && <OpticalAuditView />}
-
-	{/* App Lentes: Catálogo de Lentes Legado & Estoque de Laboratório */}
-	{activeModule === "catalogo" && <OpticalCatalogView />}
-
-	{/* App Lentes: Centro Avançado de Configurações (Lojas, Labs, Médicos, Técnicos, Comissões, ABNT) */}
-	{activeModule === "config" && <OpticalSettingsView />}
 			</div>
 
 			{/* Vertical Optical AI Copilot Sidecar (Right - Occupying full vertical height) */}

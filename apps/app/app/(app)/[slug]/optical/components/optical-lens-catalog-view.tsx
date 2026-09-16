@@ -9,7 +9,9 @@ import Money from "@carbon/icons-react/es/Money";
 import Close from "@carbon/icons-react/es/Close";
 import Enterprise from "@carbon/icons-react/es/Enterprise";
 import DocumentExport from "@carbon/icons-react/es/DocumentExport";
+import Download from "@carbon/icons-react/es/Download";
 import MagicWand from "@carbon/icons-react/es/MagicWand";
+import { toast } from "sonner";
 import {
 	LensCatalogItem,
 	LensCategory,
@@ -221,6 +223,29 @@ export function OpticalLensCatalogView() {
 		setIsBatchModalOpen(false);
 		setBatchText("");
 		setBatchPreview([]);
+	};
+
+	const handleDownloadLensTemplate = () => {
+		const headers = "Tipo\tFamília\tProduto\tCusto\tPreço Par\tÍndice Refrativo\tTecnologia\tLaboratório\tValor Peça\n";
+		const rows = [
+			"MULTIFOCAL\tVarilux\tVarilux Physio 3.0\t320\t1400\t1.59\tDigital HD\tEssilor\t700",
+			"MULTIFOCAL\tHoyalux\tHoyalux ID Myself\t450\t2200\t1.67\tFreeform 3D\tHoya\t1100",
+			"MONOFOCAL\tZeiss Single\tClearView 1.56\t120\t550\t1.56\tFreeform\tZeiss\t275",
+			"MONOFOCAL\tPersonality\tPoly Antirreflexo\t60\t320\t1.59\tConvencional\tPersonality\t160",
+			"MULTIFOCAL\tSpace\tSpace Advanced 1.50\t150\t680\t1.50\tDigital\tSorolab\t340",
+		].join("\n");
+
+		const csvContent = "\uFEFF" + headers + rows;
+		const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement("a");
+		link.setAttribute("href", url);
+		link.setAttribute("download", "modelo_importacao_lentes.csv");
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+		URL.revokeObjectURL(url);
+		toast.success("Planilha modelo de lentes baixada com sucesso!");
 	};
 
 	return (
@@ -697,9 +722,19 @@ export function OpticalLensCatalogView() {
 						</div>
 
 						<div className="p-5 space-y-4">
-							<div className="bg-zinc-50 dark:bg-zinc-800/60 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700/80 text-[11px] text-zinc-600 dark:text-zinc-300 space-y-1">
-								<div className="font-semibold text-zinc-800 dark:text-zinc-100">
-									Ordem esperada das colunas (separadas por TAB ou ponto-e-vírgula):
+							<div className="bg-zinc-50 dark:bg-zinc-800/60 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700/80 space-y-2">
+								<div className="flex flex-wrap items-center justify-between gap-2">
+									<div className="font-semibold text-zinc-800 dark:text-zinc-100 text-[11px]">
+										Ordem esperada das colunas (separadas por TAB ou ponto-e-vírgula):
+									</div>
+									<button
+										type="button"
+										onClick={handleDownloadLensTemplate}
+										className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-zinc-700 text-zinc-800 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-600 shadow-2xs cursor-pointer transition-colors"
+									>
+										<Download className="size-3.5 text-zinc-700 dark:text-zinc-200" />
+										<span>Baixar Planilha Modelo (.csv)</span>
+									</button>
 								</div>
 								<div className="font-mono text-zinc-500 text-[10px]">
 									Tipo | Família | Produto | Custo | Preço Par | IR | Tecnologia | Laboratório | Valor Peça

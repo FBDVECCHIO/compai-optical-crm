@@ -28,31 +28,10 @@ export function OpticalStandaloneContainer() {
 	}
 
 	return (
-		<main className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
-			{/* Top Bar - Visível exclusivamente após autenticação */}
-			<header className="border-b bg-card px-6 py-3.5 flex items-center justify-between shrink-0 shadow-2xs">
-				<div className="flex items-center gap-3">
-					<div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
-						<GlassesIcon className="size-5" />
-					</div>
-					<div>
-						<h1 className="text-base font-semibold tracking-tight">Balcão Óptico & Ordens de Serviço</h1>
-						<p className="text-xs text-muted-foreground">Fusão Comp AI CRM + App Lentes · Gestão de OS, Dioptrias e Laboratórios</p>
-					</div>
-				</div>
-
-				<div className="flex items-center gap-3">
-					<OpticalThemeToggle showLabel />
-					<span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-						<span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-						Copiloto IA Ativo
-					</span>
-				</div>
-			</header>
-
-			{/* Main Optical Client View */}
+		<main className="h-screen bg-zinc-200 dark:bg-zinc-950 text-foreground flex flex-col overflow-hidden">
+			{/* Main Optical Client View com Top Nav Engessado */}
 			<div className="flex-1 flex min-h-0 overflow-hidden">
-				<Suspense fallback={<div className="p-8 text-center text-sm text-muted-foreground">Carregando balcão óptico...</div>}>
+				<Suspense fallback={<div className="p-8 text-center text-sm text-zinc-500">Carregando MNOC-X...</div>}>
 					<OpticalClientView />
 				</Suspense>
 			</div>

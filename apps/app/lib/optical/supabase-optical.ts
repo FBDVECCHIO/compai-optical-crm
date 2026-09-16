@@ -59,6 +59,8 @@ export interface ClinicItem {
 	id?: number | string;
 	nome: string;
 	cidade?: string;
+	endereco?: string;
+	telefone?: string;
 	representante?: string;
 }
 

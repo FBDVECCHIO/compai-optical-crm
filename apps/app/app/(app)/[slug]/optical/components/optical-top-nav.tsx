@@ -51,17 +51,14 @@ interface OpticalTopNavProps {
 export function OpticalTopNav({
 	activeModule,
 	onSelectModule,
-	pendingConferenceCount = 2,
-	pendingResidualCount = 4,
 	userSession,
 	onLogout,
 }: OpticalTopNavProps) {
+	// Menus principais oficiais - Estritamente apenas o nome, sem contadores ou badges extras
 	const navItems: {
 		id: OpticalModuleTab;
 		label: string;
 		icon: any;
-		badge?: number | string;
-		badgeVariant?: "default" | "secondary" | "destructive" | "outline";
 	}[] = [
 		{
 			id: "balcao",
@@ -72,19 +69,15 @@ export function OpticalTopNav({
 			id: "jornada_os",
 			label: "Jornada da OS",
 			icon: DeliveryTruck,
-			badge: "6 Etapas",
-			badgeVariant: "default",
 		},
 		{
 			id: "pos_venda",
 			label: "Pós-Venda",
 			icon: UserFollow,
-			badge: "Experiência",
-			badgeVariant: "secondary",
 		},
 		{
 			id: "lentes",
-			label: "Catálogo Lentes",
+			label: "Lentes",
 			icon: Catalog,
 		},
 		{
@@ -94,15 +87,13 @@ export function OpticalTopNav({
 		},
 		{
 			id: "mensagens",
-			label: "Disparo WhatsApp",
+			label: "Mensagens WhatsApp",
 			icon: Chat,
 		},
 		{
 			id: "conferencia",
 			label: "Conferência Lab",
 			icon: CheckmarkOutline,
-			badge: pendingConferenceCount > 0 ? pendingConferenceCount : undefined,
-			badgeVariant: "destructive",
 		},
 		{
 			id: "garantias",
@@ -110,33 +101,19 @@ export function OpticalTopNav({
 			icon: WarningAlt,
 		},
 		{
-			id: "log_vendas",
-			label: "Log de Vendas",
-			icon: ListChecked,
-			badge: pendingResidualCount > 0 ? `${pendingResidualCount} resid.` : undefined,
-			badgeVariant: "secondary",
+			id: "resumo",
+			label: "Resumo Gerencial",
+			icon: Analytics,
 		},
 		{
-			id: "resumo",
-			label: "Resumo",
-			icon: Analytics,
+			id: "medicos",
+			label: "Médicos & Clínicas",
+			icon: UserFollow,
 		},
 		{
 			id: "visita_medica",
 			label: "Visita Médica",
 			icon: Events,
-		},
-		{
-			id: "medicos",
-			label: "Médicos",
-			icon: UserFollow,
-		},
-		{
-			id: "auditoria",
-			label: "Auditoria & IA",
-			icon: Bot,
-			badge: "IA Ativa",
-			badgeVariant: "outline",
 		},
 		{
 			id: "config",
@@ -152,66 +129,44 @@ export function OpticalTopNav({
 	});
 
 	return (
-		<nav
-			aria-label="Módulos do Sistema Óptico"
-			className="flex flex-wrap items-center justify-between gap-1.5 rounded-xl border bg-card/90 p-1.5 shadow-xs backdrop-blur-xs w-full"
-		>
-			<div className="flex flex-wrap items-center gap-1.5">
-				{visibleNavItems.map((item) => {
-					const isActive = activeModule === item.id;
-					return (
-						<button
-							type="button"
-							key={item.id}
-							onClick={() => onSelectModule(item.id)}
-							className={cn(
-								"flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer",
-								isActive
-									? "bg-primary text-primary-foreground shadow-xs font-bold"
-									: "text-muted-foreground hover:bg-muted hover:text-foreground",
-							)}
-						>
-							<Icon icon={item.icon} className="size-4 shrink-0" />
-							<span>{item.label}</span>
-							{item.badge && (
-								<span
-									className={cn(
-										"ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none tracking-tight",
-										isActive
-											? "bg-primary-foreground/20 text-primary-foreground"
-											: item.badgeVariant === "destructive"
-												? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20"
-												: "bg-muted text-muted-foreground border",
-									)}
-								>
-									{item.badge}
-								</span>
-							)}
-						</button>
-					);
-				})}
-			</div>
-
-			{/* User Profile & Logout (Right) */}
-			{userSession && (
-				<div className="flex items-center gap-2 ml-auto pr-1">
-					<div className="flex items-center gap-1.5 rounded-lg border bg-muted/50 px-2.5 py-1 text-xs">
-						<Icon icon={UserAvatar} className="size-3.5 text-primary" />
-						<span className="font-semibold text-foreground">
-							{userSession.nome || userSession.usuario}
-						</span>
-						<span className="text-[10px] text-muted-foreground">
-							• {userSession.loja}
-						</span>
-						{userSession.isAdmin && (
-							<Badge
-								variant="default"
-								className="text-[9px] px-1.5 py-0 h-4 bg-primary text-primary-foreground font-bold"
-							>
-								ADMIN
-							</Badge>
-						)}
+		<div className="w-full rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 p-3 shadow-xs">
+			{/* Linha de topo dentro do card: Logo/Status + Usuário & Logout */}
+			<div className="flex flex-wrap items-center justify-between gap-3 pb-2.5 mb-2.5 border-b border-zinc-200 dark:border-zinc-800">
+				<div className="flex items-center gap-2.5">
+					<div className="flex size-7 items-center justify-center rounded-lg bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-bold text-xs shadow-2xs">
+						X
 					</div>
+					<div className="flex items-center gap-2">
+						<span className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+							MNOC-X
+						</span>
+						<span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">
+							• Sistema Óptico de Alta Performance
+						</span>
+					</div>
+				</div>
+
+				{/* Perfil do Usuário e Ações */}
+				<div className="flex items-center gap-2">
+					{userSession && (
+						<div className="flex items-center gap-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1 text-xs">
+							<Icon icon={UserAvatar} className="size-3.5 text-zinc-700 dark:text-zinc-300" />
+							<span className="font-semibold text-zinc-900 dark:text-zinc-100">
+								{userSession.nome || userSession.usuario}
+							</span>
+							<span className="text-[10px] text-zinc-500 dark:text-zinc-400">
+								• {userSession.loja}
+							</span>
+							{userSession.isAdmin && (
+								<Badge
+									variant="default"
+									className="text-[9px] px-1.5 py-0 h-4 bg-zinc-800 text-white font-bold"
+								>
+									ADMIN
+								</Badge>
+							)}
+						</div>
+					)}
 
 					<OpticalThemeToggle size="sm" />
 
@@ -220,7 +175,7 @@ export function OpticalTopNav({
 							variant="ghost"
 							size="sm"
 							onClick={onLogout}
-							className="h-7 px-2 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-500/10 dark:text-rose-400 gap-1 cursor-pointer"
+							className="h-7 px-2.5 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-500/10 dark:text-rose-400 gap-1 cursor-pointer border border-rose-200 dark:border-rose-900/40"
 							title="Encerrar sessão"
 						>
 							<Icon icon={Logout} className="size-3.5" />
@@ -228,7 +183,42 @@ export function OpticalTopNav({
 						</Button>
 					)}
 				</div>
-			)}
-		</nav>
+			</div>
+
+			{/* Grade de Navegação: Delimitação bem visível SEMPRE, ocupando 100% do card */}
+			<nav
+				aria-label="Menus Principais do Sistema"
+				className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12 gap-1.5 w-full"
+			>
+				{visibleNavItems.map((item) => {
+					const isActive = activeModule === item.id;
+					return (
+						<button
+							type="button"
+							key={item.id}
+							onClick={() => onSelectModule(item.id)}
+							className={cn(
+								// Delimitação obrigatória e visível sem o mouse para usuários menos experientes
+								"w-full h-11 px-2 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer",
+								"flex items-center justify-center gap-1.5 text-center select-none",
+								// Estado Ativo: Alto contraste Apple (Preto/Carvão vs Branco)
+								isActive
+									? "bg-zinc-900 text-white border-2 border-zinc-900 shadow-sm dark:bg-white dark:text-zinc-900 dark:border-white font-bold"
+									: "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border-2 border-zinc-300 dark:border-zinc-700 shadow-2xs hover:bg-zinc-50 hover:border-zinc-400 dark:hover:bg-zinc-700 dark:hover:border-zinc-600"
+							)}
+						>
+							<Icon
+								icon={item.icon}
+								className={cn(
+									"size-3.5 shrink-0",
+									isActive ? "text-white dark:text-zinc-900" : "text-zinc-500 dark:text-zinc-400"
+								)}
+							/>
+							<span className="truncate">{item.label}</span>
+						</button>
+					);
+				})}
+			</nav>
+		</div>
 	);
 }

@@ -9,7 +9,9 @@ import Sun from "@carbon/icons-react/es/Sun";
 import Money from "@carbon/icons-react/es/Money";
 import Close from "@carbon/icons-react/es/Close";
 import DocumentExport from "@carbon/icons-react/es/DocumentExport";
+import Download from "@carbon/icons-react/es/Download";
 import Catalog from "@carbon/icons-react/es/Catalog";
+import { toast } from "sonner";
 import Glasses from "@crm/ui/components/icons/glasses";
 import {
 	FrameCatalogItem,
@@ -219,6 +221,29 @@ export function OpticalFramesCatalogView() {
 		setIsBatchModalOpen(false);
 		setBatchText("");
 		setBatchPreview([]);
+	};
+
+	const handleDownloadFrameTemplate = () => {
+		const headers = "Tipo\tFamília\tProduto\tMarca\tFabricante\tAro\tPonte\tFoto URL\tEstoque\tPreço\n";
+		const rows = [
+			"RECEITUARIO\tAcetato Classic\tRB5228 Wayfarer\tRay-Ban\tLuxottica\t53\t18\thttps://images.unsplash.com/photo-1572635196237-14b3f281503f?w=300\t12\t790",
+			"SOLAR\tMetal Aviator\tRB3025 Polarized\tRay-Ban\tLuxottica\t58\t14\thttps://images.unsplash.com/photo-1511499767150-a48a237f0083?w=300\t8\t950",
+			"RECEITUARIO\tTitanium Tech\tOAK-8025 Titanium\tOakley\tLuxottica\t55\t17\thttps://images.unsplash.com/photo-1591076482161-42ce6da69f67?w=300\t5\t890",
+			"RECEITUARIO\tFashion CatEye\tMK-3015 Rose Gold\tMichael Kors\tMarchon\t52\t16\thttps://images.unsplash.com/photo-1577803645773-f96470509666?w=300\t7\t720",
+			"SOLAR\tSport Wrap\tFlak 2.0 XL Prizm\tOakley\tLuxottica\t59\t12\thttps://images.unsplash.com/photo-1508296695146-257a814070b4?w=300\t15\t820",
+		].join("\n");
+
+		const csvContent = "\uFEFF" + headers + rows;
+		const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement("a");
+		link.setAttribute("href", url);
+		link.setAttribute("download", "modelo_importacao_pecas_armacoes.csv");
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+		URL.revokeObjectURL(url);
+		toast.success("Planilha modelo de peças e armações baixada com sucesso!");
 	};
 
 	const totalStockValue = frames.reduce((acc, f) => acc + f.preco * f.estoque, 0);
@@ -698,9 +723,19 @@ export function OpticalFramesCatalogView() {
 						</div>
 
 						<div className="p-5 space-y-4">
-							<div className="bg-zinc-50 dark:bg-zinc-800/60 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700/80 text-[11px] text-zinc-600 dark:text-zinc-300 space-y-1">
-								<div className="font-semibold text-zinc-800 dark:text-zinc-100">
-									Ordem esperada das colunas (separadas por TAB ou ponto-e-vírgula):
+							<div className="bg-zinc-50 dark:bg-zinc-800/60 p-3 rounded-xl border border-zinc-200 dark:border-zinc-700/80 space-y-2">
+								<div className="flex flex-wrap items-center justify-between gap-2">
+									<div className="font-semibold text-zinc-800 dark:text-zinc-100 text-[11px]">
+										Ordem esperada das colunas (separadas por TAB ou ponto-e-vírgula):
+									</div>
+									<button
+										type="button"
+										onClick={handleDownloadFrameTemplate}
+										className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-zinc-700 text-zinc-800 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-600 shadow-2xs cursor-pointer transition-colors"
+									>
+										<Download className="size-3.5 text-zinc-700 dark:text-zinc-200" />
+										<span>Baixar Planilha Modelo (.csv)</span>
+									</button>
 								</div>
 								<div className="font-mono text-zinc-500 text-[10px]">
 									Tipo | Família | Produto | Marca | Fabricante | Aro | Ponte | Preço | Estoque | FotoUrl

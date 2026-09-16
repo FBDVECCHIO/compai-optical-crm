@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { ReactNode } from "react";
 import { cn } from "@crm/ui/lib/utils";
@@ -11,6 +11,7 @@ interface MnocxCardProps {
 	action?: ReactNode;
 	badge?: ReactNode;
 	padding?: "none" | "sm" | "md" | "lg";
+	variant?: "info" | "container";
 }
 
 export function MnocxCard({
@@ -21,6 +22,7 @@ export function MnocxCard({
 	action,
 	badge,
 	padding = "md",
+	variant = "info",
 }: MnocxCardProps) {
 	const paddingClasses = {
 		none: "p-0",
@@ -29,14 +31,16 @@ export function MnocxCard({
 		lg: "p-6 sm:p-8",
 	};
 
+	const variantClasses = {
+		info: "bg-white dark:bg-zinc-950 border border-zinc-200/90 dark:border-zinc-800 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_20px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.95)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.05)]",
+		container: "bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 shadow-xs dark:shadow-sm",
+	};
+
 	return (
 		<div
 			className={cn(
-				"bg-white dark:bg-zinc-900",
-				"border border-zinc-200/90 dark:border-zinc-800",
+				variantClasses[variant],
 				"rounded-2xl",
-				"shadow-[0_1px_3px_rgba(0,0,0,0.04),0_6px_20px_rgba(0,0,0,0.03),inset_0_1px_0_rgba(255,255,255,0.95)]",
-				"dark:shadow-[0_2px_8px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.05)]",
 				"transition-all duration-200",
 				paddingClasses[padding],
 				className

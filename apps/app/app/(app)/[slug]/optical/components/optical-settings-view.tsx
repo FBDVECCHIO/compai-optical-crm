@@ -18,13 +18,16 @@ import UserFollow from "@carbon/icons-react/es/UserFollow";
 import UserSpeaker from "@carbon/icons-react/es/UserSpeaker";
 import UserMultiple from "@carbon/icons-react/es/UserMultiple";
 import User from "@carbon/icons-react/es/User";
+import ListChecked from "@carbon/icons-react/es/ListChecked";
 import Locked from "@carbon/icons-react/es/Locked";
 import Password from "@carbon/icons-react/es/Password";
 import Security from "@carbon/icons-react/es/Security";
+import { OpticalSalesLogView } from "./optical-sales-log-view";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
 import { Icon } from "@crm/ui/components/icon";
 import { Input } from "@crm/ui/components/input";
+import { cn } from "@crm/ui/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@crm/ui/components/tabs";
 import {
 	Dialog,
@@ -90,7 +93,8 @@ type SettingsSubTab =
 	| "tecnicos"
 	| "apoio"
 	| "tolerancias"
-	| "usuarios";
+	| "usuarios"
+	| "log_vendas";
 
 export function OpticalSettingsView() {
 	const [activeTab, setActiveTab] = useState<SettingsSubTab>("lojas");
@@ -632,52 +636,47 @@ export function OpticalSettingsView() {
 				</div>
 			</div>
 
-			{/* Sub Tabs Navigation */}
-			<div className="flex items-center border-b pb-1">
-				<Tabs
-					value={activeTab}
-					onValueChange={(val) => setActiveTab(val as SettingsSubTab)}
-					className="w-full"
-				>
-					<TabsList className="h-9 gap-1 bg-muted/60 p-1 flex-wrap w-full justify-start">
-						<TabsTrigger value="lojas" className="text-xs font-semibold px-3 gap-1.5">
-							<Icon icon={Building} className="size-3.5" />
-							Lojas ({stores.length})
-						</TabsTrigger>
-						<TabsTrigger value="labs" className="text-xs font-semibold px-3 gap-1.5">
-							<Icon icon={Chemistry} className="size-3.5" />
-							Laboratórios ({labs.length})
-						</TabsTrigger>
-						<TabsTrigger value="vendedores" className="text-xs font-semibold px-3 gap-1.5">
-							<Icon icon={UserMultiple} className="size-3.5" />
-							Vendedores ({sellers.length})
-						</TabsTrigger>
-						<TabsTrigger value="medicos" className="text-xs font-semibold px-3 gap-1.5">
-							<Icon icon={UserFollow} className="size-3.5" />
-							Médicos & Clínicas
-						</TabsTrigger>
-						<TabsTrigger value="comissoes" className="text-xs font-semibold px-3 gap-1.5">
-							<Icon icon={Money} className="size-3.5" />
-							Comissões & Estornos
-						</TabsTrigger>
-						<TabsTrigger value="tecnicos" className="text-xs font-semibold px-3 gap-1.5">
-							<Icon icon={Phone} className="size-3.5" />
-							Técnicos & WhatsApp
-						</TabsTrigger>
-						<TabsTrigger value="tolerancias" className="text-xs font-semibold px-3 gap-1.5">
-							<Icon icon={RulerAlt} className="size-3.5" />
-							Tolerâncias ABNT ISO
-						</TabsTrigger>
-						<TabsTrigger value="apoio" className="text-xs font-semibold px-3 gap-1.5">
-							<Icon icon={Events} className="size-3.5" />
-							Tabelas de Apoio
-						</TabsTrigger>
-						<TabsTrigger value="usuarios" className="text-xs font-semibold px-3 gap-1.5">
-							<Icon icon={User} className="size-3.5" />
-							Usuários & Acessos ({usersList.length})
-						</TabsTrigger>
-					</TabsList>
-				</Tabs>
+			{/* Sub Tabs Navigation: Homogêneo em Grade de 10 Colunas Iguais */}
+			<div className="w-full rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 p-2 shadow-xs">
+				<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10 gap-1.5 w-full">
+					{[
+						{ id: "lojas", label: `Lojas (${stores.length})`, icon: Building },
+						{ id: "labs", label: `Labs (${labs.length})`, icon: Chemistry },
+						{ id: "vendedores", label: `Vendedores (${sellers.length})`, icon: UserMultiple },
+						{ id: "medicos", label: "Médicos & Clínicas", icon: UserFollow },
+						{ id: "comissoes", label: "Comissões", icon: Money },
+						{ id: "tecnicos", label: "Técnicos & Zap", icon: Phone },
+						{ id: "tolerancias", label: "Tolerâncias ISO", icon: RulerAlt },
+						{ id: "apoio", label: "Tabelas Apoio", icon: Events },
+						{ id: "usuarios", label: `Usuários (${usersList.length})`, icon: User },
+						{ id: "log_vendas", label: "Log de Vendas", icon: ListChecked },
+					].map((item) => {
+						const isActive = activeTab === item.id;
+						return (
+							<button
+								type="button"
+								key={item.id}
+								onClick={() => setActiveTab(item.id as SettingsSubTab)}
+								className={cn(
+									"w-full h-10 px-2 py-1 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer",
+									"flex items-center justify-center gap-1.5 text-center select-none truncate",
+									isActive
+										? "bg-zinc-900 text-white border-2 border-zinc-900 shadow-sm dark:bg-white dark:text-zinc-900 dark:border-white font-bold"
+										: "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border-2 border-zinc-300 dark:border-zinc-700 shadow-2xs hover:bg-zinc-50 hover:border-zinc-400 dark:hover:bg-zinc-700 dark:hover:border-zinc-600"
+								)}
+							>
+								<Icon
+									icon={item.icon}
+									className={cn(
+										"size-3.5 shrink-0",
+										isActive ? "text-white dark:text-zinc-900" : "text-zinc-500 dark:text-zinc-400"
+									)}
+								/>
+								<span className="truncate">{item.label}</span>
+							</button>
+						);
+					})}
+				</div>
 			</div>
 
 			{/* CONTEÚDO DA ABA: LOJAS */}
@@ -1898,6 +1897,13 @@ export function OpticalSettingsView() {
 							</table>
 						</div>
 					</div>
+				</div>
+			)}
+
+			{/* CONTEÚDO DA ABA: LOG DE VENDAS */}
+			{activeTab === "log_vendas" && (
+				<div className="flex flex-col gap-4">
+					<OpticalSalesLogView />
 				</div>
 			)}
 
