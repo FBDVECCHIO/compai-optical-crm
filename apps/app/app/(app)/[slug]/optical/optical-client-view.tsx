@@ -45,7 +45,7 @@ import {
 export function OpticalClientView() {
 	const { session, isAuthenticated, isLoading, logout, hasPermission } = useOpticalAuth();
 	const [{ q, tab, view }, setParams] = useQueryStates(opticalSearchParams);
-	const { orders, resetToDefaults } = useOpticalOrders();
+	const { orders, isSyncingSupabase, resetToDefaults } = useOpticalOrders();
 	const [activeModule, setActiveModule] = useState<OpticalModuleTab>("balcao");
 	const [localSearch, setLocalSearch] = useState(q);
 	const [selectedOrder, setSelectedOrder] = useState<OpticalOrder | null>(null);
@@ -109,6 +109,7 @@ export function OpticalClientView() {
 					<OpticalTopNav
 						activeModule={activeModule}
 						onSelectModule={setActiveModule}
+						isSyncingSupabase={isSyncingSupabase}
 						userSession={session}
 						onLogout={logout}
 					/>

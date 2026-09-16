@@ -107,7 +107,8 @@ export function OpticalKanban({ searchQuery = "" }: { searchQuery?: string }) {
 														setSelectedOrder(order);
 														setSheetOpen(true);
 													}}
-													className="w-full text-left cursor-pointer"
+													className="w-full text-left cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-md"
+													aria-label={`Ver detalhes da OS ${order.orderNumber} do paciente ${order.patient?.name || "cliente"}`}
 												>
 													<div className="flex items-center justify-between mb-1">
 														<span className="font-mono text-xs font-bold text-primary">
@@ -147,13 +148,14 @@ export function OpticalKanban({ searchQuery = "" }: { searchQuery?: string }) {
 														asChild
 														size="icon"
 														variant="ghost"
-														className="size-7 text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400"
+														className="size-7 text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 focus-visible:ring-2 focus-visible:ring-emerald-500"
 													>
 														<a
 															href={whatsappUrl}
 															target="_blank"
 															rel="noopener noreferrer"
-															title="Avisar no WhatsApp"
+															title={`Avisar paciente ${order.patient?.name || "cliente"} sobre a OS ${order.orderNumber} no WhatsApp`}
+															aria-label={`Avisar paciente ${order.patient?.name || "cliente"} sobre a OS ${order.orderNumber} no WhatsApp`}
 														>
 															<Icon icon={Phone} className="size-3.5" />
 														</a>

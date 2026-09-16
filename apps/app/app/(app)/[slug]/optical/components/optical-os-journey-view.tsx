@@ -301,7 +301,8 @@ export function OpticalOsJourneyView() {
 							key={stage.id}
 							type="button"
 							onClick={() => setActiveStage(isSelected ? "ALL" : stage.id)}
-							className={`text-left p-3 rounded-2xl border transition-all cursor-pointer ${
+							aria-label={`Filtrar estágio ${stage.label}. ${count} ordens de serviço. ${stage.description}`}
+							className={`text-left p-3 rounded-2xl border transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-hidden ${
 								isSelected
 									? "bg-zinc-900 text-white border-zinc-900 shadow-md dark:bg-zinc-100 dark:text-zinc-900 dark:border-white"
 									: "bg-white dark:bg-zinc-900 border-zinc-200/90 dark:border-zinc-800 hover:border-zinc-300 shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
@@ -621,7 +622,9 @@ export function OpticalOsJourneyView() {
 												<button
 													type="button"
 													onClick={() => handleToggleInvoice(order)}
-													className={`px-2.5 py-0.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+													title={order.invoiceIssued ? "Nota fiscal emitida - Clique para desmarcar" : "Nota fiscal pendente - Clique para marcar como emitida"}
+													aria-label={order.invoiceIssued ? `Nota fiscal da OS ${order.orderNumber} emitida. Clique para desmarcar.` : `Nota fiscal da OS ${order.orderNumber} pendente. Clique para marcar como emitida.`}
+													className={`px-2.5 py-0.5 rounded-full text-xs font-bold transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-hidden ${
 														order.invoiceIssued
 															? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
 															: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700"
@@ -661,8 +664,9 @@ export function OpticalOsJourneyView() {
 													type="button"
 													onClick={() => handleRegressStage(order)}
 													disabled={normStage === "DIGITADA"}
-													className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-30 cursor-pointer"
+													className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-30 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-hidden"
 													title="Recuar estágio anterior"
+													aria-label={`Recuar estágio anterior da OS ${order.orderNumber}`}
 												>
 													<ArrowLeft className="size-3.5" />
 												</button>
@@ -671,8 +675,9 @@ export function OpticalOsJourneyView() {
 													href={waLink}
 													target="_blank"
 													rel="noreferrer"
-													className="p-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100"
-													title="Avisar cliente no WhatsApp"
+													className="p-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-hidden"
+													title={`Avisar paciente ${order.patient?.name || "cliente"} no WhatsApp`}
+													aria-label={`Avisar paciente ${order.patient?.name || "cliente"} sobre a OS ${order.orderNumber} no WhatsApp`}
 												>
 													<SendAlt className="size-3.5" />
 												</a>

@@ -133,7 +133,8 @@ export function OpticalAgentSidecar({
 						size="icon"
 						onClick={() => setIsCollapsed(false)}
 						title="Expandir Copiloto IA Óptico"
-						className="size-9 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-colors relative cursor-pointer"
+						aria-label="Expandir painel do Copiloto IA Óptico"
+						className="size-9 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-colors relative cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-hidden"
 					>
 						<Icon icon={Bot} className="size-5" />
 						<span className="absolute -top-1 -right-1 flex size-2.5">
@@ -152,7 +153,8 @@ export function OpticalAgentSidecar({
 					size="icon"
 					onClick={() => setIsCollapsed(false)}
 					title="Abrir painel lateral do agente"
-					className="size-8 text-muted-foreground hover:text-foreground cursor-pointer"
+					aria-label="Abrir painel lateral do agente"
+					className="size-8 text-muted-foreground hover:text-foreground cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-hidden"
 				>
 					<Icon icon={ChevronLeft} className="size-4" />
 				</Button>
@@ -197,8 +199,9 @@ export function OpticalAgentSidecar({
 						variant="ghost"
 						size="icon"
 						onClick={handleClearChat}
-						title="Limpar conversa"
-						className="size-7 text-muted-foreground hover:text-foreground cursor-pointer"
+						title="Limpar histórico de conversa"
+						aria-label="Limpar histórico de conversa com o Copiloto IA"
+						className="size-7 text-muted-foreground hover:text-foreground cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-hidden"
 					>
 						<Icon icon={TrashCan} className="size-3.5" />
 					</Button>
@@ -207,7 +210,8 @@ export function OpticalAgentSidecar({
 						size="icon"
 						onClick={() => setIsCollapsed(true)}
 						title="Recolher barra lateral"
-						className="size-7 text-muted-foreground hover:text-foreground cursor-pointer"
+						aria-label="Recolher barra lateral do Copiloto IA"
+						className="size-7 text-muted-foreground hover:text-foreground cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-hidden"
 					>
 						<Icon icon={ChevronRight} className="size-4" />
 					</Button>
@@ -432,8 +436,9 @@ export function OpticalAgentSidecar({
 					type="submit"
 					size="icon"
 					disabled={!inputValue.trim() || isTyping}
-					className="size-9 shrink-0 shadow-xs cursor-pointer"
-					title="Enviar mensagem"
+					className="size-9 shrink-0 shadow-xs cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-hidden"
+					title="Enviar mensagem para o Copiloto IA"
+					aria-label="Enviar mensagem para o Copiloto IA"
 				>
 					<Icon icon={Send} className="size-4" />
 				</Button>

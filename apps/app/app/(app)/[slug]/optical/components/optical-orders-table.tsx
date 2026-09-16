@@ -1,6 +1,8 @@
 "use client";
 
 import Checkmark from "@carbon/icons-react/es/Checkmark";
+import ChevronLeft from "@carbon/icons-react/es/ChevronLeft";
+import ChevronRight from "@carbon/icons-react/es/ChevronRight";
 import OverflowMenuHorizontal from "@carbon/icons-react/es/OverflowMenuHorizontal";
 import Phone from "@carbon/icons-react/es/Phone";
 import Time from "@carbon/icons-react/es/Time";
@@ -23,7 +25,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@crm/ui/components/table";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { generateWhatsAppLink } from "@/lib/optical/optical-mock-data";
 import { useOpticalOrders } from "@/lib/optical/optical-store";
@@ -45,6 +47,9 @@ export function OpticalOrdersTable({
 	const { orders, updateOrderStatus, payResidual } = useOpticalOrders();
 	const [selectedOrder, setSelectedOrder] = useState<OpticalOrder | null>(null);
 	const [sheetOpen, setSheetOpen] = useState(false);
+
+	const [currentPage, setCurrentPage] = useState(1);
+	const [pageSize, setPageSize] = useState(10);
 
 	const filteredOrders = useMemo(() => {
 		return orders.filter((ord) => {
@@ -70,6 +75,16 @@ export function OpticalOrdersTable({
 			return true;
 		});
 	}, [orders, searchQuery, statusFilter]);
+
+	useEffect(() => {
+		setCurrentPage(1);
+	}, [searchQuery, statusFilter]);
+
+	const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+	const paginatedOrders = useMemo(() => {
+		const start = (currentPage - 1) * pageSize;
+		return filteredOrders.slice(start, start + pageSize);
+	}, [filteredOrders, currentPage, pageSize]);
 
 	const handleRowClick = (order: OpticalOrder) => {
 		setSelectedOrder(order);
@@ -110,7 +125,7 @@ export function OpticalOrdersTable({
 								</TableCell>
 							</TableRow>
 						) : (
-							filteredOrders.map((order) => {
+							paginatedOrders.map((order) => {
 								const slaInfo = calculateSla(
 									order.promisedDeliveryDate,
 									order.status,
@@ -221,7 +236,8 @@ export function OpticalOrdersTable({
 														href={whatsappUrl}
 														target="_blank"
 														rel="noopener noreferrer"
-														title="Enviar mensagem personalizada via WhatsApp"
+														title={`Enviar mensagem personalizada via WhatsApp para ${order.patient?.name || "cliente"}`}
+														aria-label={`Enviar mensagem via WhatsApp para ${order.patient?.name || "cliente"} sobre a OS ${order.orderNumber}`}
 													>
 														<Icon icon={Phone} className="size-3" />
 														WhatsApp
@@ -234,6 +250,8 @@ export function OpticalOrdersTable({
 															variant="ghost"
 															size="icon"
 															className="size-7"
+															aria-label={`Mais opções para a OS ${order.orderNumber}`}
+															title={`Mais opções para a OS ${order.orderNumber}`}
 														>
 															<Icon
 																icon={OverflowMenuHorizontal}
@@ -288,6 +306,58 @@ export function OpticalOrdersTable({
 						)}
 					</TableBody>
 				</Table>
+			</div>
+
+			{/* Barra de Paginação Acessível */}
+			<div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t bg-muted/20 text-xs text-muted-foreground">
+				<div className="flex items-center gap-2">
+					<span>Linhas por página:</span>
+					<select
+						value={pageSize}
+						onChange={(e) => {
+							setPageSize(Number(e.target.value));
+							setCurrentPage(1);
+						}}
+						aria-label="Selecione a quantidade de ordens exibidas por página"
+						className="h-7 px-2 rounded-md border bg-background text-foreground text-xs focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-hidden"
+					>
+						<option value={10}>10</option>
+						<option value={20}>20</option>
+						<option value={50}>50</option>
+					</select>
+					<span>
+						Exibindo {filteredOrders.length === 0 ? 0 : (currentPage - 1) * pageSize + 1} a{" "}
+						{Math.min(currentPage * pageSize, filteredOrders.length)} de {filteredOrders.length} ordens
+					</span>
+				</div>
+
+				<div className="flex items-center gap-1">
+					<span className="mr-2">
+						Página {currentPage} de {totalPages}
+					</span>
+					<Button
+						variant="outline"
+						size="icon"
+						className="size-7"
+						disabled={currentPage <= 1}
+						onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+						aria-label="Ir para a página anterior"
+						title="Página anterior"
+					>
+						<Icon icon={ChevronLeft} className="size-4" />
+					</Button>
+					<Button
+						variant="outline"
+						size="icon"
+						className="size-7"
+						disabled={currentPage >= totalPages}
+						onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+						aria-label="Ir para a próxima página"
+						title="Próxima página"
+					>
+						<Icon icon={ChevronRight} className="size-4" />
+					</Button>
+				</div>
 			</div>
 
 			<OpticalOrderDetailSheet

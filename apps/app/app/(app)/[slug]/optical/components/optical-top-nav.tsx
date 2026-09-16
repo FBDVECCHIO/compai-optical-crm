@@ -3,8 +3,6 @@
 import Analytics from "@carbon/icons-react/es/Analytics";
 import Catalog from "@carbon/icons-react/es/Catalog";
 import CheckmarkOutline from "@carbon/icons-react/es/CheckmarkOutline";
-import ListChecked from "@carbon/icons-react/es/ListChecked";
-import Bot from "@carbon/icons-react/es/Bot";
 import Logout from "@carbon/icons-react/es/Logout";
 import Settings from "@carbon/icons-react/es/Settings";
 import ShoppingCart from "@carbon/icons-react/es/ShoppingCart";
@@ -42,8 +40,7 @@ export type OpticalModuleTab =
 interface OpticalTopNavProps {
 	activeModule: OpticalModuleTab;
 	onSelectModule: (tab: OpticalModuleTab) => void;
-	pendingConferenceCount?: number;
-	pendingResidualCount?: number;
+	isSyncingSupabase?: boolean;
 	userSession?: OpticalUserSession | null;
 	onLogout?: () => void;
 }
@@ -51,15 +48,19 @@ interface OpticalTopNavProps {
 export function OpticalTopNav({
 	activeModule,
 	onSelectModule,
+	isSyncingSupabase = false,
 	userSession,
 	onLogout,
 }: OpticalTopNavProps) {
-	// Menus principais oficiais - Estritamente apenas o nome, sem contadores ou badges extras
+	// Menus principais oficiais distribuídos em 2 fileiras inteligentes de 6 colunas
+	// Fileira 1: Operação Comercial & Balcão
+	// Fileira 2: Cadastros Técnicos, Relações Médicas & Gestão
 	const navItems: {
 		id: OpticalModuleTab;
 		label: string;
 		icon: any;
 	}[] = [
+		// --- LINHA 1: OPERAÇÃO COMERCIAL & BALCÃO ---
 		{
 			id: "balcao",
 			label: "Balcão & Vendas",
@@ -76,16 +77,6 @@ export function OpticalTopNav({
 			icon: UserFollow,
 		},
 		{
-			id: "lentes",
-			label: "Lentes",
-			icon: Catalog,
-		},
-		{
-			id: "pecas",
-			label: "Peças & Solares",
-			icon: Glasses,
-		},
-		{
 			id: "mensagens",
 			label: "Mensagens WhatsApp",
 			icon: Chat,
@@ -97,13 +88,19 @@ export function OpticalTopNav({
 		},
 		{
 			id: "garantias",
-			label: "Garantias",
+			label: "Garantias & Ocorrências",
 			icon: WarningAlt,
 		},
+		// --- LINHA 2: CADASTROS, CLÍNICO & GESTÃO ---
 		{
-			id: "resumo",
-			label: "Resumo Gerencial",
-			icon: Analytics,
+			id: "lentes",
+			label: "Lentes",
+			icon: Catalog,
+		},
+		{
+			id: "pecas",
+			label: "Peças & Solares",
+			icon: Glasses,
 		},
 		{
 			id: "medicos",
@@ -114,6 +111,11 @@ export function OpticalTopNav({
 			id: "visita_medica",
 			label: "Visita Médica",
 			icon: Events,
+		},
+		{
+			id: "resumo",
+			label: "Resumo Gerencial",
+			icon: Analytics,
 		},
 		{
 			id: "config",
@@ -130,14 +132,14 @@ export function OpticalTopNav({
 
 	return (
 		<div className="w-full rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 p-3 shadow-xs">
-			{/* Linha de topo dentro do card: Logo/Status + Usuário & Logout */}
+			{/* Linha de topo dentro do card: Logo/Status + Sincronização + Usuário & Logout */}
 			<div className="flex flex-wrap items-center justify-between gap-3 pb-2.5 mb-2.5 border-b border-zinc-200 dark:border-zinc-800">
 				<div className="flex items-center gap-2.5">
 					<div className="flex size-7 items-center justify-center rounded-lg bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-bold text-xs shadow-2xs">
 						X
 					</div>
 					<div className="flex items-center gap-2">
-						<span className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+						<span className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-100 font-mono">
 							MNOC-X
 						</span>
 						<span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">
@@ -146,8 +148,28 @@ export function OpticalTopNav({
 					</div>
 				</div>
 
-				{/* Perfil do Usuário e Ações */}
+				{/* Perfil do Usuário, Sincronização e Ações */}
 				<div className="flex items-center gap-2">
+					{isSyncingSupabase ? (
+						<div
+							className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] font-medium border border-amber-500/20"
+							role="status"
+							aria-live="polite"
+							title="Sincronizando dados em segundo plano com o banco de dados Supabase"
+						>
+							<span className="size-2 rounded-full bg-amber-500 animate-ping" />
+							<span>Sincronizando...</span>
+						</div>
+					) : (
+						<div
+							className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium border border-emerald-500/20"
+							title="Conexão com a nuvem ativa e dados sincronizados"
+						>
+							<span className="size-2 rounded-full bg-emerald-500" />
+							<span>Online • Seguro</span>
+						</div>
+					)}
+
 					{userSession && (
 						<div className="flex items-center gap-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1 text-xs">
 							<Icon icon={UserAvatar} className="size-3.5 text-zinc-700 dark:text-zinc-300" />
@@ -176,7 +198,8 @@ export function OpticalTopNav({
 							size="sm"
 							onClick={onLogout}
 							className="h-7 px-2.5 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-500/10 dark:text-rose-400 gap-1 cursor-pointer border border-rose-200 dark:border-rose-900/40"
-							title="Encerrar sessão"
+							title="Encerrar sessão no MNOC-X"
+							aria-label="Sair do sistema óptico"
 						>
 							<Icon icon={Logout} className="size-3.5" />
 							<span className="hidden sm:inline">Sair</span>
@@ -185,10 +208,11 @@ export function OpticalTopNav({
 				</div>
 			</div>
 
-			{/* Grade de Navegação: Delimitação bem visível SEMPRE, ocupando 100% do card */}
+			{/* Grade de Navegação: 2 fileiras equilibradas de 6 colunas com largura generosa */}
+			{/* Textos NUNCA truncados, delimitação nítida e anel de foco acessível */}
 			<nav
-				aria-label="Menus Principais do Sistema"
-				className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12 gap-1.5 w-full"
+				aria-label="Navegação Principal do MNOC-X"
+				className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 w-full"
 			>
 				{visibleNavItems.map((item) => {
 					const isActive = activeModule === item.id;
@@ -197,24 +221,28 @@ export function OpticalTopNav({
 							type="button"
 							key={item.id}
 							onClick={() => onSelectModule(item.id)}
+							aria-label={`Acessar módulo de ${item.label}`}
+							aria-current={isActive ? "page" : undefined}
+							title={`Ir para ${item.label}`}
 							className={cn(
-								// Delimitação obrigatória e visível sem o mouse para usuários menos experientes
-								"w-full h-11 px-2 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer",
-								"flex items-center justify-center gap-1.5 text-center select-none",
-								// Estado Ativo: Alto contraste Apple (Preto/Carvão vs Branco)
+								"w-full h-11 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer",
+								"flex items-center justify-center gap-2 text-center select-none",
+								"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-white focus-visible:ring-offset-2",
 								isActive
 									? "bg-zinc-900 text-white border-2 border-zinc-900 shadow-sm dark:bg-white dark:text-zinc-900 dark:border-white font-bold"
-									: "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border-2 border-zinc-300 dark:border-zinc-700 shadow-2xs hover:bg-zinc-50 hover:border-zinc-400 dark:hover:bg-zinc-700 dark:hover:border-zinc-600"
+									: "bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-2 border-zinc-300 dark:border-zinc-700 shadow-2xs hover:bg-zinc-50 hover:border-zinc-400 dark:hover:bg-zinc-700 dark:hover:border-zinc-600"
 							)}
 						>
 							<Icon
 								icon={item.icon}
 								className={cn(
-									"size-3.5 shrink-0",
+									"size-4 shrink-0",
 									isActive ? "text-white dark:text-zinc-900" : "text-zinc-500 dark:text-zinc-400"
 								)}
 							/>
-							<span className="truncate">{item.label}</span>
+							<span className="whitespace-nowrap font-semibold text-xs leading-none">
+								{item.label}
+							</span>
 						</button>
 					);
 				})}

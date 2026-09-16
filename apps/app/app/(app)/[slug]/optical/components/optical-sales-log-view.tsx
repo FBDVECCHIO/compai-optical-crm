@@ -1,5 +1,7 @@
 "use client";
 
+import ChevronLeft from "@carbon/icons-react/es/ChevronLeft";
+import ChevronRight from "@carbon/icons-react/es/ChevronRight";
 import DocumentExport from "@carbon/icons-react/es/DocumentExport";
 import Money from "@carbon/icons-react/es/Money";
 import Phone from "@carbon/icons-react/es/Phone";
@@ -9,7 +11,7 @@ import { Button } from "@crm/ui/components/button";
 import { Icon } from "@crm/ui/components/icon";
 import { Input } from "@crm/ui/components/input";
 import { Tabs, TabsList, TabsTrigger } from "@crm/ui/components/tabs";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { generateWhatsAppLink } from "@/lib/optical/optical-mock-data";
 import { useOpticalOrders } from "@/lib/optical/optical-store";
@@ -23,22 +25,37 @@ export function OpticalSalesLogView() {
 	const [search, setSearch] = useState("");
 	const [selectedOrder, setSelectedOrder] = useState<OpticalOrder | null>(null);
 
-	const filtered = orders.filter((o) => {
-		if (!o) return false;
-		const residual = Number(o.financials?.residualAmount) || 0;
-		// Filter by payment status
-		if (filterType === "PAID" && residual > 0) return false;
-		if (filterType === "RESIDUAL" && residual <= 0) return false;
+	const [currentPage, setCurrentPage] = useState(1);
+	const [pageSize, setPageSize] = useState(15);
 
-		// Filter by search text (OS, Paciente, Vendedor, Loja)
-		const query = search.toLowerCase();
-		return (
-			(o.orderNumber || "").toLowerCase().includes(query) ||
-			(o.patient?.name || "").toLowerCase().includes(query) ||
-			(o.seller?.name || "").toLowerCase().includes(query) ||
-			(o.store?.name || "").toLowerCase().includes(query)
-		);
-	});
+	const filtered = useMemo(() => {
+		return orders.filter((o) => {
+			if (!o) return false;
+			const residual = Number(o.financials?.residualAmount) || 0;
+			// Filter by payment status
+			if (filterType === "PAID" && residual > 0) return false;
+			if (filterType === "RESIDUAL" && residual <= 0) return false;
+
+			// Filter by search text (OS, Paciente, Vendedor, Loja)
+			const query = search.toLowerCase();
+			return (
+				(o.orderNumber || "").toLowerCase().includes(query) ||
+				(o.patient?.name || "").toLowerCase().includes(query) ||
+				(o.seller?.name || "").toLowerCase().includes(query) ||
+				(o.store?.name || "").toLowerCase().includes(query)
+			);
+		});
+	}, [orders, filterType, search]);
+
+	useEffect(() => {
+		setCurrentPage(1);
+	}, [filterType, search]);
+
+	const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+	const paginated = useMemo(() => {
+		const start = (currentPage - 1) * pageSize;
+		return filtered.slice(start, start + pageSize);
+	}, [filtered, currentPage, pageSize]);
 
 	const handleWhatsAppNotice = (order: OpticalOrder) => {
 		const url = generateWhatsAppLink(order);
@@ -166,7 +183,7 @@ export function OpticalSalesLogView() {
 									</td>
 								</tr>
 							) : (
-								filtered.map((order) => {
+								paginated.map((order) => {
 									const total = Number(order.financials?.totalAmount) || 0;
 									const paid = Number(order.financials?.paidAmount) || 0;
 									const residual = Number(order.financials?.residualAmount) || 0;
@@ -231,6 +248,8 @@ export function OpticalSalesLogView() {
 														variant="outline"
 														onClick={() => setSelectedOrder(order)}
 														className="h-7 text-xs px-2.5 font-medium"
+														aria-label={`Ver detalhes completos da OS ${order.orderNumber}`}
+														title={`Ver detalhes completos da OS ${order.orderNumber}`}
 													>
 														Detalhes
 													</Button>
@@ -239,7 +258,8 @@ export function OpticalSalesLogView() {
 															size="sm"
 															variant="ghost"
 															onClick={() => handleWhatsAppNotice(order)}
-															title="Avisar cliente no WhatsApp"
+															title={`Avisar paciente ${order.patient?.name || "cliente"} sobre saldo residual no WhatsApp`}
+															aria-label={`Avisar paciente ${order.patient?.name || "cliente"} sobre saldo residual de R$ ${residual.toFixed(2)} da OS ${order.orderNumber} no WhatsApp`}
 															className="size-7 p-0 text-emerald-600 hover:bg-emerald-500/10"
 														>
 															<Icon icon={Phone} className="size-4" />
@@ -253,6 +273,58 @@ export function OpticalSalesLogView() {
 							)}
 						</tbody>
 					</table>
+				</div>
+
+				{/* Paginação Acessível */}
+				<div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t bg-muted/20 text-xs text-muted-foreground">
+					<div className="flex items-center gap-2">
+						<span>Linhas por página:</span>
+						<select
+							value={pageSize}
+							onChange={(e) => {
+								setPageSize(Number(e.target.value));
+								setCurrentPage(1);
+							}}
+							aria-label="Selecione a quantidade de vendas exibidas por página"
+							className="h-7 px-2 rounded-md border bg-background text-foreground text-xs focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-hidden"
+						>
+							<option value={15}>15</option>
+							<option value={30}>30</option>
+							<option value={50}>50</option>
+						</select>
+						<span>
+							Exibindo {filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1} a{" "}
+							{Math.min(currentPage * pageSize, filtered.length)} de {filtered.length} vendas
+						</span>
+					</div>
+
+					<div className="flex items-center gap-1">
+						<span className="mr-2">
+							Página {currentPage} de {totalPages}
+						</span>
+						<Button
+							variant="outline"
+							size="icon"
+							className="size-7"
+							disabled={currentPage <= 1}
+							onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+							aria-label="Ir para a página anterior de vendas"
+							title="Página anterior"
+						>
+							<Icon icon={ChevronLeft} className="size-4" />
+						</Button>
+						<Button
+							variant="outline"
+							size="icon"
+							className="size-7"
+							disabled={currentPage >= totalPages}
+							onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+							aria-label="Ir para a próxima página de vendas"
+							title="Próxima página"
+						>
+							<Icon icon={ChevronRight} className="size-4" />
+						</Button>
+					</div>
 				</div>
 			</div>
 

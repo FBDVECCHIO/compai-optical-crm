@@ -107,6 +107,7 @@ export function OpticalOrderForm({
 		state: "SP",
 	});
 	const [loadingCep, setLoadingCep] = useState(false);
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	// Aro 1 state
 	const [aro1, setAro1] = useState<AroItem>(DEFAULT_ARO_1);
@@ -243,8 +244,10 @@ export function OpticalOrderForm({
 	}, [paymentMode, totalAmount, manualPaidAmount]);
 
 	// Submit Order
-	const handleSubmit = (e: React.FormEvent) => {
+	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
+
+		if (isSubmitting) return;
 
 		if (!patient.name.trim()) {
 			toast.error("Por favor, preencha o nome do paciente.");
@@ -259,84 +262,89 @@ export function OpticalOrderForm({
 			return;
 		}
 
-		const newOrder: OpticalOrder = {
-			id: `ord_${Date.now()}`,
-			orderNumber,
-			store: { id: "store_matriz", name: storeName },
-			seller: { id: "user_rodrigo", name: sellerName },
-			doctor: doctorName ? { name: doctorName, crm: doctorCrm } : undefined,
-			status: "DIGITADA",
-			invoiceIssued,
-			invoiceNumber: invoiceIssued ? invoiceNumber || `NF-${Math.floor(100000 + Math.random() * 900000)}` : undefined,
-			orderDate: new Date().toISOString(),
-			promisedDeliveryDate: new Date(`${promisedDate}T18:00:00Z`).toISOString(),
-			patient: {
-				...patient,
-				name: patient.name.toUpperCase(),
-			},
-			aro1,
-			hasAro2,
-			isAro2CopyOfAro1: isAro2Copy,
-			aro2: hasAro2 ? aro2 : undefined,
-			financials: {
-				subtotalFrames,
-				subtotalLenses,
-				subtotalTreatments,
-				discount,
-				totalAmount,
-				paymentMode,
-				paidAmount,
-				residualAmount,
-				paymentMethod1,
-				paymentAmount1: paidAmount,
-				cardInstallments1:
-					paymentMethod1 === "CARTAO_CREDITO" ? cardInstallments1 : 1,
-				nfce: nfce || undefined,
-				notes: notes || undefined,
-			},
-			aiAudit: {
-				ocrConfidence: 0.98,
-				prescriptionVerified: true,
-				labCostCrosscheck: "APPROVED",
-				estimatedLabCost: Math.round(subtotalLenses * 0.42),
-				grossMarginPercent: Number(
-					(
-						((totalAmount - Math.round(subtotalLenses * 0.42)) / totalAmount) *
-						100
-					).toFixed(1),
-				),
-				cylinderTranspositionValid: true,
-				diameterThicknessCheck: "OK",
-				creditRiskCheck: residualAmount > 2000 ? "MEDIUM" : "LOW",
-				agentNotes: [
-					"OS digitada no balcão rápido com validação automática de consistência óptica.",
-					`Sinal de entrada: R$ ${paidAmount.toFixed(2)}. Residual pendente: R$ ${residualAmount.toFixed(2)}.`,
-					"Checagem de transposição e conformidade com laboratório validada.",
-				],
-				timelineEvents: [
-					{
-						id: `ev_${Date.now()}`,
-						time: new Date().toLocaleTimeString("pt-BR", {
-							hour: "2-digit",
-							minute: "2-digit",
-						}),
-						title: "Ordem de Serviço Emitida no Balcão",
-						detail: `OS ${orderNumber} cadastrada por ${sellerName}.`,
-						status: "ok",
-					},
-				],
-			},
-			createdAt: new Date().toISOString(),
-			updatedAt: new Date().toISOString(),
-		};
+		setIsSubmitting(true);
+		try {
+			const newOrder: OpticalOrder = {
+				id: `ord_${Date.now()}`,
+				orderNumber,
+				store: { id: "store_matriz", name: storeName },
+				seller: { id: "user_rodrigo", name: sellerName },
+				doctor: doctorName ? { name: doctorName, crm: doctorCrm } : undefined,
+				status: "DIGITADA",
+				invoiceIssued,
+				invoiceNumber: invoiceIssued ? invoiceNumber || `NF-${Math.floor(100000 + Math.random() * 900000)}` : undefined,
+				orderDate: new Date().toISOString(),
+				promisedDeliveryDate: new Date(`${promisedDate}T18:00:00Z`).toISOString(),
+				patient: {
+					...patient,
+					name: patient.name.toUpperCase(),
+				},
+				aro1,
+				hasAro2,
+				isAro2CopyOfAro1: isAro2Copy,
+				aro2: hasAro2 ? aro2 : undefined,
+				financials: {
+					subtotalFrames,
+					subtotalLenses,
+					subtotalTreatments,
+					discount,
+					totalAmount,
+					paymentMode,
+					paidAmount,
+					residualAmount,
+					paymentMethod1,
+					paymentAmount1: paidAmount,
+					cardInstallments1:
+						paymentMethod1 === "CARTAO_CREDITO" ? cardInstallments1 : 1,
+					nfce: nfce || undefined,
+					notes: notes || undefined,
+				},
+				aiAudit: {
+					ocrConfidence: 0.98,
+					prescriptionVerified: true,
+					labCostCrosscheck: "APPROVED",
+					estimatedLabCost: Math.round(subtotalLenses * 0.42),
+					grossMarginPercent: Number(
+						(
+							((totalAmount - Math.round(subtotalLenses * 0.42)) / totalAmount) *
+							100
+						).toFixed(1),
+					),
+					cylinderTranspositionValid: true,
+					diameterThicknessCheck: "OK",
+					creditRiskCheck: residualAmount > 2000 ? "MEDIUM" : "LOW",
+					agentNotes: [
+						"OS digitada no balcão rápido com validação automática de consistência óptica.",
+						`Sinal de entrada: R$ ${paidAmount.toFixed(2)}. Residual pendente: R$ ${residualAmount.toFixed(2)}.`,
+						"Checagem de transposição e conformidade com laboratório validada.",
+					],
+					timelineEvents: [
+						{
+							id: `ev_${Date.now()}`,
+							time: new Date().toLocaleTimeString("pt-BR", {
+								hour: "2-digit",
+								minute: "2-digit",
+							}),
+							title: "Ordem de Serviço Emitida no Balcão",
+							detail: `OS ${orderNumber} cadastrada por ${sellerName}.`,
+							status: "ok",
+						},
+					],
+				},
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString(),
+			};
 
-		addOrder(newOrder);
-		toast.success(`Ordem de Serviço ${orderNumber} emitida com sucesso!`, {
-			description: `Paciente: ${patient.name.toUpperCase()} | Total: R$ ${totalAmount.toFixed(2)}`,
-		});
+			addOrder(newOrder);
+			toast.success(`Ordem de Serviço ${orderNumber} emitida com sucesso!`, {
+				description: `Paciente: ${patient.name.toUpperCase()} | Total: R$ ${totalAmount.toFixed(2)}`,
+			});
 
-		if (onSuccess) {
-			onSuccess(newOrder);
+			if (onSuccess) {
+				onSuccess(newOrder);
+			}
+		} finally {
+			setIsSubmitting(false);
 		}
 	};
 
@@ -521,6 +529,7 @@ export function OpticalOrderForm({
 									<Input
 										id="patient-cep"
 										value={patient.cep}
+										disabled={loadingCep}
 										onChange={(e) => {
 											const formatted = formatCep(e.target.value);
 											setPatient((p) => ({ ...p, cep: formatted }));
@@ -530,15 +539,18 @@ export function OpticalOrderForm({
 										}}
 										placeholder="00000-000"
 										className="text-xs font-mono"
+										aria-label="CEP do paciente"
 									/>
 								</Field>
 								<Button
 									type="button"
 									variant="secondary"
 									size="sm"
-									className="h-9 px-3 text-xs"
+									className="h-9 px-3 text-xs focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-hidden"
 									disabled={loadingCep}
 									onClick={() => handleSearchCep()}
+									aria-label={loadingCep ? "Buscando endereço via CEP no ViaCEP..." : "Buscar endereço no ViaCEP"}
+									title="Buscar endereço no ViaCEP"
 								>
 									{loadingCep ? (
 										<Spinner className="size-3" />
@@ -1554,7 +1566,9 @@ export function OpticalOrderForm({
 									type="button"
 									variant="ghost"
 									size="sm"
+									disabled={isSubmitting}
 									onClick={onCancel}
+									aria-label="Cancelar emissão de Ordem de Serviço"
 								>
 									Cancelar
 								</Button>
@@ -1562,10 +1576,21 @@ export function OpticalOrderForm({
 							<Button
 								type="submit"
 								size="default"
-								className="h-10 px-6 font-semibold shadow-sm"
+								disabled={isSubmitting}
+								className="h-10 px-6 font-semibold shadow-sm focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-hidden"
+								aria-label={isSubmitting ? "Emitindo Ordem de Serviço..." : "Gravar e emitir Ordem de Serviço"}
 							>
-								<Icon icon={Checkmark} className="mr-2 size-4" />
-								Gravar e Emitir Ordem de Serviço
+								{isSubmitting ? (
+									<>
+										<Spinner className="mr-2 size-4" />
+										Emitindo OS...
+									</>
+								) : (
+									<>
+										<Icon icon={Checkmark} className="mr-2 size-4" />
+										Gravar e Emitir Ordem de Serviço
+									</>
+								)}
 							</Button>
 						</div>
 				</div>
