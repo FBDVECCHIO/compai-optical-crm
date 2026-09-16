@@ -24,30 +24,32 @@ export function OpticalSalesLogView() {
 	const [selectedOrder, setSelectedOrder] = useState<OpticalOrder | null>(null);
 
 	const filtered = orders.filter((o) => {
+		if (!o) return false;
+		const residual = Number(o.financials?.residualAmount) || 0;
 		// Filter by payment status
-		if (filterType === "PAID" && o.financials.residualAmount > 0) return false;
-		if (filterType === "RESIDUAL" && o.financials.residualAmount <= 0) return false;
+		if (filterType === "PAID" && residual > 0) return false;
+		if (filterType === "RESIDUAL" && residual <= 0) return false;
 
 		// Filter by search text (OS, Paciente, Vendedor, Loja)
 		const query = search.toLowerCase();
 		return (
-			o.orderNumber.toLowerCase().includes(query) ||
-			o.patient.name.toLowerCase().includes(query) ||
-			o.seller.name.toLowerCase().includes(query) ||
-			o.store.name.toLowerCase().includes(query)
+			(o.orderNumber || "").toLowerCase().includes(query) ||
+			(o.patient?.name || "").toLowerCase().includes(query) ||
+			(o.seller?.name || "").toLowerCase().includes(query) ||
+			(o.store?.name || "").toLowerCase().includes(query)
 		);
 	});
 
 	const handleWhatsAppNotice = (order: OpticalOrder) => {
 		const url = generateWhatsAppLink(order);
 		window.open(url, "_blank", "noopener,noreferrer");
-		toast.success(`WhatsApp aberto para ${order.patient.name}!`);
+		toast.success(`WhatsApp aberto para ${order.patient?.name || "Cliente"}!`);
 	};
 
 	const handleExportPDF = () => {
-		const totalVendido = filtered.reduce((acc, o) => acc + o.financials.totalAmount, 0);
-		const totalRecebido = filtered.reduce((acc, o) => acc + o.financials.paidAmount, 0);
-		const totalResidual = filtered.reduce((acc, o) => acc + o.financials.residualAmount, 0);
+		const totalVendido = filtered.reduce((acc, o) => acc + (Number(o.financials?.totalAmount) || 0), 0);
+		const totalRecebido = filtered.reduce((acc, o) => acc + (Number(o.financials?.paidAmount) || 0), 0);
+		const totalResidual = filtered.reduce((acc, o) => acc + (Number(o.financials?.residualAmount) || 0), 0);
 
 		printOpticalReport({
 			title: "Relatório de Vendas e Ordens de Serviço (Balcão)",
@@ -71,14 +73,21 @@ export function OpticalSalesLogView() {
 				{ header: "Status", key: "status", align: "center", width: "90px" },
 			],
 			data: filtered.map((o) => ({
-				os: o.orderNumber,
-				emissao: new Date(o.createdAt).toLocaleDateString("pt-BR"),
-				paciente: `${o.patient.name} (${o.patient.cpf || "S/ CPF"})`,
-				loja: o.store.name,
-				vendedor: o.seller.name,
-				valorTotal: `R$ ${o.financials.totalAmount.toFixed(2)}`,
-				valorPago: `R$ ${o.financials.paidAmount.toFixed(2)}`,
-				saldoResidual: `R$ ${o.financials.residualAmount.toFixed(2)}`,
+				os: o.orderNumber || "—",
+				emissao: (() => {
+					try {
+						const d = o.orderDate || o.createdAt ? new Date(o.orderDate || o.createdAt) : null;
+						return d && !isNaN(d.getTime()) ? d.toLocaleDateString("pt-BR") : "—";
+					} catch {
+						return "—";
+					}
+				})(),
+				paciente: `${o.patient?.name || "Cliente"} (${o.patient?.cpf || "S/ CPF"})`,
+				loja: o.store?.name || "—",
+				vendedor: o.seller?.name || "—",
+				valorTotal: `R$ ${(Number(o.financials?.totalAmount) || 0).toFixed(2)}`,
+				valorPago: `R$ ${(Number(o.financials?.paidAmount) || 0).toFixed(2)}`,
+				saldoResidual: `R$ ${(Number(o.financials?.residualAmount) || 0).toFixed(2)}`,
 				status: o.status,
 			})),
 		});
@@ -158,41 +167,53 @@ export function OpticalSalesLogView() {
 								</tr>
 							) : (
 								filtered.map((order) => {
-									const hasResidual = order.financials.residualAmount > 0;
+									const total = Number(order.financials?.totalAmount) || 0;
+									const paid = Number(order.financials?.paidAmount) || 0;
+									const residual = Number(order.financials?.residualAmount) || 0;
+									const hasResidual = residual > 0;
+									const dateFormatted = (() => {
+										try {
+											const d = order.orderDate || order.createdAt ? new Date(order.orderDate || order.createdAt) : null;
+											return d && !isNaN(d.getTime()) ? d.toLocaleDateString("pt-BR") : "—";
+										} catch {
+											return "—";
+										}
+									})();
+
 									return (
 										<tr key={order.id} className="hover:bg-muted/20 transition-colors">
 											<td className="py-3 px-4">
 												<span className="font-mono font-bold text-primary">{order.orderNumber}</span>
 												<div className="text-[11px] text-muted-foreground">
-													{new Date(order.orderDate).toLocaleDateString("pt-BR")}
+													{dateFormatted}
 												</div>
 											</td>
 											<td className="py-3 px-4">
-												<div className="font-bold text-foreground uppercase">{order.patient.name}</div>
-												<div className="text-[11px] text-muted-foreground font-mono">{order.patient.cpf}</div>
+												<div className="font-bold text-foreground uppercase">{order.patient?.name || "Cliente"}</div>
+												<div className="text-[11px] text-muted-foreground font-mono">{order.patient?.cpf || "—"}</div>
 											</td>
 											<td className="py-3 px-4">
-												<div className="font-medium text-foreground">{order.store.name}</div>
-												<div className="text-[11px] text-muted-foreground">{order.seller.name}</div>
+												<div className="font-medium text-foreground">{order.store?.name || "—"}</div>
+												<div className="text-[11px] text-muted-foreground">{order.seller?.name || "—"}</div>
 											</td>
 											<td className="py-3 px-4 max-w-xs">
-												<div className="font-medium truncate">{order.aro1.frameBrand} ({order.aro1.lensName})</div>
+												<div className="font-medium truncate">{order.aro1?.frameBrand || "Armação"} ({order.aro1?.lensName || "Lente"})</div>
 												{order.hasAro2 && (
 													<Badge variant="outline" className="text-[10px] mt-0.5">
-														+ 2º Par: {order.aro2?.frameBrand}
+														+ 2º Par: {order.aro2?.frameBrand || "Armação 2"}
 													</Badge>
 												)}
 											</td>
 											<td className="py-3 px-4 text-right font-mono font-bold">
-												R$ {order.financials.totalAmount.toFixed(2)}
+												R$ {total.toFixed(2)}
 											</td>
 											<td className="py-3 px-4 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
-												R$ {order.financials.paidAmount.toFixed(2)}
+												R$ {paid.toFixed(2)}
 											</td>
 											<td className="py-3 px-4 text-right font-mono font-bold">
 												{hasResidual ? (
 													<span className="text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md">
-														R$ {order.financials.residualAmount.toFixed(2)}
+														R$ {residual.toFixed(2)}
 													</span>
 												) : (
 													<span className="text-muted-foreground font-normal">R$ 0,00</span>

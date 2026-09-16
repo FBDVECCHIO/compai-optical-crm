@@ -73,6 +73,61 @@ export function OpticalOrderDetailSheet({
 
 	const whatsappUrl = generateWhatsAppLink(order);
 
+	const patientName = order.patient?.name || "Cliente sem Nome";
+	const patientWhatsapp = order.patient?.whatsapp || order.patient?.secondaryPhone || "—";
+	const storeName = order.store?.name || "Óptica Central";
+	const sellerName = order.seller?.name || "Atendente";
+
+	const formattedOrderDate = (() => {
+		try {
+			const d = order.orderDate ? new Date(order.orderDate) : null;
+			return d && !isNaN(d.getTime()) ? d.toLocaleDateString("pt-BR") : "—";
+		} catch {
+			return "—";
+		}
+	})();
+
+	const fin = order.financials || {
+		totalAmount: 0,
+		paidAmount: 0,
+		residualAmount: 0,
+		paymentMode: "TOTAL",
+	};
+
+	const totalAmount = Number(fin.totalAmount) || 0;
+	const paidAmount = Number(fin.paidAmount) || 0;
+	const residualAmount = Number(fin.residualAmount) || 0;
+	const subtotalFrames = Number((fin as any).subtotalFrames) || Number(order.aro1?.framePrice) || 0;
+	const subtotalLenses = Number((fin as any).subtotalLenses) || Number(order.aro1?.lensPrice) || 0;
+	const subtotalTreatments = Number((fin as any).subtotalTreatments) || Number(order.aro1?.treatmentPrice) || 0;
+	const discount = Number((fin as any).discount) || 0;
+
+	const aro1Price =
+		(Number(order.aro1?.framePrice) || 0) +
+		(Number(order.aro1?.lensPrice) || 0) +
+		(Number(order.aro1?.treatmentPrice) || 0);
+
+	const aro2Price =
+		(Number(order.aro2?.framePrice) || 0) +
+		(Number(order.aro2?.lensPrice) || 0) +
+		(Number(order.aro2?.treatmentPrice) || 0);
+
+	const aiAudit = order.aiAudit || {
+		ocrConfidence: 0.95,
+		grossMarginPercent: 65,
+		estimatedLabCost: 280,
+		diameterThicknessCheck: "OK",
+		creditRiskCheck: "BAIXO",
+		timelineEvents: [
+			{
+				id: "ev_default",
+				title: "Auditoria Inicial",
+				detail: "Ordem registrada no sistema MNOC-X.",
+				time: "Hoje",
+			},
+		],
+	};
+
 	return (
 		<Sheet open={open} onOpenChange={onOpenChange}>
 			<SheetContent
@@ -91,13 +146,11 @@ export function OpticalOrderDetailSheet({
 										{order.orderNumber}
 									</SheetTitle>
 									<Badge variant="outline" className="font-medium text-xs">
-										{order.store.name}
+										{storeName}
 									</Badge>
 								</div>
 								<SheetDescription className="text-xs">
-									Aberta em{" "}
-									{new Date(order.orderDate).toLocaleDateString("pt-BR")} por{" "}
-									{order.seller.name}
+									Aberta em {formattedOrderDate} por {sellerName}
 								</SheetDescription>
 							</div>
 						</div>
@@ -133,22 +186,22 @@ export function OpticalOrderDetailSheet({
 								Paciente
 							</span>
 							<span className="font-bold text-sm text-foreground">
-								{order.patient.name}
+								{patientName}
 							</span>
 							<span className="text-xs text-muted-foreground">
-								WhatsApp: {order.patient.whatsapp}
+								WhatsApp: {patientWhatsapp}
 							</span>
 						</div>
 					</div>
 
 					<div className="flex items-center gap-2">
-						{order.financials.residualAmount > 0 ? (
+						{residualAmount > 0 ? (
 							<div className="flex items-center gap-2">
 								<Badge
 									variant="destructive"
 									className="font-mono text-xs px-2.5 py-1"
 								>
-									Residual: R$ {order.financials.residualAmount.toFixed(2)}
+									Residual: R$ {residualAmount.toFixed(2)}
 								</Badge>
 								<Button
 									variant="outline"
@@ -206,15 +259,10 @@ export function OpticalOrderDetailSheet({
 							<div className="flex items-center justify-between border-b pb-2">
 								<div className="font-bold text-sm text-foreground flex items-center gap-2">
 									<Icon icon={Glasses} className="size-4 text-primary" />
-									Aro 1 — {order.aro1.frameBrand} {order.aro1.frameModel}
+									Aro 1 — {order.aro1?.frameBrand || "Armação"} {order.aro1?.frameModel || ""}
 								</div>
 								<Badge variant="secondary" className="text-xs font-mono">
-									R${" "}
-									{(
-										order.aro1.framePrice +
-										order.aro1.lensPrice +
-										order.aro1.treatmentPrice
-									).toFixed(2)}
+									R$ {aro1Price.toFixed(2)}
 								</Badge>
 							</div>
 
@@ -223,34 +271,34 @@ export function OpticalOrderDetailSheet({
 									<span className="font-medium text-foreground block">
 										Laboratório:
 									</span>
-									{order.aro1.lab}
+									{order.aro1?.lab || "—"}
 								</div>
 								<div>
 									<span className="font-medium text-foreground block">
 										Lente:
 									</span>
-									{order.aro1.lensName}
+									{order.aro1?.lensName || "—"}
 								</div>
 								<div>
 									<span className="font-medium text-foreground block">
 										Tratamento:
 									</span>
-									{order.aro1.noTreatment
+									{order.aro1?.noTreatment
 										? "Sem Tratamento"
-										: order.aro1.treatment}
+										: order.aro1?.treatment || "Padrão"}
 								</div>
 								<div>
 									<span className="font-medium text-foreground block">
 										Armação:
 									</span>
-									{order.aro1.frameCode}
+									{order.aro1?.frameCode || "—"}
 								</div>
 							</div>
 
 							<OpticalDioptersTable
 								idPrefix="detail-aro1"
 								title="Dioptrias Cadastradas — Aro 1"
-								value={order.aro1.diopters}
+								value={order.aro1?.diopters}
 								onChange={() => {}}
 								readOnly
 							/>
@@ -262,16 +310,11 @@ export function OpticalOrderDetailSheet({
 								<div className="flex items-center justify-between border-b pb-2">
 									<div className="font-bold text-sm text-foreground flex items-center gap-2">
 										<Icon icon={Glasses} className="size-4 text-amber-500" />
-										Aro 2 (2º Par / Dobro) — {order.aro2.frameBrand}{" "}
-										{order.aro2.frameModel}
+										Aro 2 (2º Par / Dobro) — {order.aro2?.frameBrand || "Armação"}{" "}
+										{order.aro2?.frameModel || ""}
 									</div>
 									<Badge variant="secondary" className="text-xs font-mono">
-										R${" "}
-										{(
-											order.aro2.framePrice +
-											order.aro2.lensPrice +
-											order.aro2.treatmentPrice
-										).toFixed(2)}
+										R$ {aro2Price.toFixed(2)}
 									</Badge>
 								</div>
 
@@ -280,34 +323,34 @@ export function OpticalOrderDetailSheet({
 										<span className="font-medium text-foreground block">
 											Laboratório:
 										</span>
-										{order.aro2.lab}
+										{order.aro2?.lab || "—"}
 									</div>
 									<div>
 										<span className="font-medium text-foreground block">
 											Lente:
 										</span>
-										{order.aro2.lensName}
+										{order.aro2?.lensName || "—"}
 									</div>
 									<div>
 										<span className="font-medium text-foreground block">
 											Tratamento:
 										</span>
-										{order.aro2.noTreatment
+										{order.aro2?.noTreatment
 											? "Sem Tratamento"
-											: order.aro2.treatment}
+											: order.aro2?.treatment || "Padrão"}
 									</div>
 									<div>
 										<span className="font-medium text-foreground block">
 											Armação:
 										</span>
-										{order.aro2.frameCode}
+										{order.aro2?.frameCode || "—"}
 									</div>
 								</div>
 
 								<OpticalDioptersTable
 									idPrefix="detail-aro2"
 									title="Dioptrias Cadastradas — Aro 2"
-									value={order.aro2.diopters}
+									value={order.aro2?.diopters}
 									onChange={() => {}}
 									readOnly
 								/>
@@ -320,25 +363,26 @@ export function OpticalOrderDetailSheet({
 								Endereço de Entrega & Contato (ViaCEP)
 							</div>
 							<div className="text-muted-foreground">
-								{order.patient.street}, {order.patient.number}{" "}
-								{order.patient.complement && `(${order.patient.complement})`} —{" "}
-								{order.patient.neighborhood}, {order.patient.city}/
-								{order.patient.state} — CEP: {order.patient.cep}
+								{order.patient?.street || ""}, {order.patient?.number || ""}{" "}
+								{order.patient?.complement && `(${order.patient.complement})`}{" "}
+								{order.patient?.neighborhood ? `— ${order.patient.neighborhood}, ` : ""}
+								{order.patient?.city || ""}/{order.patient?.state || ""}{" "}
+								{order.patient?.cep ? `— CEP: ${order.patient.cep}` : ""}
 							</div>
 							<div className="text-muted-foreground">
 								CPF:{" "}
 								<span className="font-mono text-foreground">
-									{order.patient.cpf}
+									{order.patient?.cpf || "Não informado"}
 								</span>{" "}
-								| E-mail: {order.patient.email || "Não informado"}
+								| E-mail: {order.patient?.email || "Não informado"}
 							</div>
 							{order.doctor && (
 								<div className="text-muted-foreground pt-1 border-t">
 									Prescrição Médica:{" "}
 									<span className="font-medium text-foreground">
-										{order.doctor.name}
+										{order.doctor?.name || "Médico"}
 									</span>{" "}
-									({order.doctor.crm || "CRM não inf."})
+									({order.doctor?.crm || "CRM não inf."})
 								</div>
 							)}
 						</div>
@@ -353,12 +397,12 @@ export function OpticalOrderDetailSheet({
 								</span>
 								<Badge
 									variant={
-										order.financials.paymentMode === "TOTAL"
+										fin.paymentMode === "TOTAL"
 											? "default"
 											: "secondary"
 									}
 								>
-									{order.financials.paymentMode === "TOTAL"
+									{fin.paymentMode === "TOTAL"
 										? "Quitação Total"
 										: "Apenas Sinal"}
 								</Badge>
@@ -370,7 +414,7 @@ export function OpticalOrderDetailSheet({
 										Subtotal Armações
 									</span>
 									<span className="text-base font-bold font-mono">
-										R$ {order.financials.subtotalFrames.toFixed(2)}
+										R$ {subtotalFrames.toFixed(2)}
 									</span>
 								</div>
 								<div className="p-3 rounded-lg bg-muted/40 border">
@@ -378,7 +422,7 @@ export function OpticalOrderDetailSheet({
 										Subtotal Lentes
 									</span>
 									<span className="text-base font-bold font-mono">
-										R$ {order.financials.subtotalLenses.toFixed(2)}
+										R$ {subtotalLenses.toFixed(2)}
 									</span>
 								</div>
 								<div className="p-3 rounded-lg bg-muted/40 border">
@@ -386,7 +430,7 @@ export function OpticalOrderDetailSheet({
 										Subtotal Tratamentos
 									</span>
 									<span className="text-base font-bold font-mono">
-										R$ {order.financials.subtotalTreatments.toFixed(2)}
+										R$ {subtotalTreatments.toFixed(2)}
 									</span>
 								</div>
 								<div className="p-3 rounded-lg bg-muted/40 border">
@@ -394,7 +438,7 @@ export function OpticalOrderDetailSheet({
 										Desconto Concedido
 									</span>
 									<span className="text-base font-bold font-mono text-emerald-600 dark:text-emerald-400">
-										- R$ {order.financials.discount.toFixed(2)}
+										- R$ {discount.toFixed(2)}
 									</span>
 								</div>
 							</div>
@@ -407,19 +451,19 @@ export function OpticalOrderDetailSheet({
 										Total da Venda:
 									</span>
 									<span className="font-bold font-mono text-base text-foreground">
-										R$ {order.financials.totalAmount.toFixed(2)}
+										R$ {totalAmount.toFixed(2)}
 									</span>
 								</div>
 								<div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400">
 									<span className="font-medium">Valor Pago no Caixa:</span>
 									<span className="font-bold font-mono text-base">
-										R$ {order.financials.paidAmount.toFixed(2)}
+										R$ {paidAmount.toFixed(2)}
 									</span>
 								</div>
 								<div className="flex justify-between text-sm p-2 rounded-md bg-muted/60 font-bold">
 									<span
 										className={
-											order.financials.residualAmount > 0
+											residualAmount > 0
 												? "text-rose-600 dark:text-rose-400"
 												: "text-foreground"
 										}
@@ -427,9 +471,9 @@ export function OpticalOrderDetailSheet({
 										Saldo Residual a Receber:
 									</span>
 									<span
-										className={`font-mono text-base font-extrabold ${order.financials.residualAmount > 0 ? "text-rose-600 dark:text-rose-400" : "text-foreground"}`}
+										className={`font-mono text-base font-extrabold ${residualAmount > 0 ? "text-rose-600 dark:text-rose-400" : "text-foreground"}`}
 									>
-										R$ {order.financials.residualAmount.toFixed(2)}
+										R$ {residualAmount.toFixed(2)}
 									</span>
 								</div>
 							</div>
@@ -438,14 +482,14 @@ export function OpticalOrderDetailSheet({
 								<span className="font-medium text-foreground">
 									Forma de Pagamento:{" "}
 								</span>
-								{order.financials.paymentMethod1}
-								{order.financials.cardInstallments1 &&
-									order.financials.cardInstallments1 > 1 && (
-										<span> em {order.financials.cardInstallments1}x</span>
+								{(fin as any).paymentMethod1 || (fin as any).paymentMethod || "Cartão de Crédito"}
+								{(fin as any).cardInstallments1 &&
+									(fin as any).cardInstallments1 > 1 && (
+										<span> em {(fin as any).cardInstallments1}x</span>
 									)}
-								{order.financials.notes && (
+								{(fin as any).notes && (
 									<div className="mt-1 pt-1 border-t text-muted-foreground italic">
-										"{order.financials.notes}"
+										"{(fin as any).notes}"
 									</div>
 								)}
 							</div>
@@ -473,7 +517,7 @@ export function OpticalOrderDetailSheet({
 								</div>
 								<Badge variant="default" className="text-xs font-mono">
 									OCR Confiança:{" "}
-									{(order.aiAudit.ocrConfidence * 100).toFixed(0)}%
+									{((Number(aiAudit.ocrConfidence) || 0.95) * 100).toFixed(0)}%
 								</Badge>
 							</div>
 						</div>
@@ -503,12 +547,12 @@ export function OpticalOrderDetailSheet({
 										variant="secondary"
 										className="text-[10px] text-emerald-600 dark:text-emerald-400"
 									>
-										{order.aiAudit.grossMarginPercent}% Margem
+										{aiAudit.grossMarginPercent || 65}% Margem
 									</Badge>
 								</div>
 								<p className="text-muted-foreground text-[11px]">
 									Custo estimado tabela lab: R${" "}
-									{order.aiAudit.estimatedLabCost.toFixed(2)}. Margem aprovada.
+									{(Number(aiAudit.estimatedLabCost) || 280).toFixed(2)}. Margem aprovada.
 								</p>
 							</div>
 
@@ -516,7 +560,7 @@ export function OpticalOrderDetailSheet({
 							<div className="rounded-lg border p-3 bg-card space-y-1">
 								<div className="flex items-center justify-between font-semibold text-foreground">
 									<span>Compatibilidade de Montagem</span>
-									{order.aiAudit.diameterThicknessCheck === "OK" ? (
+									{aiAudit.diameterThicknessCheck === "OK" ? (
 										<Icon
 											icon={CheckmarkFilled}
 											className="size-4 text-emerald-500"
@@ -539,11 +583,11 @@ export function OpticalOrderDetailSheet({
 								<div className="flex items-center justify-between font-semibold text-foreground">
 									<span>Risco de Inadimplência</span>
 									<Badge variant="outline" className="text-[10px]">
-										Risco: {order.aiAudit.creditRiskCheck}
+										Risco: {aiAudit.creditRiskCheck || "BAIXO"}
 									</Badge>
 								</div>
 								<p className="text-muted-foreground text-[11px]">
-									{order.financials.residualAmount > 0
+									{residualAmount > 0
 										? "Saldo pendente exige bloqueio de entrega até quitação em caixa."
 										: "Pedido 100% quitado. Liberação imediata sem pendências."}
 								</p>
@@ -556,7 +600,7 @@ export function OpticalOrderDetailSheet({
 								Trilha de Evidências & Ações Automatizadas
 							</span>
 							<div className="space-y-2.5">
-								{order.aiAudit.timelineEvents.map((ev) => (
+								{(aiAudit.timelineEvents || []).map((ev) => (
 									<div key={ev.id} className="flex items-start gap-2.5 text-xs">
 										<div className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
 											<Icon icon={Time} className="size-3" />

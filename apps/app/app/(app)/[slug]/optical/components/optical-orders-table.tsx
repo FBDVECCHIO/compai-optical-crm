@@ -48,9 +48,10 @@ export function OpticalOrdersTable({
 
 	const filteredOrders = useMemo(() => {
 		return orders.filter((ord) => {
+			if (!ord) return false;
 			if (statusFilter !== "ALL") {
 				if (statusFilter === "RESIDUAL") {
-					if (ord.financials.residualAmount <= 0) return false;
+					if ((Number(ord.financials?.residualAmount) || 0) <= 0) return false;
 				} else if (ord.status !== statusFilter) {
 					return false;
 				}
@@ -58,11 +59,11 @@ export function OpticalOrdersTable({
 
 			if (searchQuery.trim()) {
 				const q = searchQuery.toLowerCase();
-				const matchNum = ord.orderNumber.toLowerCase().includes(q);
-				const matchClient = ord.patient.name.toLowerCase().includes(q);
-				const matchCpf = ord.patient.cpf.includes(q);
-				const matchLab = ord.aro1.lab.toLowerCase().includes(q);
-				const matchFrame = ord.aro1.frameBrand.toLowerCase().includes(q);
+				const matchNum = (ord.orderNumber || "").toLowerCase().includes(q);
+				const matchClient = (ord.patient?.name || "").toLowerCase().includes(q);
+				const matchCpf = (ord.patient?.cpf || "").includes(q);
+				const matchLab = (ord.aro1?.lab || "").toLowerCase().includes(q);
+				const matchFrame = (ord.aro1?.frameBrand || "").toLowerCase().includes(q);
 				return matchNum || matchClient || matchCpf || matchLab || matchFrame;
 			}
 
@@ -129,10 +130,10 @@ export function OpticalOrdersTable({
 													{order.orderNumber}
 												</span>
 												<span className="font-medium text-xs text-foreground truncate max-w-[160px]">
-													{order.patient.name}
+													{order.patient?.name || "Cliente sem Nome"}
 												</span>
 												<span className="text-[11px] text-muted-foreground font-mono">
-													{order.patient.cpf}
+													{order.patient?.cpf || "—"}
 												</span>
 											</div>
 										</TableCell>
@@ -141,9 +142,14 @@ export function OpticalOrdersTable({
 										<TableCell className="py-3">
 											<div className="flex flex-col gap-1">
 												<span className="text-xs font-medium text-foreground">
-													{new Date(
-														order.promisedDeliveryDate,
-													).toLocaleDateString("pt-BR")}
+													{(() => {
+														try {
+															const d = order.promisedDeliveryDate ? new Date(order.promisedDeliveryDate) : null;
+															return d && !isNaN(d.getTime()) ? d.toLocaleDateString("pt-BR") : "—";
+														} catch {
+															return "—";
+														}
+													})()}
 												</span>
 												<Badge
 													variant="outline"
@@ -159,14 +165,14 @@ export function OpticalOrdersTable({
 										<TableCell className="py-3">
 											<div className="flex flex-col text-xs">
 												<span className="font-medium text-foreground truncate max-w-[190px]">
-													{order.aro1.frameBrand} ({order.aro1.lab})
+													{order.aro1?.frameBrand || "Armação"} ({order.aro1?.lab || "Lab"})
 												</span>
 												<span className="text-[11px] text-muted-foreground truncate max-w-[190px]">
-													{order.aro1.lensName}
+													{order.aro1?.lensName || "Lente"}
 												</span>
 												{order.hasAro2 && (
 													<span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-														+ 2º Par: {order.aro2?.frameBrand}
+														+ 2º Par: {order.aro2?.frameBrand || "Armação 2"}
 													</span>
 												)}
 											</div>
@@ -181,15 +187,15 @@ export function OpticalOrdersTable({
 										<TableCell className="py-3 text-right">
 											<div className="flex flex-col items-end">
 												<span className="font-mono text-xs font-bold text-foreground">
-													R$ {order.financials.totalAmount.toFixed(2)}
+													R$ {(Number(order.financials?.totalAmount) || 0).toFixed(2)}
 												</span>
-												{order.financials.residualAmount > 0 ? (
+												{(Number(order.financials?.residualAmount) || 0) > 0 ? (
 													<Badge
 														variant="destructive"
 														className="text-[10px] font-mono px-1.5 py-0 mt-0.5"
 													>
 														Residual: R${" "}
-														{order.financials.residualAmount.toFixed(2)}
+														{(Number(order.financials?.residualAmount) || 0).toFixed(2)}
 													</Badge>
 												) : (
 													<span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
@@ -244,7 +250,7 @@ export function OpticalOrdersTable({
 														>
 															Ver Detalhes & Dioptrias
 														</DropdownMenuItem>
-														{order.financials.residualAmount > 0 && (
+														{(Number(order.financials?.residualAmount) || 0) > 0 && (
 															<DropdownMenuItem
 																onClick={() => {
 																	payResidual(order.id);
@@ -359,7 +365,7 @@ function StatusBadge({ status }: { status: OpticalOrderStatus }) {
 	}
 }
 
-function calculateSla(promisedDateStr: string, status: OpticalOrderStatus) {
+function calculateSla(promisedDateStr?: string | null, status?: OpticalOrderStatus) {
 	if (status === "ENTREGUE") {
 		return {
 			label: "Concluído",
@@ -368,8 +374,32 @@ function calculateSla(promisedDateStr: string, status: OpticalOrderStatus) {
 		};
 	}
 
+	if (status === "CANCELADA") {
+		return {
+			label: "Cancelada",
+			icon: Warning,
+			className: "text-zinc-400 border-zinc-200 dark:border-zinc-800",
+		};
+	}
+
+	if (!promisedDateStr) {
+		return {
+			label: "Sem prazo definido",
+			icon: Time,
+			className: "text-zinc-500 border-zinc-200 dark:border-zinc-800",
+		};
+	}
+
 	const now = new Date();
 	const target = new Date(promisedDateStr);
+	if (isNaN(target.getTime())) {
+		return {
+			label: "Prazo a definir",
+			icon: Time,
+			className: "text-zinc-500 border-zinc-200 dark:border-zinc-800",
+		};
+	}
+
 	const diffMs = target.getTime() - now.getTime();
 	const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 

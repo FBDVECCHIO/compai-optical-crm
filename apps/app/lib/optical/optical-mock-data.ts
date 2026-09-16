@@ -671,30 +671,45 @@ export const INITIAL_OPTICAL_ORDERS: OpticalOrder[] = [
 ];
 
 export function generateWhatsAppLink(order: OpticalOrder): string {
-	const rawPhone = order.patient.whatsapp.replace(/\D/g, "");
-	const cleanPhone = rawPhone.startsWith("55") ? rawPhone : `55${rawPhone}`;
+	const phoneStr = order?.patient?.whatsapp || order?.patient?.secondaryPhone || "";
+	const rawPhone = (typeof phoneStr === "string" ? phoneStr : "").replace(/\D/g, "");
+	const cleanPhone = rawPhone ? (rawPhone.startsWith("55") ? rawPhone : `55${rawPhone}`) : "";
 
-	let msg = `Olá, ${order.patient.name}! Tudo bem?\n\nAqui é da Óptica Central sobre a sua Ordem de Serviço *${order.orderNumber}*.`;
+	const patientName = order?.patient?.name || "Cliente";
+	const orderNum = order?.orderNumber || "";
 
-	if (order.status === "PRONTA_LOJA") {
+	let msg = `Olá, ${patientName}! Tudo bem?\n\nAqui é da Óptica sobre a sua Ordem de Serviço *${orderNum}*.`;
+
+	const residual = Number(order?.financials?.residualAmount) || 0;
+
+	if (order?.status === "PRONTA_LOJA") {
 		msg += `\n\n🎉 Seus óculos estão *PRONTOS* para retirada na nossa loja!`;
-		if (order.financials.residualAmount > 0) {
+		if (residual > 0) {
 			const formattedResidual = new Intl.NumberFormat("pt-BR", {
 				style: "currency",
 				currency: "BRL",
-			}).format(order.financials.residualAmount);
+			}).format(residual);
 			msg += `\n\nLembramos que há um saldo residual de *${formattedResidual}* para quitação no ato da retirada.`;
 		}
 		msg += `\n\nTe esperamos para a prova e ajuste de conforto! 😊`;
-	} else if (order.status === "EM_LABORATORIO") {
-		msg += `\n\nSeus óculos estão em fase de produção especializada no laboratório técnico parceiro. Previsão de chegada: ${new Date(order.promisedDeliveryDate).toLocaleDateString("pt-BR")}.`;
-	} else if (order.status === "EM_MONTAGEM") {
+	} else if (order?.status === "EM_LABORATORIO") {
+		let dateStr = "em breve";
+		try {
+			if (order?.promisedDeliveryDate) {
+				const d = new Date(order.promisedDeliveryDate);
+				if (!isNaN(d.getTime())) dateStr = d.toLocaleDateString("pt-BR");
+			}
+		} catch {}
+		msg += `\n\nSeus óculos estão em fase de produção especializada no laboratório técnico parceiro. Previsão de chegada: ${dateStr}.`;
+	} else if (order?.status === "EM_MONTAGEM") {
 		msg += `\n\nAs lentes chegaram do laboratório e já estão na fase final de montagem na armação! Em breve te avisamos assim que estiverem prontos.`;
 	} else {
 		msg += `\n\nEstamos acompanhando sua confecção de perto! Qualquer dúvida estamos à disposição.`;
 	}
 
-	return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
+	return cleanPhone
+		? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
+		: `https://wa.me/?text=${encodeURIComponent(msg)}`;
 }
 
 // -------------------------------------------------------------

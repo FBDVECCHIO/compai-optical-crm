@@ -24,9 +24,10 @@ export interface NormalizedAddress {
 const cepCache = new Map<string, NormalizedAddress>();
 
 export async function fetchViaCep(
-	rawCep: string,
+	rawCep?: string | null,
 ): Promise<NormalizedAddress | null> {
-	const cleaned = rawCep.replace(/\D/g, "");
+	if (!rawCep) return null;
+	const cleaned = String(rawCep).replace(/\D/g, "");
 	if (cleaned.length !== 8) return null;
 
 	const cached = cepCache.get(cleaned);
@@ -66,14 +67,16 @@ export async function fetchViaCep(
 	}
 }
 
-export function formatCep(val: string): string {
-	const digits = val.replace(/\D/g, "").slice(0, 8);
+export function formatCep(val?: string | null): string {
+	if (!val) return "";
+	const digits = String(val).replace(/\D/g, "").slice(0, 8);
 	if (digits.length <= 5) return digits;
 	return `${digits.slice(0, 5)}-${digits.slice(5)}`;
 }
 
-export function formatCpf(val: string): string {
-	const digits = val.replace(/\D/g, "").slice(0, 11);
+export function formatCpf(val?: string | null): string {
+	if (!val) return "";
+	const digits = String(val).replace(/\D/g, "").slice(0, 11);
 	if (digits.length <= 3) return digits;
 	if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
 	if (digits.length <= 9)
@@ -81,8 +84,9 @@ export function formatCpf(val: string): string {
 	return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
 }
 
-export function formatPhone(val: string): string {
-	const digits = val.replace(/\D/g, "").slice(0, 11);
+export function formatPhone(val?: string | null): string {
+	if (!val) return "";
+	const digits = String(val).replace(/\D/g, "").slice(0, 11);
 	if (digits.length <= 2) return digits ? `(${digits}` : "";
 	if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
 	if (digits.length <= 10)

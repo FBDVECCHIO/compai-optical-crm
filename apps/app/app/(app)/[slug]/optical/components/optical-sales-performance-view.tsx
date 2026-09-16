@@ -112,15 +112,24 @@ export function OpticalSalesPerformanceView() {
 			});
 
 			const totalRealizado = sOrders.reduce(
-				(acc, o) => acc + o.financials.totalAmount,
+				(acc, o) => acc + (Number(o.financials?.totalAmount) || 0),
 				0,
 			);
 
 			// Vendas da semana atual (aproximação pelos últimos 6 dias)
 			const seisDiasAtras = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
 			const vendasSemana = sOrders
-				.filter((o) => new Date(o.createdAt) >= seisDiasAtras)
-				.reduce((acc, o) => acc + o.financials.totalAmount, 0);
+				.filter((o) => {
+					try {
+						const dateVal = o.orderDate || o.createdAt;
+						if (!dateVal) return false;
+						const d = new Date(dateVal);
+						return !isNaN(d.getTime()) && d >= seisDiasAtras;
+					} catch {
+						return false;
+					}
+				})
+				.reduce((acc, o) => acc + (Number(o.financials?.totalAmount) || 0), 0);
 
 			const pctAtingidoMes =
 				seller.metaMes > 0 ? (totalRealizado / seller.metaMes) * 100 : 0;
@@ -170,15 +179,15 @@ export function OpticalSalesPerformanceView() {
 
 	// Métricas Globais da Loja
 	const totalFaturadoGeral = useMemo(() => {
-		return orders.reduce((acc, o) => acc + o.financials.totalAmount, 0);
+		return orders.reduce((acc, o) => acc + (Number(o.financials?.totalAmount) || 0), 0);
 	}, [orders]);
 
 	const totalMetaLoja = useMemo(() => {
-		return sellerGoals.reduce((acc, s) => acc + s.metaMes, 0);
+		return sellerGoals.reduce((acc, s) => acc + (Number(s.metaMes) || 0), 0);
 	}, [sellerGoals]);
 
 	const totalResiduosGeral = useMemo(() => {
-		return orders.reduce((acc, o) => acc + o.financials.residualAmount, 0);
+		return orders.reduce((acc, o) => acc + (Number(o.financials?.residualAmount) || 0), 0);
 	}, [orders]);
 
 	const ticketMedioGeral = useMemo(() => {

@@ -52,9 +52,9 @@ export function OpticalKanban({ searchQuery = "" }: { searchQuery?: string }) {
 		const q = searchQuery.toLowerCase();
 		return orders.filter(
 			(o) =>
-				o.orderNumber.toLowerCase().includes(q) ||
-				o.patient.name.toLowerCase().includes(q) ||
-				o.patient.cpf.includes(q),
+				(o.orderNumber || "").toLowerCase().includes(q) ||
+				(o.patient?.name || "").toLowerCase().includes(q) ||
+				(o.patient?.cpf || "").includes(q),
 		);
 	}, [orders, searchQuery]);
 
@@ -122,23 +122,23 @@ export function OpticalKanban({ searchQuery = "" }: { searchQuery?: string }) {
 													</div>
 
 													<div className="font-semibold text-xs text-foreground truncate">
-														{order.patient.name}
+														{order.patient?.name || "Cliente sem Nome"}
 													</div>
 
 													<div className="text-[11px] text-muted-foreground truncate mt-0.5">
-														{order.aro1.frameBrand} • {order.aro1.lab}
+														{order.aro1?.frameBrand || "Armação"} • {order.aro1?.lab || "Lab"}
 													</div>
 												</button>
 
 												<div className="mt-2 flex items-center justify-between border-t pt-2">
 													<div className="flex flex-col">
 														<span className="text-[11px] font-bold font-mono text-foreground">
-															R$ {order.financials.totalAmount.toFixed(2)}
+															R$ {(Number(order.financials?.totalAmount) || 0).toFixed(2)}
 														</span>
-														{order.financials.residualAmount > 0 && (
+														{(Number(order.financials?.residualAmount) || 0) > 0 && (
 															<span className="text-[10px] font-bold font-mono text-rose-600 dark:text-rose-400">
 																Residual: R${" "}
-																{order.financials.residualAmount.toFixed(2)}
+																{(Number(order.financials?.residualAmount) || 0).toFixed(2)}
 															</span>
 														)}
 													</div>
@@ -178,12 +178,18 @@ export function OpticalKanban({ searchQuery = "" }: { searchQuery?: string }) {
 	);
 }
 
-function getKanbanSla(dateStr: string, status: OpticalOrderStatus) {
+function getKanbanSla(dateStr?: string | null, status?: OpticalOrderStatus) {
 	if (status === "ENTREGUE") {
 		return { label: "Entregue", className: "text-zinc-500" };
 	}
+	if (!dateStr) {
+		return { label: "Sem prazo", className: "text-zinc-500" };
+	}
 	const now = new Date();
 	const target = new Date(dateStr);
+	if (isNaN(target.getTime())) {
+		return { label: "Prazo pendente", className: "text-zinc-500" };
+	}
 	const diffDays = Math.ceil(
 		(target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
 	);

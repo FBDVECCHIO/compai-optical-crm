@@ -159,9 +159,9 @@ export function OpticalWarrantiesView() {
 		const cleanVal = searchVal.trim().toUpperCase();
 		const matchedOrder = orders.find(
 			(o) =>
-				o.id.toUpperCase() === cleanVal ||
-				o.orderNumber.toUpperCase() === cleanVal ||
-				o.orderNumber.toUpperCase().includes(cleanVal),
+				(o?.id || "").toUpperCase() === cleanVal ||
+				(o?.orderNumber || "").toUpperCase() === cleanVal ||
+				(o?.orderNumber || "").toUpperCase().includes(cleanVal),
 		);
 
 		if (matchedOrder) {

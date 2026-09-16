@@ -102,9 +102,9 @@ export function OpticalOsJourneyView() {
 			}
 			if (searchQuery.trim()) {
 				const q = searchQuery.toLowerCase();
-				const matchNum = order.orderNumber.toLowerCase().includes(q);
-				const matchName = order.patient.name.toLowerCase().includes(q);
-				const matchCpf = order.patient.cpf.includes(q);
+				const matchNum = (order.orderNumber || "").toLowerCase().includes(q);
+				const matchName = (order.patient?.name || "").toLowerCase().includes(q);
+				const matchCpf = (order.patient?.cpf || "").includes(q);
 				return matchNum || matchName || matchCpf;
 			}
 			return true;
@@ -175,7 +175,7 @@ export function OpticalOsJourneyView() {
 			// Se avançou para ENTREGUE, inicia automaticamente o Pós-Venda
 			if (nextStage === "ENTREGUE") {
 				await createPostSalesFromOrder(order);
-				toast.info(`Cliente ${order.patient.name} encaminhado para o ciclo de Pós-Venda (Pós 7)!`);
+				toast.info(`Cliente ${order.patient?.name || "Cliente"} encaminhado para o ciclo de Pós-Venda (Pós 7)!`);
 			}
 		}
 	};
@@ -216,14 +216,21 @@ export function OpticalOsJourneyView() {
 			.map(
 				(o) => `
 			<tr>
-				<td><strong>#${o.orderNumber}</strong></td>
-				<td>${o.patient.name}</td>
+				<td><strong>#${o.orderNumber || "—"}</strong></td>
+				<td>${o.patient?.name || "Cliente"}</td>
 				<td>${o.aro1?.lensOd || o.aro1?.lensName || "Padrão"}</td>
-				<td>${o.aro1?.diopters.od.esf || "0.00"} / ${o.aro1?.diopters.od.cil || "0.00"} x ${o.aro1?.diopters.od.eixo || "0"}°</td>
+				<td>${(o.aro1?.diopters as any)?.od?.spherical ?? (o.aro1?.diopters as any)?.od?.esf ?? "0.00"} / ${(o.aro1?.diopters as any)?.od?.cylindrical ?? (o.aro1?.diopters as any)?.od?.cil ?? "0.00"} x ${(o.aro1?.diopters as any)?.od?.axis ?? (o.aro1?.diopters as any)?.od?.eixo ?? "0"}°</td>
 				<td>${o.aro1?.lensOe || o.aro1?.lensName || "Padrão"}</td>
-				<td>${o.aro1?.diopters.oe.esf || "0.00"} / ${o.aro1?.diopters.oe.cil || "0.00"} x ${o.aro1?.diopters.oe.eixo || "0"}°</td>
+				<td>${(o.aro1?.diopters as any)?.oe?.spherical ?? (o.aro1?.diopters as any)?.oe?.esf ?? "0.00"} / ${(o.aro1?.diopters as any)?.oe?.cylindrical ?? (o.aro1?.diopters as any)?.oe?.cil ?? "0.00"} x ${(o.aro1?.diopters as any)?.oe?.axis ?? (o.aro1?.diopters as any)?.oe?.eixo ?? "0"}°</td>
 				<td>${o.aro1?.treatment || "Incolor"}</td>
-				<td>${new Date(o.promisedDeliveryDate).toLocaleDateString("pt-BR")}</td>
+				<td>${(() => {
+					try {
+						const d = o.promisedDeliveryDate ? new Date(o.promisedDeliveryDate) : null;
+						return d && !isNaN(d.getTime()) ? d.toLocaleDateString("pt-BR") : "—";
+					} catch {
+						return "—";
+					}
+				})()}</td>
 			</tr>
 		`
 			)
@@ -540,10 +547,10 @@ export function OpticalOsJourneyView() {
 														</span>
 													</div>
 													<h4 className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 mt-0.5">
-														{order.patient.name}
+														{order.patient?.name || "Cliente sem Nome"}
 													</h4>
 													<p className="text-[10px] text-zinc-400 font-mono">
-														CPF: {order.patient.cpf}
+														CPF: {order.patient?.cpf || "—"}
 													</p>
 												</div>
 
@@ -579,19 +586,19 @@ export function OpticalOsJourneyView() {
 												<div className="flex justify-between">
 													<span className="text-zinc-400">Armação:</span>
 													<span className="font-medium text-right truncate max-w-[180px]">
-														{order.aro1?.frameBrand} {order.aro1?.frameModel}
+														{order.aro1?.frameBrand || "Armação"} {order.aro1?.frameModel || ""}
 													</span>
 												</div>
 												<div className="flex justify-between">
 													<span className="text-zinc-400">Lente OD:</span>
 													<span className="font-medium text-right truncate max-w-[180px]">
-														{order.aro1?.lensOd || order.aro1?.lensName}
+														{order.aro1?.lensOd || order.aro1?.lensName || "Padrão"}
 													</span>
 												</div>
 												<div className="flex justify-between">
 													<span className="text-zinc-400">Lente OE:</span>
 													<span className="font-medium text-right truncate max-w-[180px]">
-														{order.aro1?.lensOe || order.aro1?.lensName}
+														{order.aro1?.lensOe || order.aro1?.lensName || "Padrão"}
 													</span>
 												</div>
 												<div className="flex justify-between">
@@ -631,17 +638,17 @@ export function OpticalOsJourneyView() {
 													{new Intl.NumberFormat("pt-BR", {
 														style: "currency",
 														currency: "BRL",
-													}).format(order.financials.totalAmount)}
+													}).format(Number(order.financials?.totalAmount) || 0)}
 												</span>
 											</div>
-											{order.financials.residualAmount > 0 && (
+											{(Number(order.financials?.residualAmount) || 0) > 0 && (
 												<div className="flex items-center justify-between text-xs text-rose-600 dark:text-rose-400 font-semibold">
 													<span>Saldo a Cobrar:</span>
 													<span>
 														{new Intl.NumberFormat("pt-BR", {
 															style: "currency",
 															currency: "BRL",
-														}).format(order.financials.residualAmount)}
+														}).format(Number(order.financials?.residualAmount) || 0)}
 													</span>
 												</div>
 											)}
