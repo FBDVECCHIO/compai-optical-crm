@@ -463,7 +463,7 @@ export function OpticalOrderDetailSheet({
 									</div>
 									<div>
 										<h4 className="font-bold text-sm text-foreground">
-											Comp AI Optical Inspector
+											MNOC-X Optical Inspector
 										</h4>
 										<p className="text-xs text-muted-foreground">
 											Auditoria automática de laboratório, dioptrias e margem

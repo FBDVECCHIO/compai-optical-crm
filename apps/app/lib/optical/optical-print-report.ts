@@ -31,7 +31,7 @@ export function printOpticalReport(options: PrintReportOptions) {
 	const {
 		title,
 		subtitle,
-		companyName = "Comp AI Óptica · CRM & Controle",
+		companyName = "MNOC-X · Gestão Óptica Unificada",
 		unitName = "Rede Integrada",
 		period = "Geral",
 		kpis = [],
@@ -268,7 +268,7 @@ export function printOpticalReport(options: PrintReportOptions) {
 	</table>
 
 	<div class="footer">
-		<div>Comp AI Óptica · Gestão Unificada de Balcão e Laboratórios</div>
+		<div>MNOC-X · Balcão, Laboratórios e Pós-Venda</div>
 		<div>Página 1 de 1</div>
 	</div>
 
@@ -284,6 +284,51 @@ export function printOpticalReport(options: PrintReportOptions) {
 </html>
 	`;
 
+	printWindow.document.open();
+	printWindow.document.write(html);
+	printWindow.document.close();
+}
+
+export interface PrintHtmlReportOptions {
+	title: string;
+	subtitle?: string;
+	contentHtml: string;
+}
+
+export function printHtmlReport(options: PrintHtmlReportOptions) {
+	if (typeof window === "undefined") return;
+	const printWindow = window.open("", "_blank");
+	if (!printWindow) {
+		alert("Permita popups para imprimir o relatório.");
+		return;
+	}
+	const html = `<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>${options.title}</title>
+	<style>
+		body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 24px; color: #18181b; }
+		h1 { font-size: 18px; margin: 0 0 4px; }
+		p.sub { font-size: 12px; color: #71717a; margin: 0 0 16px; }
+		table { width: 100%; border-collapse: collapse; font-size: 11px; }
+		th, td { border: 1px solid #e4e4e7; padding: 6px 8px; text-align: left; }
+		th { background: #f4f4f5; font-weight: 600; }
+		@media print { body { margin: 0; } }
+	</style>
+</head>
+<body>
+	<h1>${options.title}</h1>
+	${options.subtitle ? `<p class="sub">${options.subtitle}</p>` : ""}
+	${options.contentHtml}
+	<script>
+		window.onload = function() {
+			window.focus();
+			setTimeout(function() { window.print(); }, 250);
+		};
+	</script>
+</body>
+</html>`;
 	printWindow.document.open();
 	printWindow.document.write(html);
 	printWindow.document.close();

@@ -29,6 +29,11 @@ import { OpticalSettingsView } from "./components/optical-settings-view";
 import { OpticalSummaryCards } from "./components/optical-summary-cards";
 import { OpticalTopNav, type OpticalModuleTab } from "./components/optical-top-nav";
 import { OpticalWarrantiesView } from "./components/optical-warranties-view";
+import { OpticalOsJourneyView } from "./components/optical-os-journey-view";
+import { OpticalPostSalesView } from "./components/optical-post-sales-view";
+import { OpticalLensCatalogView } from "./components/optical-lens-catalog-view";
+import { OpticalFramesCatalogView } from "./components/optical-frames-catalog-view";
+import { OpticalBulkMessagingView } from "./components/optical-bulk-messaging-view";
 import type { OpticalOrder } from "@/lib/optical/optical-types";
 import {
 	type OpticalTab,
@@ -234,6 +239,24 @@ export function OpticalClientView() {
 		</>
 	)}
 
+	{/* MNOC-X: Jornada da OS (6 Etapas + Painel de Pedidos Lab) */}
+	{activeModule === "jornada_os" && <OpticalOsJourneyView />}
+
+	{/* MNOC-X: Gestão de Pós-Venda (Pós 7, Pós 30, Pós 90, Ativo Promo) */}
+	{activeModule === "pos_venda" && <OpticalPostSalesView />}
+
+	{/* MNOC-X: Catálogo Técnico de Lentes (Variação por olho OD/OE, Inserção em Lote) */}
+	{activeModule === "lentes" && <OpticalLensCatalogView />}
+
+	{/* MNOC-X: Catálogo de Peças (Armações e Solares, Aro, Ponte, Estoque) */}
+	{activeModule === "pecas" && <OpticalFramesCatalogView />}
+
+	{/* MNOC-X: Mensagens Padrão & Envio em Massa (WhatsApp) */}
+	{activeModule === "mensagens" && <OpticalBulkMessagingView />}
+
+	{/* MNOC-X: Garantias & Ocorrências */}
+	{activeModule === "garantias" && <OpticalWarrantiesView />}
+
 	{/* App Lentes: Conferência de Laboratório */}
 	{activeModule === "conferencia" && <OpticalConferenceView />}
 
@@ -252,7 +275,7 @@ export function OpticalClientView() {
 	{/* Comp AI: Auditoria de Receitas e Agente IA */}
 	{activeModule === "auditoria" && <OpticalAuditView />}
 
-	{/* App Lentes: Catálogo de Lentes & Estoque de Laboratório */}
+	{/* App Lentes: Catálogo de Lentes Legado & Estoque de Laboratório */}
 	{activeModule === "catalogo" && <OpticalCatalogView />}
 
 	{/* App Lentes: Centro Avançado de Configurações (Lojas, Labs, Médicos, Técnicos, Comissões, ABNT) */}

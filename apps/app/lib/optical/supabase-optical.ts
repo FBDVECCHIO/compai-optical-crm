@@ -1,4 +1,18 @@
-import type { OpticalOrder, OpticalOrderStatus } from "./optical-types";
+import type {
+	FrameCatalogItem,
+	LensCatalogItem,
+	MessageTemplateItem,
+	OpticalOrder,
+	OpticalOrderStatus,
+	PostSalesRecord,
+	PostSalesStage,
+} from "./optical-types";
+import {
+	INITIAL_FRAME_CATALOG,
+	INITIAL_LENS_CATALOG,
+	INITIAL_MESSAGE_TEMPLATES,
+	INITIAL_POST_SALES,
+} from "./optical-mock-data";
 
 const SUPABASE_URL =
 	process.env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -872,6 +886,11 @@ export async function deleteSupabaseOcorrenciasBulk(ids: number[]): Promise<bool
 
 export interface OpticalUserPermissions {
 	balcao: boolean;
+	jornada_os: boolean;
+	pos_venda: boolean;
+	lentes: boolean;
+	pecas: boolean;
+	mensagens: boolean;
 	conferencia: boolean;
 	log_vendas: boolean;
 	resumo: boolean;
@@ -917,6 +936,11 @@ export function decodeUserPermissions(user: OpticalUserRecord): OpticalUserPermi
 	if (isAdmin) {
 		return {
 			balcao: true,
+			jornada_os: true,
+			pos_venda: true,
+			lentes: true,
+			pecas: true,
+			mensagens: true,
 			conferencia: true,
 			log_vendas: true,
 			resumo: true,
@@ -943,6 +967,11 @@ export function decodeUserPermissions(user: OpticalUserRecord): OpticalUserPermi
 
 	return {
 		balcao: user.venda === "ATIVO",
+		jornada_os: true, // Sempre ativo para balcão
+		pos_venda: true, // Sempre ativo para equipe de loja
+		lentes: true, // Catálogo de lentes ativo
+		pecas: true, // Catálogo de peças ativo
+		mensagens: true, // Envio WhatsApp ativo
 		conferencia: user.conferencia === "ATIVO",
 		log_vendas: user.log_vendas === "ATIVO" || user.venda === "ATIVO",
 		resumo: user.dashboard === "ATIVO" || user.resumo_vendas === "ATIVO",
@@ -1468,6 +1497,231 @@ export async function saveAssistenciaTemplates(
 ): Promise<boolean> {
 	return await saveConfigSetting("templates_assistencia", templates);
 }
+
+// -------------------------------------------------------------
+// MNOC-X: CATÁLOGO DE LENTES
+// -------------------------------------------------------------
+const LENS_STORAGE_KEY = "mnocx_lens_catalog_v1";
+
+export async function fetchLensCatalog(): Promise<LensCatalogItem[]> {
+	if (typeof window !== "undefined") {
+		try {
+			const saved = localStorage.getItem(LENS_STORAGE_KEY);
+			if (saved) {
+				const parsed = JSON.parse(saved);
+				if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+			}
+		} catch (e) {
+			console.warn("Erro ao ler catálogo de lentes local:", e);
+		}
+	}
+	return INITIAL_LENS_CATALOG;
+}
+
+export async function saveLensCatalogItem(item: LensCatalogItem): Promise<LensCatalogItem[]> {
+	const current = await fetchLensCatalog();
+	const existingIndex = current.findIndex((l) => l.id === item.id);
+	let updated: LensCatalogItem[];
+	if (existingIndex >= 0) {
+		updated = [...current];
+		updated[existingIndex] = item;
+	} else {
+		updated = [item, ...current];
+	}
+	if (typeof window !== "undefined") {
+		try {
+			localStorage.setItem(LENS_STORAGE_KEY, JSON.stringify(updated));
+		} catch (e) {
+			console.warn("Erro ao persistir catálogo de lentes:", e);
+		}
+	}
+	return updated;
+}
+
+export async function importLensCatalogBatch(items: LensCatalogItem[]): Promise<LensCatalogItem[]> {
+	const current = await fetchLensCatalog();
+	const updated = [...items, ...current];
+	if (typeof window !== "undefined") {
+		try {
+			localStorage.setItem(LENS_STORAGE_KEY, JSON.stringify(updated));
+		} catch (e) {
+			console.warn("Erro ao importar lote de lentes:", e);
+		}
+	}
+	return updated;
+}
+
+// -------------------------------------------------------------
+// MNOC-X: CATÁLOGO DE PEÇAS (ARMAÇÕES & SOLARES)
+// -------------------------------------------------------------
+const FRAME_STORAGE_KEY = "mnocx_frame_catalog_v1";
+
+export async function fetchFrameCatalog(): Promise<FrameCatalogItem[]> {
+	if (typeof window !== "undefined") {
+		try {
+			const saved = localStorage.getItem(FRAME_STORAGE_KEY);
+			if (saved) {
+				const parsed = JSON.parse(saved);
+				if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+			}
+		} catch (e) {
+			console.warn("Erro ao ler catálogo de peças local:", e);
+		}
+	}
+	return INITIAL_FRAME_CATALOG;
+}
+
+export async function saveFrameCatalogItem(item: FrameCatalogItem): Promise<FrameCatalogItem[]> {
+	const current = await fetchFrameCatalog();
+	const existingIndex = current.findIndex((f) => f.id === item.id);
+	let updated: FrameCatalogItem[];
+	if (existingIndex >= 0) {
+		updated = [...current];
+		updated[existingIndex] = item;
+	} else {
+		updated = [item, ...current];
+	}
+	if (typeof window !== "undefined") {
+		try {
+			localStorage.setItem(FRAME_STORAGE_KEY, JSON.stringify(updated));
+		} catch (e) {
+			console.warn("Erro ao persistir catálogo de armações:", e);
+		}
+	}
+	return updated;
+}
+
+export async function importFrameCatalogBatch(items: FrameCatalogItem[]): Promise<FrameCatalogItem[]> {
+	const current = await fetchFrameCatalog();
+	const updated = [...items, ...current];
+	if (typeof window !== "undefined") {
+		try {
+			localStorage.setItem(FRAME_STORAGE_KEY, JSON.stringify(updated));
+		} catch (e) {
+			console.warn("Erro ao importar lote de armações:", e);
+		}
+	}
+	return updated;
+}
+
+// -------------------------------------------------------------
+// MNOC-X: PÓS-VENDA (EXPERIÊNCIA DO CONSUMIDOR)
+// -------------------------------------------------------------
+const POST_SALES_STORAGE_KEY = "mnocx_post_sales_v1";
+
+export async function fetchPostSalesRecords(): Promise<PostSalesRecord[]> {
+	if (typeof window !== "undefined") {
+		try {
+			const saved = localStorage.getItem(POST_SALES_STORAGE_KEY);
+			if (saved) {
+				const parsed = JSON.parse(saved);
+				if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+			}
+		} catch (e) {
+			console.warn("Erro ao ler pós-venda local:", e);
+		}
+	}
+	return INITIAL_POST_SALES;
+}
+
+export async function advancePostSalesStage(
+	id: string,
+	nextStage: PostSalesStage,
+	notes?: string,
+): Promise<PostSalesRecord[]> {
+	const current = await fetchPostSalesRecords();
+	const updated = current.map((item) => {
+		if (item.id !== id) return item;
+		return {
+			...item,
+			currentStage: nextStage,
+			lastContactAt: new Date().toISOString(),
+			contactCount: item.contactCount + 1,
+			notes: notes ? `${item.notes ? item.notes + " | " : ""}${notes}` : item.notes,
+			updatedAt: new Date().toISOString(),
+		};
+	});
+	if (typeof window !== "undefined") {
+		try {
+			localStorage.setItem(POST_SALES_STORAGE_KEY, JSON.stringify(updated));
+		} catch (e) {
+			console.warn("Erro ao atualizar estágio de pós-venda:", e);
+		}
+	}
+	return updated;
+}
+
+export async function createPostSalesFromOrder(order: OpticalOrder): Promise<PostSalesRecord> {
+	const newRecord: PostSalesRecord = {
+		id: `ps_${Date.now()}`,
+		orderId: order.id,
+		orderNumber: order.orderNumber,
+		patientName: order.patient.name,
+		patientPhone: order.patient.whatsapp,
+		sellerName: order.seller.name,
+		storeName: order.store.name,
+		deliveredAt: order.deliveredAt || new Date().toISOString(),
+		currentStage: "POS_7",
+		nextContactDueAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+		contactCount: 0,
+		notes: "Óculos entregue. Início do ciclo de pós-venda.",
+		createdAt: new Date().toISOString(),
+		updatedAt: new Date().toISOString(),
+	};
+	const current = await fetchPostSalesRecords();
+	const updated = [newRecord, ...current];
+	if (typeof window !== "undefined") {
+		try {
+			localStorage.setItem(POST_SALES_STORAGE_KEY, JSON.stringify(updated));
+		} catch (e) {
+			console.warn("Erro ao salvar pós-venda da OS:", e);
+		}
+	}
+	return newRecord;
+}
+
+// -------------------------------------------------------------
+// MNOC-X: MENSAGENS PADRÃO E ENVIO EM MASSA
+// -------------------------------------------------------------
+const MESSAGE_TEMPLATES_KEY = "mnocx_message_templates_v1";
+
+export async function fetchMessageTemplates(): Promise<MessageTemplateItem[]> {
+	if (typeof window !== "undefined") {
+		try {
+			const saved = localStorage.getItem(MESSAGE_TEMPLATES_KEY);
+			if (saved) {
+				const parsed = JSON.parse(saved);
+				if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+			}
+		} catch (e) {
+			console.warn("Erro ao ler templates de mensagens:", e);
+		}
+	}
+	return INITIAL_MESSAGE_TEMPLATES;
+}
+
+export async function saveMessageTemplate(
+	template: MessageTemplateItem,
+): Promise<MessageTemplateItem[]> {
+	const current = await fetchMessageTemplates();
+	const existingIndex = current.findIndex((t) => t.id === template.id);
+	let updated: MessageTemplateItem[];
+	if (existingIndex >= 0) {
+		updated = [...current];
+		updated[existingIndex] = template;
+	} else {
+		updated = [template, ...current];
+	}
+	if (typeof window !== "undefined") {
+		try {
+			localStorage.setItem(MESSAGE_TEMPLATES_KEY, JSON.stringify(updated));
+		} catch (e) {
+			console.warn("Erro ao salvar template de mensagem:", e);
+		}
+	}
+	return updated;
+}
+
 
 
 

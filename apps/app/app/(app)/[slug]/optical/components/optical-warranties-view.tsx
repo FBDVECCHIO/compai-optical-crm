@@ -474,12 +474,17 @@ export function OpticalWarrantiesView() {
 			{/* Header */}
 			<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 				<div>
-					<h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-						<Icon icon={WarningAlt} className="size-5 text-amber-500" />
-						Garantias, Devoluções & Ocorrências de Balcão
-					</h2>
-					<p className="text-xs text-muted-foreground mt-0.5">
-						Gestão de trocas por não adaptação, erros de refação de laboratório, estornos e acionamento técnico via WhatsApp.
+					<div className="flex items-center gap-2">
+						<span className="px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase rounded-md bg-zinc-900 text-white dark:bg-white dark:text-zinc-900">
+							MNOC-X
+						</span>
+						<h2 className="text-xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 flex items-center gap-2">
+							<Icon icon={WarningAlt} className="size-5 text-amber-500" />
+							Garantias, Devoluções & Ocorrências
+						</h2>
+					</div>
+					<p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+						Gestão de trocas por não adaptação, refações em laboratórios homologados, estornos e acionamento técnico via WhatsApp.
 					</p>
 				</div>
 				<div className="flex items-center gap-2">
@@ -487,7 +492,7 @@ export function OpticalWarrantiesView() {
 						variant="outline"
 						size="sm"
 						onClick={handleExportPDF}
-						className="h-8 text-xs font-semibold gap-1.5 cursor-pointer border-neutral-300 dark:border-neutral-700 shadow-2xs"
+						className="h-8 text-xs font-semibold gap-1.5 cursor-pointer border-zinc-200 dark:border-zinc-700 shadow-2xs"
 					>
 						<Icon icon={DocumentExport} className="size-3.5" />
 						Exportar PDF
@@ -496,7 +501,7 @@ export function OpticalWarrantiesView() {
 						variant="outline"
 						size="sm"
 						onClick={loadData}
-						className="h-8 text-xs font-semibold gap-1.5 cursor-pointer"
+						className="h-8 text-xs font-semibold gap-1.5 cursor-pointer border-zinc-200 dark:border-zinc-700"
 					>
 						<Icon icon={Reset} className="size-3.5" />
 						Atualizar
@@ -504,7 +509,7 @@ export function OpticalWarrantiesView() {
 					<Button
 						size="sm"
 						onClick={openCreateForm}
-						className="h-8 text-xs font-bold gap-1.5 bg-primary text-primary-foreground shadow-xs cursor-pointer"
+						className="h-8 text-xs font-bold gap-1.5 bg-zinc-800 text-white hover:bg-zinc-900 dark:bg-zinc-200 dark:text-zinc-900 shadow-xs cursor-pointer"
 					>
 						<Icon icon={Add} className="size-3.5" />
 						Nova Ocorrência

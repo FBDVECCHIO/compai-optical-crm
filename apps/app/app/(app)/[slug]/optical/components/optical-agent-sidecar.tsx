@@ -248,6 +248,22 @@ export function OpticalAgentSidecar({
 					<Icon icon={Help} className="size-3 text-amber-500" />
 					Dúvida Aro 2
 				</button>
+				<button
+					type="button"
+					onClick={() => handleQuickPrompt("O que é o Número de Abbe e como afeta a aberração cromática?")}
+					className="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-[10px] font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 transition-colors cursor-pointer"
+				>
+					<Icon icon={Calculator} className="size-3 text-blue-500" />
+					Abbe & Física
+				</button>
+				<button
+					type="button"
+					onClick={() => handleQuickPrompt("Explique a diferença fisiológica entre Miopia e Astigmatismo")}
+					className="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-[10px] font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 transition-colors cursor-pointer"
+				>
+					<Icon icon={Help} className="size-3 text-purple-500" />
+					Miopia vs Astigmatismo
+				</button>
 			</div>
 
 			{/* Mensagens (Scrollable Area) */}
@@ -617,11 +633,88 @@ function generateAgentResponse(query: string, orders: OpticalOrder[]): MessageIt
 		};
 	}
 
+	// 10. Fisiologia do Olho Humano & Ametropias (Consultor Óptico)
+	if (q.includes("miopia") || q.includes("hipermetropia") || q.includes("astigmatismo") || q.includes("presbiopia") || q.includes("fisiologia") || q.includes("cristalino") || q.includes("cornea") || q.includes("córnea") || q.includes("retina")) {
+		return {
+			id: `resp_${Date.now()}`,
+			sender: "agent",
+			text: `👁️ **Consultor Óptico — Fisiologia do Olho & Ametropias:**
+
+• **Miopia (Divergente / Sinal Negativo -)**:
+  - *Causa*: Globo ocular longo no eixo axial ou curvatura excessiva da córnea.
+  - *Foco*: Imagem forma-se **antes** da retina.
+  - *Correção*: Lentes côncavas/divergentes (centro mais fino, borda mais grossa).
+
+• **Hipermetropia (Convergente / Sinal Positivo +)**:
+  - *Causa*: Globo ocular curto ou córnea plana.
+  - *Foco*: Imagem forma-se **atrás** da retina.
+  - *Correção*: Lentes convexas/convergentes (centro mais espesso, borda fina).
+
+• **Astigmatismo (Cilíndrico / Eixo 1° a 180°)**:
+  - *Causa*: Córnea assimétrica (formato de bola de futebol americano em vez de futebol comum), gerando múltiplos pontos focais (meridianos ortogonais).
+  - *Correção*: Lentes tóricas/cilíndricas corrigindo a dioptria no meridiano exato do eixo.
+
+• **Presbiopia ('Vista Cansada' / Adição +0.75 a +3.50)**:
+  - *Causa*: Perda fisiológica da elasticidade do cristalino e do tônus do músculo ciliar a partir dos 40-45 anos.
+  - *Correção*: Lentes multifocais progressivas, bifocais ou ocupacionais.`,
+			timestamp,
+		};
+	}
+
+	// 11. Física Básica da Luz e Número Abbe
+	if (q.includes("abbe") || q.includes("dispersão") || q.includes("dispersao") || q.includes("snell") || q.includes("física") || q.includes("fisica") || q.includes("antirreflexo") || q.includes("ar")) {
+		return {
+			id: `resp_${Date.now()}`,
+			sender: "agent",
+			text: `🔬 **Consultor Óptico — Física Básica da Luz & Lentes:**
+
+• **Número de Abbe (V-number)**:
+  - Mede a constringência e dispersão cromática do material (separação das cores do espectro da luz).
+  - **Quanto maior o Abbe, menor a aberração cromática** e mais limpa é a visão periférica.
+  - *Comparativo*:
+    * CR-39 (1.50): Abbe 58 (excelente pureza óptica)
+    * Trivex (1.53): Abbe 45 (ótima óptica e ultrarresistente)
+    * Alto Índice (1.67): Abbe 32
+    * Super Alto Índice (1.74): Abbe 33
+    * Policarbonato (1.59): Abbe 30 (maior dispersão; requer tratamentos antirreflexo de alta tecnologia).
+
+• **Lei de Snell-Descartes (n1 · sen(θ1) = n2 · sen(θ2))**:
+  - Quanto maior o índice de refração (n) da matéria, mais a luz sofre refração e mais plana/fina a lente pode ser construída para a mesma dioptria.
+
+• **Tratamento Antirreflexo (AR)**:
+  - Atua por interferência destrutiva eliminando até 99.8% dos reflexos residuais da superfície da lente, maximizando a transmissão de luz para a retina.`,
+			timestamp,
+		};
+	}
+
+	// 12. Ciclo de Pós-Venda MNOC-X
+	if (q.includes("pós") || q.includes("pos") || q.includes("experiência") || q.includes("experiencia") || q.includes("jornada")) {
+		return {
+			id: `resp_${Date.now()}`,
+			sender: "agent",
+			text: `📱 **Ciclo de Pós-Venda MNOC-X (Experiência do Consumidor):**
+
+1. **Pós 7 Dias (Adaptação Inicial)**:
+   - *Foco*: Checagem de adaptação com armação e novas lentes (especialmente multifocais e astigmatismo).
+   - *Ação*: WhatsApp com mensagem cordial de suporte.
+
+2. **Pós 30 Dias (Ajuste Fino Ergonômico)**:
+   - *Foco*: Convite para limpeza ultrassônica e ajuste das plaquetas, ponteiras e parafusos na loja.
+
+3. **Pós 90 Dias (Satisfação Plena & Indicação)**:
+   - *Foco*: Avaliação de satisfação do cliente (NPS) e convite para indicar amigos/familiares com benefício.
+
+4. **Ativo Promocional (10 a 12 meses)**:
+   - *Foco*: Lembrete de consulta de rotina anual com o médico oftalmologista e voucher exclusivo de renovação.`,
+			timestamp,
+		};
+	}
+
 	// Resposta Padrão Inteligente
 	return {
 		id: `resp_${Date.now()}`,
 		sender: "agent",
-		text: "Entendido! Estou monitorando todas as ordens e parâmetros ópticos em tempo real.\n\nVocê pode me pedir:\n• Status de qualquer OS (ex: 'OS 1045' ou 'Mariana Souza')\n• Resumo financeiro ('Quem tem resíduo a pagar?')\n• Cálculo técnico ('Transpor +2.00 -1.50 45')\n• Apoio operacional ('Como emitir Aro 2?')\n\nDigite sua dúvida ou selecione um dos atalhos rápidos acima!",
+		text: "Entendido! Estou monitorando todas as ordens e parâmetros ópticos em tempo real.\n\nVocê pode me pedir:\n• Consultoria Técnica ('O que é Número de Abbe?', 'Explique a Miopia')\n• Posição de OS (ex: 'OS 1045' ou 'Mariana Souza')\n• Resumo financeiro ('Quem tem resíduo a pagar?')\n• Transposição ('Transpor +2.00 -1.50 45')\n• Ciclo de Pós-Venda ('Como funciona o pós 7 dias?')\n\nDigite sua dúvida ou selecione um dos atalhos rápidos acima!",
 		timestamp,
 	};
 }

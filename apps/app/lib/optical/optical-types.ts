@@ -1,11 +1,16 @@
 export type OpticalOrderStatus =
 	| "DIGITADA"
+	| "PEDIDO"
+	| "MONTAGEM"
+	| "CONFERIDO"
+	| "LOJA"
+	| "ENTREGUE"
+	| "CANCELADA"
+	// Compatibilidade legada
 	| "EM_LABORATORIO"
 	| "EM_MONTAGEM"
 	| "CONFERIDA"
-	| "PRONTA_LOJA"
-	| "ENTREGUE"
-	| "CANCELADA";
+	| "PRONTA_LOJA";
 
 export type OpticalPaymentMode = "TOTAL" | "SINAL";
 
@@ -45,6 +50,20 @@ export interface AroItem {
 	noTreatment: boolean;
 	treatmentPrice: number;
 	diopters: EyePrescription;
+
+	// Suporte a variação por olho (OD e OE) a partir do catálogo
+	differentLensesPerEye?: boolean;
+	lensOd?: string;
+	lensPriceOd?: number;
+	treatmentOd?: string;
+	treatmentPriceOd?: number;
+	labOd?: string;
+
+	lensOe?: string;
+	lensPriceOe?: number;
+	treatmentOe?: string;
+	treatmentPriceOe?: number;
+	labOe?: string;
 }
 
 export interface OpticalPatient {
@@ -129,6 +148,11 @@ export interface OpticalOrder {
 	labExpectedAt?: string;
 	readyAt?: string;
 	deliveredAt?: string;
+
+	// Gestão de Nota Fiscal (NF feita ou não)
+	invoiceIssued?: boolean;
+	invoiceNumber?: string;
+
 	aro1: AroItem;
 	hasAro2: boolean;
 	isAro2CopyOfAro1: boolean;
@@ -137,4 +161,90 @@ export interface OpticalOrder {
 	aiAudit: OpticalAIAudit;
 	createdAt: string;
 	updatedAt: string;
+}
+
+// -------------------------------------------------------------
+// PÓS-VENDA (EXPERIÊNCIA DO CONSUMIDOR)
+// -------------------------------------------------------------
+export type PostSalesStage = "POS_7" | "POS_30" | "POS_90" | "ATIVO_PROMO";
+
+export interface PostSalesRecord {
+	id: string;
+	orderId: string;
+	orderNumber: string;
+	patientName: string;
+	patientPhone: string;
+	sellerName: string;
+	storeName: string;
+	deliveredAt: string; // ISO date
+	currentStage: PostSalesStage;
+	lastContactAt?: string;
+	nextContactDueAt: string;
+	contactCount: number;
+	notes?: string;
+	feedbackRating?: "EXCELLENT" | "GOOD" | "REGULAR" | "ADJUSTMENT_NEEDED";
+	promoSent?: boolean;
+	createdAt: string;
+	updatedAt: string;
+}
+
+// -------------------------------------------------------------
+// CATÁLOGO DE LENTES (ABASTECE A OS COM VARIAÇÃO POR OLHO)
+// -------------------------------------------------------------
+export type LensCategory = "MONOFOCAL" | "MULTIFOCAL" | "BIFOCAL" | "OCUPACIONAL";
+
+export interface LensCatalogItem {
+	id: string;
+	tipo: LensCategory;
+	familia: string;
+	produto: string;
+	custo: number;
+	preco: number;
+	indiceRefrativo: string; // "1.50" | "1.56" | "1.59" | "1.67" | "1.74"
+	tecnologia: string; // "Freeform" | "HD" | "Convencional" | "Digital"
+	laboratorio: string; // "Hoya" | "Zeiss" | "Essilor" | "Sorolab" | "Personality" | etc.
+	valorPeca: number; // valor de uma lente (olho)
+	tratamentosDisponiveis?: string[];
+	ativo: boolean;
+}
+
+// -------------------------------------------------------------
+// CATÁLOGO DE PEÇAS (ARMAÇÕES & SOLARES)
+// -------------------------------------------------------------
+export type FrameCategory = "RECEITUARIO" | "SOLAR" | "CLIP_ON";
+
+export interface FrameCatalogItem {
+	id: string;
+	tipo: FrameCategory;
+	familia: string;
+	produto: string;
+	marca: string;
+	fabricante: string;
+	tamanhoAro: string; // ex: "52", "54"
+	tamanhoPonte: string; // ex: "18", "20"
+	fotoUrl?: string;
+	estoque: number;
+	preco: number;
+	ativo: boolean;
+}
+
+// -------------------------------------------------------------
+// MENSAGENS PADRÃO E DISPARO EM MASSA
+// -------------------------------------------------------------
+export type MessageTemplateType =
+	| "POS_7"
+	| "POS_30"
+	| "POS_90"
+	| "PRONTA_LOJA"
+	| "ATIVO_PROMO"
+	| "COBRANCA_RESIDUAL"
+	| "GERAL";
+
+export interface MessageTemplateItem {
+	id: string;
+	tipo: MessageTemplateType;
+	titulo: string;
+	texto: string;
+	variaveis: string[]; // ["{{cliente}}", "{{os}}", "{{loja}}", "{{saldo}}", "{{lente}}"]
+	ativo: boolean;
 }

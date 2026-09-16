@@ -12,6 +12,9 @@ import UserAvatar from "@carbon/icons-react/es/UserAvatar";
 import UserFollow from "@carbon/icons-react/es/UserFollow";
 import WarningAlt from "@carbon/icons-react/es/WarningAlt";
 import Events from "@carbon/icons-react/es/Events";
+import DeliveryTruck from "@carbon/icons-react/es/DeliveryTruck";
+import Chat from "@carbon/icons-react/es/Chat";
+import Glasses from "@crm/ui/components/icons/glasses";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
 import { Icon } from "@crm/ui/components/icon";
@@ -21,7 +24,13 @@ import { OpticalThemeToggle } from "./optical-theme-toggle";
 
 export type OpticalModuleTab =
 	| "balcao"
+	| "jornada_os"
+	| "pos_venda"
+	| "lentes"
+	| "pecas"
+	| "mensagens"
 	| "conferencia"
+	| "garantias"
 	| "log_vendas"
 	| "resumo"
 	| "visita_medica"
@@ -56,8 +65,37 @@ export function OpticalTopNav({
 	}[] = [
 		{
 			id: "balcao",
-			label: "Balcão e Vendas",
+			label: "Balcão & Vendas",
 			icon: ShoppingCart,
+		},
+		{
+			id: "jornada_os",
+			label: "Jornada da OS",
+			icon: DeliveryTruck,
+			badge: "6 Etapas",
+			badgeVariant: "default",
+		},
+		{
+			id: "pos_venda",
+			label: "Pós-Venda",
+			icon: UserFollow,
+			badge: "Experiência",
+			badgeVariant: "secondary",
+		},
+		{
+			id: "lentes",
+			label: "Catálogo Lentes",
+			icon: Catalog,
+		},
+		{
+			id: "pecas",
+			label: "Peças & Solares",
+			icon: Glasses,
+		},
+		{
+			id: "mensagens",
+			label: "Disparo WhatsApp",
+			icon: Chat,
 		},
 		{
 			id: "conferencia",
@@ -65,6 +103,11 @@ export function OpticalTopNav({
 			icon: CheckmarkOutline,
 			badge: pendingConferenceCount > 0 ? pendingConferenceCount : undefined,
 			badgeVariant: "destructive",
+		},
+		{
+			id: "garantias",
+			label: "Garantias",
+			icon: WarningAlt,
 		},
 		{
 			id: "log_vendas",
@@ -75,7 +118,7 @@ export function OpticalTopNav({
 		},
 		{
 			id: "resumo",
-			label: "Resumo Gerencial",
+			label: "Resumo",
 			icon: Analytics,
 		},
 		{
@@ -85,20 +128,15 @@ export function OpticalTopNav({
 		},
 		{
 			id: "medicos",
-			label: "Resultado Médico",
+			label: "Médicos",
 			icon: UserFollow,
 		},
 		{
 			id: "auditoria",
-			label: "Auditoria e Agente IA",
+			label: "Auditoria & IA",
 			icon: Bot,
 			badge: "IA Ativa",
 			badgeVariant: "outline",
-		},
-		{
-			id: "catalogo",
-			label: "Catálogo e Estoque",
-			icon: Catalog,
 		},
 		{
 			id: "config",

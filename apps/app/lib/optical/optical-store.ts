@@ -122,9 +122,18 @@ export function useOpticalOrders() {
 		notify();
 	};
 
+	const updateOrder = (order: OpticalOrder) => {
+		globalOrders = globalOrders.map((ord) => (ord.id === order.id ? order : ord));
+		notify();
+		saveOrderToSupabase(order).catch((err) =>
+			console.warn("Could not sync updated order to Supabase:", err),
+		);
+	};
+
 	return {
 		orders,
 		addOrder,
+		updateOrder,
 		updateOrderStatus,
 		payResidual,
 		resetToDefaults,

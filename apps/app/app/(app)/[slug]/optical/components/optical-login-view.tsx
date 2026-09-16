@@ -60,14 +60,19 @@ export function OpticalLoginView() {
 			<div className="w-full max-w-md space-y-8 rounded-2xl border bg-card p-8 shadow-xl">
 				{/* Brand & Title */}
 				<div className="flex flex-col items-center text-center">
-					<div className="flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md mb-4">
+					<div className="flex size-14 items-center justify-center rounded-2xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-lg mb-4 border border-zinc-700/40">
 						<GlassesIcon className="size-8" />
 					</div>
-					<h2 className="text-2xl font-bold tracking-tight text-foreground">
-						Comp AI Óptica
-					</h2>
-					<p className="mt-1 text-xs text-muted-foreground max-w-xs">
-						Sistema Integrado de Balcão, Ordens de Serviço, Conferência de Laboratório e Gestão
+					<div className="flex items-center gap-2">
+						<h2 className="text-2xl font-extrabold tracking-tight text-zinc-950 dark:text-zinc-50">
+							MNOC-X
+						</h2>
+						<span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700">
+							2.0
+						</span>
+					</div>
+					<p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 max-w-xs">
+						Sistema Operacional de Balcão, Jornada da OS, Laboratórios e Pós-Venda
 					</p>
 				</div>
 
@@ -150,9 +155,9 @@ export function OpticalLoginView() {
 					<Button
 						type="submit"
 						disabled={loading}
-						className="w-full h-10 text-xs font-bold shadow-md bg-primary text-primary-foreground hover:bg-primary/90 mt-2 cursor-pointer"
+						className="w-full h-10 text-xs font-bold shadow-md bg-zinc-800 text-white hover:bg-zinc-900 active:bg-zinc-950 dark:bg-zinc-200 dark:text-zinc-900 mt-2 cursor-pointer transition-all"
 					>
-						{loading ? "Verificando credenciais..." : "Entrar no Sistema Óptico"}
+						{loading ? "Verificando credenciais..." : "Entrar no MNOC-X"}
 					</Button>
 
 					<div className="flex items-center justify-center gap-2 pt-1">
