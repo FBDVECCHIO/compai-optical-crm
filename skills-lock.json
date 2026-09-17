@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "agent-browser": {
+      "source": "vercel-labs/agent-browser",
+      "sourceType": "github",
+      "skillPath": "skills/agent-browser/SKILL.md",
+      "computedHash": "f16441f2ebf3b7e0228fa6f22e0d77b0388cace324af81856e9a34d78ccdcb17"
+    },
     "ai-elements": {
       "source": "vercel/ai-elements",
       "sourceType": "github",
