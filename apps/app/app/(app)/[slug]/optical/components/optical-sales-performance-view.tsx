@@ -255,161 +255,7 @@ export function OpticalSalesPerformanceView() {
 				</div>
 			</div>
 
-			{/* 2. KPIS GERAIS DE PERFORMANCE (Cards Brancos em Container Cinza Baixo) */}
-			<MnocxCard variant="container" padding="md" className="space-y-4">
-				<div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2.5">
-					<div className="flex items-center gap-2">
-						<div className="flex size-6 items-center justify-center rounded-lg bg-zinc-800 text-white text-xs font-bold">
-							<Icon icon={Analytics} className="size-3.5" />
-						</div>
-						<h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-							Performance Consolidada da Rede • {capitalizedMonth} / {currentYear}
-						</h2>
-					</div>
-					<div className="flex items-center gap-2">
-						<span className="text-xs text-zinc-500 font-medium">
-							Dias Úteis: {diasDecorridos} decorridos de {totalDiasUteis} ({progressDiasUteisPct.toFixed(1)}% do mês)
-						</span>
-					</div>
-				</div>
-
-				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-					{/* Card 1: Faturamento do Mês */}
-					<MnocxCard variant="info" padding="sm">
-						<div className="flex items-center justify-between">
-							<span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
-								Faturamento do Mês
-							</span>
-							<Icon icon={Money} className="size-4 text-emerald-600" />
-						</div>
-						<div className="mt-1 flex items-baseline justify-between">
-							<span className="text-xl font-bold text-zinc-900 dark:text-zinc-100 font-mono">
-								{new Intl.NumberFormat("pt-BR", {
-									style: "currency",
-									currency: "BRL",
-								}).format(totalFaturadoGeral)}
-							</span>
-							<Badge
-								variant="default"
-								className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
-							>
-								{totalMetaLoja > 0
-									? `${((totalFaturadoGeral / totalMetaLoja) * 100).toFixed(1)}% da Meta`
-									: "100%"}
-							</Badge>
-						</div>
-						<div className="mt-2 text-[11px] text-zinc-500 flex justify-between border-t pt-1.5 border-zinc-100 dark:border-zinc-800">
-							<span>Meta Total:</span>
-							<span className="font-semibold text-zinc-700 dark:text-zinc-300 font-mono">
-								{new Intl.NumberFormat("pt-BR", {
-									style: "currency",
-									currency: "BRL",
-								}).format(totalMetaLoja)}
-							</span>
-						</div>
-					</MnocxCard>
-
-					{/* Card 2: Meta Diária Necessária */}
-					<MnocxCard variant="info" padding="sm">
-						<div className="flex items-center justify-between">
-							<span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
-								Meta Diária Necessária
-							</span>
-							<Icon icon={Calendar} className="size-4 text-blue-600" />
-						</div>
-						<div className="mt-1 flex items-baseline justify-between">
-							<span className="text-xl font-bold text-blue-700 dark:text-blue-400 font-mono">
-								{new Intl.NumberFormat("pt-BR", {
-									style: "currency",
-									currency: "BRL",
-								}).format(metaDiariaLojaNecessaria)}
-								<span className="text-xs font-normal text-zinc-500">/dia</span>
-							</span>
-							<span className="text-[10px] font-semibold text-zinc-500">
-								{diasRestantes} dias restantes
-							</span>
-						</div>
-						<div className="mt-2 text-[11px] text-zinc-500 flex justify-between border-t pt-1.5 border-zinc-100 dark:border-zinc-800">
-							<span>Falta Faturar:</span>
-							<span className="font-semibold text-zinc-700 dark:text-zinc-300 font-mono">
-								{new Intl.NumberFormat("pt-BR", {
-									style: "currency",
-									currency: "BRL",
-								}).format(Math.max(0, totalMetaLoja - totalFaturadoGeral))}
-							</span>
-						</div>
-					</MnocxCard>
-
-					{/* Card 3: Tíquete Médio & OSs */}
-					<MnocxCard variant="info" padding="sm">
-						<div className="flex items-center justify-between">
-							<span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
-								Tíquete Médio / OSs
-							</span>
-							<Icon icon={ChartLineData} className="size-4 text-zinc-500" />
-						</div>
-						<div className="mt-1 flex items-baseline justify-between">
-							<span className="text-xl font-bold text-zinc-900 dark:text-zinc-100 font-mono">
-								{new Intl.NumberFormat("pt-BR", {
-									style: "currency",
-									currency: "BRL",
-								}).format(ticketMedioGeral)}
-							</span>
-							<span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
-								{orders.length} OSs
-							</span>
-						</div>
-						<div className="mt-2 text-[11px] text-zinc-500 flex justify-between border-t pt-1.5 border-zinc-100 dark:border-zinc-800">
-							<span>Ritmo da Loja:</span>
-							<span
-								className={`font-semibold font-mono ${
-									diferencaLojaRitmo >= 0
-										? "text-emerald-600"
-										: "text-amber-600"
-								}`}
-							>
-								{diferencaLojaRitmo >= 0 ? "+" : ""}
-								{new Intl.NumberFormat("pt-BR", {
-									style: "currency",
-									currency: "BRL",
-								}).format(diferencaLojaRitmo)}
-							</span>
-						</div>
-					</MnocxCard>
-
-					{/* Card 4: Saldo Residual a Receber */}
-					<MnocxCard variant="info" padding="sm">
-						<div className="flex items-center justify-between">
-							<span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
-								Saldo Residual a Receber
-							</span>
-							<Icon icon={WarningAlt} className="size-4 text-rose-500" />
-						</div>
-						<div className="mt-1 flex items-baseline justify-between">
-							<span className="text-xl font-bold text-rose-600 dark:text-rose-400 font-mono">
-								{new Intl.NumberFormat("pt-BR", {
-									style: "currency",
-									currency: "BRL",
-								}).format(totalResiduosGeral)}
-							</span>
-							<Badge
-								variant="outline"
-								className="text-[10px] text-rose-600 border-rose-200"
-							>
-								{orders.filter((o) => o.financials.residualAmount > 0).length} OSs
-							</Badge>
-						</div>
-						<div className="mt-2 text-[11px] text-zinc-500 flex justify-between border-t pt-1.5 border-zinc-100 dark:border-zinc-800">
-							<span>Receber na Retirada:</span>
-							<span className="font-semibold text-zinc-700 dark:text-zinc-300">
-								Aviso automático ativo
-							</span>
-						</div>
-					</MnocxCard>
-				</div>
-			</MnocxCard>
-
-			{/* 3. GESTÃO DE METAS POR DIAS ÚTEIS COM MEDIDOR ESTILO SALESFORCE */}
+			{/* 2. GESTÃO DE METAS POR VENDEDOR & PERFORMANCE CONSOLIDADA */}
 			<MnocxCard variant="container" padding="md" className="space-y-4">
 				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3">
 					<div>
@@ -418,12 +264,14 @@ export function OpticalSalesPerformanceView() {
 								<Icon icon={Trophy} className="size-3.5" />
 							</div>
 							<h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-								Gestão de Metas por Vendedor • Velocímetro Power BI
+								Gestão de Metas por Vendedor
 							</h2>
+							<span className="hidden sm:inline text-xs text-zinc-500 font-medium">
+								• Performance Consolidada da Rede ({capitalizedMonth} / {currentYear})
+							</span>
 						</div>
 						<p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-							Acompanhe o Pace (ritmo de venda real vs tempo útil decorrido), meta
-							diária de fechamento e o prêmio da semana.
+							Acompanhamento consolidado de vendas, ritmo diário por dias úteis e metas individuais da equipe.
 						</p>
 					</div>
 
@@ -438,9 +286,9 @@ export function OpticalSalesPerformanceView() {
 										? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-xs"
 										: "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
 								}`}
-								title="Visualização com Velocímetro Radial estilo Power BI"
+								title="Visualização com Velocímetro Radial"
 							>
-								⚡ Velocímetro Power BI
+								⚡ Velocímetro
 							</button>
 							<button
 								type="button"
@@ -483,10 +331,11 @@ export function OpticalSalesPerformanceView() {
 					</div>
 				</div>
 
-				{/* VELOCÍMETRO CONSOLIDADO MASTER DA REDE / LOJA ESTILO POWER BI */}
-				{gaugeMode === "speedometer" && (
-					<div className="p-5 rounded-2xl bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-900/90 dark:via-zinc-900 dark:to-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
-						<div className="w-full md:w-auto flex flex-col items-center">
+				{/* VELOCÍMETRO CONSOLIDADO MASTER COM CARDS DE PERFORMANCE NA VERTICAL AO LADO */}
+				{gaugeMode === "speedometer" ? (
+					<div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-900/90 dark:via-zinc-900 dark:to-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-6">
+						{/* Medidor Master à esquerda */}
+						<div className="w-full lg:w-auto flex flex-col items-center shrink-0">
 							<SpeedometerGauge
 								size="lg"
 								value={totalFaturadoGeral}
@@ -497,68 +346,164 @@ export function OpticalSalesPerformanceView() {
 							/>
 						</div>
 
-						<div className="w-full md:flex-1 grid grid-cols-2 gap-3">
-							<div className="p-3.5 rounded-xl bg-white dark:bg-zinc-850/80 border border-zinc-200 dark:border-zinc-800 shadow-xs">
-								<span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 block uppercase">
-									Faturamento Total
-								</span>
-								<span className="text-lg sm:text-xl font-extrabold font-mono text-zinc-900 dark:text-zinc-100 mt-0.5 block">
-									{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(totalFaturadoGeral)}
-								</span>
-								<span className="text-[10px] text-zinc-500 font-mono mt-0.5 block">
-									Meta: {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(totalMetaLoja)}
-								</span>
-							</div>
-
-							<div className="p-3.5 rounded-xl bg-white dark:bg-zinc-850/80 border border-zinc-200 dark:border-zinc-800 shadow-xs">
-								<span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 block uppercase">
-									Alvo Esperado Hoje
-								</span>
-								<span className="text-lg sm:text-xl font-extrabold font-mono text-blue-600 dark:text-blue-400 mt-0.5 block">
-									{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(totalMetaLoja * (progressDiasUteisPct / 100))}
-								</span>
-								<span className="text-[10px] text-zinc-500 font-mono mt-0.5 block">
-									{progressDiasUteisPct.toFixed(1)}% do mês decorrido
-								</span>
-							</div>
-
-							<div className="p-3.5 rounded-xl bg-white dark:bg-zinc-850/80 border border-zinc-200 dark:border-zinc-800 shadow-xs">
-								<span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 block uppercase">
-									Diferença de Ritmo
-								</span>
-								{totalFaturadoGeral >= totalMetaLoja * (progressDiasUteisPct / 100) ? (
-									<span className="text-lg sm:text-xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400 mt-0.5 block">
-										+{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(totalFaturadoGeral - totalMetaLoja * (progressDiasUteisPct / 100))}
+						{/* Cards de Performance Consolidada posicionados ao lado na vertical / 2 colunas */}
+						<div className="w-full lg:flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+							{/* Card 1: Faturamento do Mês */}
+							<div className="p-3.5 rounded-xl bg-white dark:bg-zinc-850/90 border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col justify-between">
+								<div className="flex items-center justify-between">
+									<span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
+										Faturamento do Mês
 									</span>
-								) : (
-									<span className="text-lg sm:text-xl font-extrabold font-mono text-rose-600 dark:text-rose-400 mt-0.5 block">
-										{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(totalFaturadoGeral - totalMetaLoja * (progressDiasUteisPct / 100))}
+									<Icon icon={Money} className="size-4 text-emerald-600" />
+								</div>
+								<div className="my-1.5 flex items-baseline justify-between">
+									<span className="text-xl font-bold text-zinc-900 dark:text-zinc-100 font-mono">
+										{new Intl.NumberFormat("pt-BR", {
+											style: "currency",
+											currency: "BRL",
+										}).format(totalFaturadoGeral)}
 									</span>
-								)}
-								<span className="text-[10px] text-zinc-500 font-mono mt-0.5 block">
-									Pace atual vs data de hoje
-								</span>
+									<Badge
+										variant="default"
+										className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
+									>
+										{totalMetaLoja > 0
+											? `${((totalFaturadoGeral / totalMetaLoja) * 100).toFixed(1)}% da Meta`
+											: "100%"}
+									</Badge>
+								</div>
+								<div className="text-[11px] text-zinc-500 flex justify-between border-t pt-1.5 border-zinc-100 dark:border-zinc-800">
+									<span>Meta Total:</span>
+									<span className="font-semibold text-zinc-700 dark:text-zinc-300 font-mono">
+										{new Intl.NumberFormat("pt-BR", {
+											style: "currency",
+											currency: "BRL",
+										}).format(totalMetaLoja)}
+									</span>
+								</div>
 							</div>
 
-							<div className="p-3.5 rounded-xl bg-white dark:bg-zinc-850/80 border border-zinc-200 dark:border-zinc-800 shadow-xs">
-								<span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 block uppercase">
-									Projeção de Fechamento
-								</span>
-								<span className="text-lg sm:text-xl font-extrabold font-mono text-zinc-900 dark:text-zinc-100 mt-0.5 block">
-									{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(
-										progressDiasUteisPct > 0 ? (totalFaturadoGeral / progressDiasUteisPct) * 100 : totalFaturadoGeral
-									)}
-								</span>
-								<span className="text-[10px] text-zinc-500 font-mono mt-0.5 block">
-									Baseado no ritmo atual
-								</span>
+							{/* Card 2: Meta Diária Necessária */}
+							<div className="p-3.5 rounded-xl bg-white dark:bg-zinc-850/90 border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col justify-between">
+								<div className="flex items-center justify-between">
+									<span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
+										Meta Diária Necessária
+									</span>
+									<Icon icon={Calendar} className="size-4 text-blue-600" />
+								</div>
+								<div className="my-1.5 flex items-baseline justify-between">
+									<span className="text-xl font-bold text-blue-700 dark:text-blue-400 font-mono">
+										{new Intl.NumberFormat("pt-BR", {
+											style: "currency",
+											currency: "BRL",
+										}).format(metaDiariaLojaNecessaria)}
+										<span className="text-xs font-normal text-zinc-500">/dia</span>
+									</span>
+									<span className="text-[10px] font-semibold text-zinc-500">
+										{diasRestantes} dias restantes
+									</span>
+								</div>
+								<div className="text-[11px] text-zinc-500 flex justify-between border-t pt-1.5 border-zinc-100 dark:border-zinc-800">
+									<span>Falta Faturar:</span>
+									<span className="font-semibold text-zinc-700 dark:text-zinc-300 font-mono">
+										{new Intl.NumberFormat("pt-BR", {
+											style: "currency",
+											currency: "BRL",
+										}).format(Math.max(0, totalMetaLoja - totalFaturadoGeral))}
+									</span>
+								</div>
 							</div>
+
+							{/* Card 3: Tíquete Médio & OSs */}
+							<div className="p-3.5 rounded-xl bg-white dark:bg-zinc-850/90 border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col justify-between">
+								<div className="flex items-center justify-between">
+									<span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
+										Tíquete Médio / OSs
+									</span>
+									<Icon icon={ChartLineData} className="size-4 text-zinc-500" />
+								</div>
+								<div className="my-1.5 flex items-baseline justify-between">
+									<span className="text-xl font-bold text-zinc-900 dark:text-zinc-100 font-mono">
+										{new Intl.NumberFormat("pt-BR", {
+											style: "currency",
+											currency: "BRL",
+										}).format(ticketMedioGeral)}
+									</span>
+									<span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+										{orders.length} OSs
+									</span>
+								</div>
+								<div className="text-[11px] text-zinc-500 flex justify-between border-t pt-1.5 border-zinc-100 dark:border-zinc-800">
+									<span>Ritmo da Loja:</span>
+									<span
+										className={`font-semibold font-mono ${
+											diferencaLojaRitmo >= 0
+												? "text-emerald-600"
+												: "text-amber-600"
+										}`}
+									>
+										{diferencaLojaRitmo >= 0 ? "+" : ""}
+										{new Intl.NumberFormat("pt-BR", {
+											style: "currency",
+											currency: "BRL",
+										}).format(diferencaLojaRitmo)}
+									</span>
+								</div>
+							</div>
+
+							{/* Card 4: Saldo Residual a Receber */}
+							<div className="p-3.5 rounded-xl bg-white dark:bg-zinc-850/90 border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col justify-between">
+								<div className="flex items-center justify-between">
+									<span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
+										Saldo Residual a Receber
+									</span>
+									<Icon icon={WarningAlt} className="size-4 text-rose-500" />
+								</div>
+								<div className="my-1.5 flex items-baseline justify-between">
+									<span className="text-xl font-bold text-rose-600 dark:text-rose-400 font-mono">
+										{new Intl.NumberFormat("pt-BR", {
+											style: "currency",
+											currency: "BRL",
+										}).format(totalResiduosGeral)}
+									</span>
+									<Badge
+										variant="outline"
+										className="text-[10px] text-rose-600 border-rose-200"
+									>
+										{orders.filter((o) => o.financials.residualAmount > 0).length} OSs
+									</Badge>
+								</div>
+								<div className="text-[11px] text-zinc-500 flex justify-between border-t pt-1.5 border-zinc-100 dark:border-zinc-800">
+									<span>Receber na Retirada:</span>
+									<span className="font-semibold text-zinc-700 dark:text-zinc-300">
+										Aviso automático ativo
+									</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				) : (
+					/* Modo Barra Compacta */
+					<div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+						<div className="flex items-center justify-between text-xs">
+							<span className="font-bold text-zinc-800 dark:text-zinc-200">
+								Progresso Consolidado da Loja: {((totalFaturadoGeral / (totalMetaLoja || 1)) * 100).toFixed(1)}%
+							</span>
+							<span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">
+								{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalFaturadoGeral)} / {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalMetaLoja)}
+							</span>
+						</div>
+						<div className="relative h-3 w-full bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+							<div
+								className="h-full bg-emerald-500 rounded-full"
+								style={{ width: `${Math.min(100, (totalFaturadoGeral / (totalMetaLoja || 1)) * 100)}%` }}
+							/>
 						</div>
 					</div>
 				)}
 
-				{/* Grid de Vendedores com Medidor Salesforce */}
-				<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+				{/* Grid de Vendedores: Otimizado na horizontal e vertical para caber o máximo de vendedores na tela */}
+				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
 					{sellerPerformance.map((seller) => {
 						// Salesforce Status colors & badge
 						const isAhead = seller.pacePct >= 105;
@@ -569,55 +514,51 @@ export function OpticalSalesPerformanceView() {
 							<MnocxCard
 								key={seller.id}
 								variant="info"
-								padding="md"
-								className="space-y-3.5 relative overflow-hidden"
+								padding="sm"
+								className="space-y-2.5 relative overflow-hidden flex flex-col justify-between"
 							>
 								{/* Header do Vendedor */}
-								<div className="flex items-start justify-between gap-3">
-									<div className="flex items-center gap-2.5">
-										<div className="flex size-9 items-center justify-center rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 font-bold">
-											<Icon icon={UserAvatar} className="size-4" />
+								<div className="flex items-start justify-between gap-1.5">
+									<div className="flex items-center gap-2 min-w-0">
+										<div className="flex size-7 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 font-bold shrink-0">
+											<Icon icon={UserAvatar} className="size-3.5" />
 										</div>
-										<div>
-											<div className="flex items-center gap-2">
-												<h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+										<div className="min-w-0">
+											<div className="flex items-center gap-1">
+												<h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
 													{seller.nome}
 												</h3>
-												<span className="text-[10px] text-zinc-400 font-medium">
-													• {seller.loja}
-												</span>
 											</div>
-											<span className="text-xs text-zinc-500 font-mono">
-												{seller.osCount} vendas concluídas no mês
+											<span className="text-[10px] text-zinc-400 font-mono block truncate">
+												{seller.osCount} OSs • {seller.loja}
 											</span>
 										</div>
 									</div>
 
-									<div className="flex items-center gap-1.5">
-										{/* Badge Estilo Salesforce de Pace */}
+									<div className="flex items-center gap-1 shrink-0">
 										{isAhead && (
-											<span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-												🚀 À Frente ({seller.paceMultiplier.toFixed(2)}x)
+											<span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+												🚀 {seller.paceMultiplier.toFixed(1)}x
 											</span>
 										)}
 										{isOnTrack && (
-											<span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20">
-												🎯 No Ritmo ({seller.paceMultiplier.toFixed(2)}x)
+											<span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20">
+												🎯 {seller.paceMultiplier.toFixed(1)}x
 											</span>
 										)}
 										{isBehind && (
-											<span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20">
-												⚠️ Abaixo do Ritmo ({seller.paceMultiplier.toFixed(2)}x)
+											<span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20">
+												⚠️ {seller.paceMultiplier.toFixed(1)}x
 											</span>
 										)}
 
 										<button
 											type="button"
 											onClick={() => handleOpenEditSeller(seller)}
-											className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+											className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
 											title="Editar metas"
 										>
-											<Icon icon={Edit} className="size-3.5" />
+											<Icon icon={Edit} className="size-3" />
 										</button>
 									</div>
 								</div>

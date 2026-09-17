@@ -1,3 +1,5 @@
+import type { FiscalInfo } from "./fiscal-service";
+
 export type OpticalOrderStatus =
 	| "DIGITADA"
 	| "PEDIDO"
@@ -152,6 +154,7 @@ export interface OpticalOrder {
 	// Gestão de Nota Fiscal (NF feita ou não)
 	invoiceIssued?: boolean;
 	invoiceNumber?: string;
+	fiscalInfo?: FiscalInfo;
 
 	aro1: AroItem;
 	hasAro2: boolean;
@@ -206,6 +209,7 @@ export interface LensCatalogItem {
 	valorPeca: number; // valor de uma lente (olho)
 	tratamentosDisponiveis?: string[];
 	ativo: boolean;
+	origem?: "PLANILHA" | "SISTEMA";
 }
 
 // -------------------------------------------------------------
@@ -226,6 +230,7 @@ export interface FrameCatalogItem {
 	estoque: number;
 	preco: number;
 	ativo: boolean;
+	origem?: "PLANILHA" | "SISTEMA";
 }
 
 // -------------------------------------------------------------

@@ -5,8 +5,8 @@ import { INITIAL_OPTICAL_ORDERS } from "./optical-mock-data";
 import { fetchRealOrdersFromSupabase, saveOrderToSupabase } from "./supabase-optical";
 import type { OpticalOrder, OpticalOrderStatus } from "./optical-types";
 
-const CURRENT_STORAGE_KEY = "mnocx_optical_orders_v2";
-const LEGACY_STORAGE_KEY = "compai_optical_orders_v1";
+export const CURRENT_STORAGE_KEY = "mnocx_optical_orders_v2";
+export const LEGACY_STORAGE_KEY = "compai_optical_orders_v1";
 
 const fallbackAIAudit = {
 	ocrConfidence: 0.98,
@@ -205,13 +205,24 @@ export function sanitizeOrder(raw: any, index = 0): OpticalOrder {
 	};
 }
 
+function getStorage(): Storage | null {
+	if (typeof window !== "undefined" && window.localStorage) {
+		return window.localStorage;
+	}
+	if (typeof globalThis !== "undefined" && (globalThis as any).localStorage) {
+		return (globalThis as any).localStorage;
+	}
+	return null;
+}
+
 function loadSavedOrders(): OpticalOrder[] {
-	if (typeof window === "undefined") {
+	const storage = getStorage();
+	if (!storage) {
 		return INITIAL_OPTICAL_ORDERS.map((o, idx) => sanitizeOrder(o, idx));
 	}
 
 	try {
-		const saved = localStorage.getItem(CURRENT_STORAGE_KEY);
+		const saved = storage.getItem(CURRENT_STORAGE_KEY);
 		if (saved) {
 			const parsed = JSON.parse(saved);
 			if (Array.isArray(parsed) && parsed.length > 0) {
@@ -220,13 +231,13 @@ function loadSavedOrders(): OpticalOrder[] {
 		}
 
 		// Fallback para chave legada e migração automática
-		const legacySaved = localStorage.getItem(LEGACY_STORAGE_KEY);
+		const legacySaved = storage.getItem(LEGACY_STORAGE_KEY);
 		if (legacySaved) {
 			const parsed = JSON.parse(legacySaved);
 			if (Array.isArray(parsed) && parsed.length > 0) {
 				const sanitized = parsed.map((o, idx) => sanitizeOrder(o, idx));
 				try {
-					localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(sanitized));
+					storage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(sanitized));
 				} catch {}
 				return sanitized;
 			}
@@ -243,9 +254,10 @@ let hasLoadedSupabase = false;
 const listeners = new Set<(orders: OpticalOrder[]) => void>();
 
 function notify() {
-	if (typeof window !== "undefined") {
+	const storage = getStorage();
+	if (storage) {
 		try {
-			localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(globalOrders));
+			storage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(globalOrders));
 		} catch (e) {
 			console.warn("Could not persist optical orders to localStorage", e);
 		}
@@ -256,16 +268,109 @@ function notify() {
 }
 
 export function clearOpticalStorage() {
-	if (typeof window !== "undefined") {
+	const storage = getStorage();
+	if (storage) {
 		try {
-			localStorage.removeItem(CURRENT_STORAGE_KEY);
-			localStorage.removeItem(LEGACY_STORAGE_KEY);
+			storage.removeItem(CURRENT_STORAGE_KEY);
+			storage.removeItem(LEGACY_STORAGE_KEY);
 		} catch (e) {
 			console.warn("Error clearing optical storage", e);
 		}
 	}
 	globalOrders = INITIAL_OPTICAL_ORDERS.map((o, idx) => sanitizeOrder(o, idx));
 	notify();
+}
+
+export function getOpticalOrders(): OpticalOrder[] {
+	return globalOrders;
+}
+
+export function setOpticalOrders(orders: OpticalOrder[]): void {
+	globalOrders = orders.map((o, idx) => sanitizeOrder(o, idx));
+	notify();
+}
+
+export function resetToDefaults(): void {
+	globalOrders = INITIAL_OPTICAL_ORDERS.map((o, idx) => sanitizeOrder(o, idx));
+	notify();
+}
+
+export function addOrder(order: OpticalOrder): OpticalOrder {
+	const safeOrder = sanitizeOrder(order);
+	globalOrders = [safeOrder, ...globalOrders];
+	notify();
+	// Salva assincronamente no Supabase
+	saveOrderToSupabase(safeOrder).catch((err) =>
+		console.warn("Could not sync new order to Supabase:", err),
+	);
+	return safeOrder;
+}
+
+export function updateOrder(order: OpticalOrder): OpticalOrder {
+	const safeOrder = sanitizeOrder(order);
+	globalOrders = globalOrders.map((ord) => (ord.id === safeOrder.id ? safeOrder : ord));
+	notify();
+	saveOrderToSupabase(safeOrder).catch((err) =>
+		console.warn("Could not sync updated order to Supabase:", err),
+	);
+	return safeOrder;
+}
+
+export function updateOrderStatus(
+	id: string,
+	newStatus: OpticalOrderStatus,
+): OpticalOrder | undefined {
+	let updatedOrder: OpticalOrder | undefined;
+	globalOrders = globalOrders.map((ord) => {
+		if (ord.id !== id) return ord;
+		const updated = {
+			...ord,
+			status: newStatus,
+			updatedAt: new Date().toISOString(),
+		};
+		if (newStatus === "PRONTA_LOJA") {
+			updated.readyAt = new Date().toISOString();
+		} else if (newStatus === "ENTREGUE") {
+			updated.deliveredAt = new Date().toISOString();
+		}
+		const sanitized = sanitizeOrder(updated);
+		updatedOrder = sanitized;
+		return sanitized;
+	});
+	notify();
+	if (updatedOrder) {
+		saveOrderToSupabase(updatedOrder).catch((err) =>
+			console.warn("Could not sync updated status to Supabase:", err),
+		);
+	}
+	return updatedOrder;
+}
+
+export function payResidual(id: string): OpticalOrder | undefined {
+	let updatedOrder: OpticalOrder | undefined;
+	globalOrders = globalOrders.map((ord) => {
+		if (ord.id !== id) return ord;
+		const total = Number(ord.financials?.totalAmount) || 0;
+		const updated = sanitizeOrder({
+			...ord,
+			financials: {
+				...ord.financials,
+				paidAmount: total,
+				residualAmount: 0,
+				paymentMode: "TOTAL",
+			},
+			updatedAt: new Date().toISOString(),
+		});
+		updatedOrder = updated;
+		return updated;
+	});
+	notify();
+	if (updatedOrder) {
+		saveOrderToSupabase(updatedOrder).catch((err) =>
+			console.warn("Could not sync paid residual order to Supabase:", err),
+		);
+	}
+	return updatedOrder;
 }
 
 export function useOpticalOrders() {
@@ -307,66 +412,6 @@ export function useOpticalOrders() {
 			listeners.delete(listener);
 		};
 	}, []);
-
-	const addOrder = (order: OpticalOrder) => {
-		const safeOrder = sanitizeOrder(order);
-		globalOrders = [safeOrder, ...globalOrders];
-		notify();
-		// Salva assincronamente no Supabase
-		saveOrderToSupabase(safeOrder).catch((err) =>
-			console.warn("Could not sync new order to Supabase:", err),
-		);
-	};
-
-	const updateOrderStatus = (id: string, newStatus: OpticalOrderStatus) => {
-		globalOrders = globalOrders.map((ord) => {
-			if (ord.id !== id) return ord;
-			const updated = {
-				...ord,
-				status: newStatus,
-				updatedAt: new Date().toISOString(),
-			};
-			if (newStatus === "PRONTA_LOJA") {
-				updated.readyAt = new Date().toISOString();
-			} else if (newStatus === "ENTREGUE") {
-				updated.deliveredAt = new Date().toISOString();
-			}
-			return sanitizeOrder(updated);
-		});
-		notify();
-	};
-
-	const payResidual = (id: string) => {
-		globalOrders = globalOrders.map((ord) => {
-			if (ord.id !== id) return ord;
-			const total = Number(ord.financials?.totalAmount) || 0;
-			return sanitizeOrder({
-				...ord,
-				financials: {
-					...ord.financials,
-					paidAmount: total,
-					residualAmount: 0,
-					paymentMode: "TOTAL",
-				},
-				updatedAt: new Date().toISOString(),
-			});
-		});
-		notify();
-	};
-
-	const resetToDefaults = () => {
-		globalOrders = INITIAL_OPTICAL_ORDERS.map((o, idx) => sanitizeOrder(o, idx));
-		notify();
-	};
-
-	const updateOrder = (order: OpticalOrder) => {
-		const safeOrder = sanitizeOrder(order);
-		globalOrders = globalOrders.map((ord) => (ord.id === safeOrder.id ? safeOrder : ord));
-		notify();
-		saveOrderToSupabase(safeOrder).catch((err) =>
-			console.warn("Could not sync updated order to Supabase:", err),
-		);
-	};
 
 	return {
 		orders,

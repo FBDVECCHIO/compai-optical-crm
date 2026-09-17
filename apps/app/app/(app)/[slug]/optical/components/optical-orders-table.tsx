@@ -94,15 +94,15 @@ export function OpticalOrdersTable({
 	return (
 		<div className="rounded-xl border bg-card shadow-xs overflow-hidden">
 			<div className="overflow-x-auto">
-				<Table>
+				<Table className="min-w-[980px]">
 					<TableHeader>
-						<tr className="border-b bg-muted/40 text-xs font-semibold text-muted-foreground">
-							<TableHead className="w-[180px]">OS & Paciente</TableHead>
-							<TableHead className="w-[150px]">Promessa / SLA</TableHead>
-							<TableHead className="w-[200px]">Aros & Lentes</TableHead>
-							<TableHead className="w-[140px]">Status da OS</TableHead>
-							<TableHead className="w-[150px] text-right">Financeiro</TableHead>
-							<TableHead className="w-[160px] text-right">Ações</TableHead>
+						<tr className="border-b bg-muted/40 text-xs font-semibold text-muted-foreground text-left">
+							<TableHead className="min-w-[180px] text-left">OS & Paciente</TableHead>
+							<TableHead className="min-w-[140px] text-left">Promessa / SLA</TableHead>
+							<TableHead className="min-w-[220px] text-left">Aros & Lentes</TableHead>
+							<TableHead className="min-w-[140px] text-left">Status da OS</TableHead>
+							<TableHead className="min-w-[150px] text-left">Financeiro</TableHead>
+							<TableHead className="min-w-[160px] text-left">Ações</TableHead>
 						</tr>
 					</TableHeader>
 					<TableBody>
@@ -139,23 +139,23 @@ export function OpticalOrdersTable({
 										className="cursor-pointer transition-colors hover:bg-muted/50"
 									>
 										{/* OS & Paciente */}
-										<TableCell className="py-3">
-											<div className="flex flex-col">
+										<TableCell className="py-2.5 text-left whitespace-nowrap">
+											<div className="flex flex-col items-start">
 												<span className="font-mono text-xs font-bold text-primary">
 													{order.orderNumber}
 												</span>
-												<span className="font-medium text-xs text-foreground truncate max-w-[160px]">
+												<span className="font-medium text-xs text-foreground">
 													{order.patient?.name || "Cliente sem Nome"}
 												</span>
 												<span className="text-[11px] text-muted-foreground font-mono">
-													{order.patient?.cpf || "—"}
+													CPF: {order.patient?.cpf || "—"}
 												</span>
 											</div>
 										</TableCell>
 
 										{/* SLA / Prazo */}
-										<TableCell className="py-3">
-											<div className="flex flex-col gap-1">
+										<TableCell className="py-2.5 text-left whitespace-nowrap">
+											<div className="flex flex-col items-start gap-1">
 												<span className="text-xs font-medium text-foreground">
 													{(() => {
 														try {
@@ -177,12 +177,12 @@ export function OpticalOrdersTable({
 										</TableCell>
 
 										{/* Aros & Lentes */}
-										<TableCell className="py-3">
-											<div className="flex flex-col text-xs">
-												<span className="font-medium text-foreground truncate max-w-[190px]">
+										<TableCell className="py-2.5 text-left whitespace-nowrap">
+											<div className="flex flex-col items-start text-xs">
+												<span className="font-medium text-foreground">
 													{order.aro1?.frameBrand || "Armação"} ({order.aro1?.lab || "Lab"})
 												</span>
-												<span className="text-[11px] text-muted-foreground truncate max-w-[190px]">
+												<span className="text-[11px] text-muted-foreground">
 													{order.aro1?.lensName || "Lente"}
 												</span>
 												{order.hasAro2 && (
@@ -194,13 +194,13 @@ export function OpticalOrdersTable({
 										</TableCell>
 
 										{/* Status Badge */}
-										<TableCell className="py-3">
+										<TableCell className="py-2.5 text-left whitespace-nowrap">
 											<StatusBadge status={order.status} />
 										</TableCell>
 
 										{/* Financeiro */}
-										<TableCell className="py-3 text-right">
-											<div className="flex flex-col items-end">
+										<TableCell className="py-2.5 text-left whitespace-nowrap">
+											<div className="flex flex-col items-start">
 												<span className="font-mono text-xs font-bold text-foreground">
 													R$ {(Number(order.financials?.totalAmount) || 0).toFixed(2)}
 												</span>
@@ -222,10 +222,10 @@ export function OpticalOrdersTable({
 
 										{/* Ações */}
 										<TableCell
-											className="py-3 text-right"
+											className="py-2.5 text-left whitespace-nowrap"
 											onClick={(e) => e.stopPropagation()}
 										>
-											<div className="flex items-center justify-end gap-1.5">
+											<div className="flex items-center justify-start gap-1.5">
 												<Button
 													asChild
 													variant="outline"

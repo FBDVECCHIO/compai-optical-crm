@@ -656,47 +656,89 @@ export function OpticalSettingsView() {
 				</div>
 			</div>
 
-			{/* Sub Tabs Navigation: Homogêneo em Grade Equilibrada */}
-			<div className="w-full rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 p-2 shadow-xs">
-				<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11 gap-1.5 w-full">
-					{[
-						{ id: "lojas", label: `Lojas (${stores.length})`, icon: Building },
-						{ id: "labs", label: `Labs (${labs.length})`, icon: Chemistry },
-						{ id: "vendedores", label: `Vendedores (${sellers.length})`, icon: UserMultiple },
-						{ id: "medicos", label: "Médicos & Clínicas", icon: UserFollow },
-						{ id: "comissoes", label: "Comissões", icon: Money },
-						{ id: "tecnicos", label: "Técnicos & Zap", icon: Phone },
-						{ id: "tolerancias", label: "Tolerâncias ISO", icon: RulerAlt },
-						{ id: "apoio", label: "Tabelas Apoio", icon: Events },
-						{ id: "usuarios", label: `Usuários (${usersList.length})`, icon: User },
-						{ id: "log_vendas", label: "Log de Vendas", icon: ListChecked },
-						{ id: "integridade", label: "Banco & Integridade", icon: Security },
-					].map((item) => {
-						const isActive = activeTab === item.id;
-						return (
-							<button
-								type="button"
-								key={item.id}
-								onClick={() => setActiveTab(item.id as SettingsSubTab)}
-								className={cn(
-									"w-full h-10 px-2 py-1 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer",
-									"flex items-center justify-center gap-1.5 text-center select-none truncate",
-									isActive
-										? "bg-zinc-900 text-white border-2 border-zinc-900 shadow-sm dark:bg-white dark:text-zinc-900 dark:border-white font-bold"
-										: "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border-2 border-zinc-300 dark:border-zinc-700 shadow-2xs hover:bg-zinc-50 hover:border-zinc-400 dark:hover:bg-zinc-700 dark:hover:border-zinc-600"
-								)}
-							>
-								<Icon
-									icon={item.icon}
+			{/* Sub Tabs Navigation: Reorganizado no mesmo padrão e largura do TopNav */}
+			<div className="w-full rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 p-3 shadow-xs">
+				<div className="flex flex-col gap-2 w-full">
+					{/* Linha 1: Cadastros Operacionais (6 colunas) */}
+					<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 w-full">
+						{[
+							{ id: "lojas", label: `Lojas (${stores.length})`, icon: Building },
+							{ id: "labs", label: `Labs (${labs.length})`, icon: Chemistry },
+							{ id: "vendedores", label: `Vendedores (${sellers.length})`, icon: UserMultiple },
+							{ id: "medicos", label: "Médicos & Clínicas", icon: UserFollow },
+							{ id: "comissoes", label: "Comissões", icon: Money },
+							{ id: "tecnicos", label: "Técnicos & Zap", icon: Phone },
+						].map((item) => {
+							const isActive = activeTab === item.id;
+							return (
+								<button
+									type="button"
+									key={item.id}
+									data-subtab={item.id}
+									onClick={() => setActiveTab(item.id as SettingsSubTab)}
+									aria-label={`Acessar configurações de ${item.label}`}
+									aria-current={isActive ? "page" : undefined}
 									className={cn(
-										"size-3.5 shrink-0",
-										isActive ? "text-white dark:text-zinc-900" : "text-zinc-500 dark:text-zinc-400"
+										"w-full h-11 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer",
+										"flex items-center justify-center gap-2 text-center select-none whitespace-nowrap",
+										"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-white focus-visible:ring-offset-2",
+										isActive
+											? "bg-zinc-900 text-white border-2 border-zinc-900 shadow-sm dark:bg-white dark:text-zinc-900 dark:border-white font-bold"
+											: "bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-2 border-zinc-300 dark:border-zinc-700 shadow-2xs hover:bg-zinc-50 hover:border-zinc-400 dark:hover:bg-zinc-700 dark:hover:border-zinc-600"
 									)}
-								/>
-								<span className="truncate">{item.label}</span>
-							</button>
-						);
-					})}
+								>
+									<Icon
+										icon={item.icon}
+										className={cn(
+											"size-4 shrink-0",
+											isActive ? "text-white dark:text-zinc-900" : "text-zinc-500 dark:text-zinc-400"
+										)}
+									/>
+									<span className="font-semibold text-xs leading-none">{item.label}</span>
+								</button>
+							);
+						})}
+					</div>
+
+					{/* Linha 2: Parâmetros Técnicos & Governança (5 colunas) */}
+					<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 w-full">
+						{[
+							{ id: "tolerancias", label: "Tolerâncias ISO", icon: RulerAlt },
+							{ id: "apoio", label: "Tabelas Apoio", icon: Events },
+							{ id: "usuarios", label: `Usuários (${usersList.length})`, icon: User },
+							{ id: "log_vendas", label: "Log de Vendas", icon: ListChecked },
+							{ id: "integridade", label: "Banco & Integridade", icon: Security },
+						].map((item) => {
+							const isActive = activeTab === item.id;
+							return (
+								<button
+									type="button"
+									key={item.id}
+									data-subtab={item.id}
+									onClick={() => setActiveTab(item.id as SettingsSubTab)}
+									aria-label={`Acessar configurações de ${item.label}`}
+									aria-current={isActive ? "page" : undefined}
+									className={cn(
+										"w-full h-11 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer",
+										"flex items-center justify-center gap-2 text-center select-none whitespace-nowrap",
+										"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-white focus-visible:ring-offset-2",
+										isActive
+											? "bg-zinc-900 text-white border-2 border-zinc-900 shadow-sm dark:bg-white dark:text-zinc-900 dark:border-white font-bold"
+											: "bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-2 border-zinc-300 dark:border-zinc-700 shadow-2xs hover:bg-zinc-50 hover:border-zinc-400 dark:hover:bg-zinc-700 dark:hover:border-zinc-600"
+									)}
+								>
+									<Icon
+										icon={item.icon}
+										className={cn(
+											"size-4 shrink-0",
+											isActive ? "text-white dark:text-zinc-900" : "text-zinc-500 dark:text-zinc-400"
+										)}
+									/>
+									<span className="font-semibold text-xs leading-none">{item.label}</span>
+								</button>
+							);
+						})}
+					</div>
 				</div>
 			</div>
 

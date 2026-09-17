@@ -52,15 +52,14 @@ export function OpticalTopNav({
 	userSession,
 	onLogout,
 }: OpticalTopNavProps) {
-	// Menus principais oficiais distribuídos em 2 fileiras inteligentes de 6 colunas
-	// Fileira 1: Operação Comercial & Balcão
-	// Fileira 2: Cadastros Técnicos, Relações Médicas & Gestão
-	const navItems: {
+	// Menus principais oficiais distribuídos em 2 fileiras inteligentes e equilibradas
+	// Fileira 1: Operação Comercial & Balcão (5 módulos principais)
+	// Fileira 2: Cadastros Técnicos, Relações Médicas & Gestão (6 módulos)
+	const row1Items: {
 		id: OpticalModuleTab;
 		label: string;
 		icon: any;
 	}[] = [
-		// --- LINHA 1: OPERAÇÃO COMERCIAL & BALCÃO ---
 		{
 			id: "balcao",
 			label: "Balcão & Vendas",
@@ -86,12 +85,13 @@ export function OpticalTopNav({
 			label: "Conferência Lab",
 			icon: CheckmarkOutline,
 		},
-		{
-			id: "garantias",
-			label: "Garantias & Ocorrências",
-			icon: WarningAlt,
-		},
-		// --- LINHA 2: CADASTROS, CLÍNICO & GESTÃO ---
+	];
+
+	const row2Items: {
+		id: OpticalModuleTab;
+		label: string;
+		icon: any;
+	}[] = [
 		{
 			id: "lentes",
 			label: "Lentes",
@@ -124,11 +124,49 @@ export function OpticalTopNav({
 		},
 	];
 
-	const visibleNavItems = navItems.filter((item) => {
-		if (!userSession) return true;
-		if (userSession.isAdmin) return true;
-		return userSession.permissions[item.id] !== false;
-	});
+	const filterVisible = (items: typeof row1Items) =>
+		items.filter((item) => {
+			if (!userSession) return true;
+			if (userSession.isAdmin) return true;
+			return userSession.permissions[item.id] !== false;
+		});
+
+	const visibleRow1 = filterVisible(row1Items);
+	const visibleRow2 = filterVisible(row2Items);
+
+	const renderNavButton = (item: (typeof row1Items)[0]) => {
+		const isActive = activeModule === item.id;
+		return (
+			<button
+				type="button"
+				key={item.id}
+				data-module={item.id}
+				onClick={() => onSelectModule(item.id)}
+				aria-label={`Acessar módulo de ${item.label}`}
+				aria-current={isActive ? "page" : undefined}
+				title={`Ir para ${item.label}`}
+				className={cn(
+					"w-full h-11 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer",
+					"flex items-center justify-center gap-2 text-center select-none",
+					"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-white focus-visible:ring-offset-2",
+					isActive
+						? "bg-zinc-900 text-white border-2 border-zinc-900 shadow-sm dark:bg-white dark:text-zinc-900 dark:border-white font-bold"
+						: "bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-2 border-zinc-300 dark:border-zinc-700 shadow-2xs hover:bg-zinc-50 hover:border-zinc-400 dark:hover:bg-zinc-700 dark:hover:border-zinc-600"
+				)}
+			>
+				<Icon
+					icon={item.icon}
+					className={cn(
+						"size-4 shrink-0",
+						isActive ? "text-white dark:text-zinc-900" : "text-zinc-500 dark:text-zinc-400"
+					)}
+				/>
+				<span className="whitespace-nowrap font-semibold text-xs leading-none">
+					{item.label}
+				</span>
+			</button>
+		);
+	};
 
 	return (
 		<div className="w-full rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 p-3 shadow-xs">
@@ -208,44 +246,20 @@ export function OpticalTopNav({
 				</div>
 			</div>
 
-			{/* Grade de Navegação: 2 fileiras equilibradas de 6 colunas com largura generosa */}
+			{/* Grade de Navegação: 2 fileiras equilibradas de 5 e 6 colunas com largura generosa */}
 			{/* Textos NUNCA truncados, delimitação nítida e anel de foco acessível */}
 			<nav
 				aria-label="Navegação Principal do MNOC-X"
-				className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 w-full"
+				className="flex flex-col gap-2 w-full"
 			>
-				{visibleNavItems.map((item) => {
-					const isActive = activeModule === item.id;
-					return (
-						<button
-							type="button"
-							key={item.id}
-							onClick={() => onSelectModule(item.id)}
-							aria-label={`Acessar módulo de ${item.label}`}
-							aria-current={isActive ? "page" : undefined}
-							title={`Ir para ${item.label}`}
-							className={cn(
-								"w-full h-11 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer",
-								"flex items-center justify-center gap-2 text-center select-none",
-								"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-white focus-visible:ring-offset-2",
-								isActive
-									? "bg-zinc-900 text-white border-2 border-zinc-900 shadow-sm dark:bg-white dark:text-zinc-900 dark:border-white font-bold"
-									: "bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-2 border-zinc-300 dark:border-zinc-700 shadow-2xs hover:bg-zinc-50 hover:border-zinc-400 dark:hover:bg-zinc-700 dark:hover:border-zinc-600"
-							)}
-						>
-							<Icon
-								icon={item.icon}
-								className={cn(
-									"size-4 shrink-0",
-									isActive ? "text-white dark:text-zinc-900" : "text-zinc-500 dark:text-zinc-400"
-								)}
-							/>
-							<span className="whitespace-nowrap font-semibold text-xs leading-none">
-								{item.label}
-							</span>
-						</button>
-					);
-				})}
+				{/* Linha 1: Operação Comercial & Balcão (5 colunas) */}
+				<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 w-full">
+					{visibleRow1.map(renderNavButton)}
+				</div>
+				{/* Linha 2: Cadastros Técnicos, Relações Médicas & Gestão (6 colunas) */}
+				<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 w-full">
+					{visibleRow2.map(renderNavButton)}
+				</div>
 			</nav>
 		</div>
 	);

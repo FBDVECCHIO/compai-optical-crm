@@ -53,6 +53,8 @@ export interface DoctorItem {
 	nome: string;
 	crm: string;
 	representante?: string;
+	especialidade?: string;
+	clinica?: string;
 }
 
 export interface ClinicItem {
@@ -149,6 +151,9 @@ export async function saveOrderToSupabase(
 			cliente_nome: order.patient.name,
 			total_venda: order.financials.totalAmount,
 			detalhes: {
+				status: order.status,
+				readyAt: order.readyAt,
+				deliveredAt: order.deliveredAt,
 				clienteCpf: order.patient.cpf,
 				clienteTelefone: order.patient.whatsapp || order.patient.secondaryPhone,
 				clienteWhatsApp: order.patient.whatsapp,
@@ -613,7 +618,9 @@ function mapVendaToOpticalOrder(row: SupabaseVendaRow): OpticalOrder {
 	const residual = Number(d.valorResidual) ?? Math.max(0, total - paid);
 
 	let status: OpticalOrderStatus = "DIGITADA";
-	if (d.conferido === true || d.status === "PRONTA_LOJA") {
+	if (d.status === "CONFERIDA") {
+		status = "CONFERIDA";
+	} else if (d.conferido === true || d.status === "PRONTA_LOJA") {
 		status = "PRONTA_LOJA";
 	} else if (d.status === "EM_MONTAGEM") {
 		status = "EM_MONTAGEM";
@@ -621,6 +628,8 @@ function mapVendaToOpticalOrder(row: SupabaseVendaRow): OpticalOrder {
 		status = "EM_LABORATORIO";
 	} else if (d.status === "ENTREGUE") {
 		status = "ENTREGUE";
+	} else if (d.status === "CANCELADA") {
+		status = "CANCELADA";
 	} else {
 		status = "DIGITADA";
 	}
@@ -654,6 +663,8 @@ function mapVendaToOpticalOrder(row: SupabaseVendaRow): OpticalOrder {
 			name: row.loja || "Conceição (Matriz)",
 		},
 		status,
+		readyAt: d.readyAt,
+		deliveredAt: d.deliveredAt,
 		orderDate: row.data || new Date().toISOString().split("T")[0] || "",
 		promisedDeliveryDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
 		aro1: {

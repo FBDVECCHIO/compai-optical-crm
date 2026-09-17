@@ -1,10 +1,20 @@
 "use client";
 
+import ChevronLeft from "@carbon/icons-react/es/ChevronLeft";
+import ChevronRight from "@carbon/icons-react/es/ChevronRight";
+import OverflowMenuHorizontal from "@carbon/icons-react/es/OverflowMenuHorizontal";
 import Phone from "@carbon/icons-react/es/Phone";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@crm/ui/components/dropdown-menu";
 import { Icon } from "@crm/ui/components/icon";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { generateWhatsAppLink } from "@/lib/optical/optical-mock-data";
 import { useOpticalOrders } from "@/lib/optical/optical-store";
 import type {
@@ -43,9 +53,22 @@ const KANBAN_COLUMNS: {
 ];
 
 export function OpticalKanban({ searchQuery = "" }: { searchQuery?: string }) {
-	const { orders } = useOpticalOrders();
+	const { orders, updateOrderStatus } = useOpticalOrders();
 	const [selectedOrder, setSelectedOrder] = useState<OpticalOrder | null>(null);
 	const [sheetOpen, setSheetOpen] = useState(false);
+	const [dragOverCol, setDragOverCol] = useState<OpticalOrderStatus | null>(null);
+	const [draggedOrderId, setDraggedOrderId] = useState<string | null>(null);
+
+	const handleDrop = (orderId: string, targetStatus: OpticalOrderStatus) => {
+		const order = orders.find((o) => o.id === orderId);
+		if (!order) return;
+		if (order.status === targetStatus) return;
+
+		updateOrderStatus(orderId, targetStatus);
+		const targetCol = KANBAN_COLUMNS.find((c) => c.status === targetStatus);
+		const targetTitle = targetCol?.title || targetStatus;
+		toast.success(`OS #${order.orderNumber} movida para ${targetTitle}`);
+	};
 
 	const filteredOrders = useMemo(() => {
 		if (!searchQuery.trim()) return orders;
@@ -69,7 +92,35 @@ export function OpticalKanban({ searchQuery = "" }: { searchQuery?: string }) {
 					return (
 						<div
 							key={col.status}
-							className="flex-1 min-w-[240px] rounded-xl border bg-muted/20 p-3 flex flex-col gap-3"
+							onDragOver={(e) => {
+								e.preventDefault();
+								e.dataTransfer.dropEffect = "move";
+								if (dragOverCol !== col.status) {
+									setDragOverCol(col.status);
+								}
+							}}
+							onDragEnter={(e) => {
+								e.preventDefault();
+								setDragOverCol(col.status);
+							}}
+							onDragLeave={(e) => {
+								if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+									setDragOverCol(null);
+								}
+							}}
+							onDrop={(e) => {
+								e.preventDefault();
+								setDragOverCol(null);
+								const orderId = e.dataTransfer.getData("text/plain");
+								if (orderId) {
+									handleDrop(orderId, col.status);
+								}
+							}}
+							className={`flex-1 min-w-[240px] rounded-xl border bg-muted/20 p-3 flex flex-col gap-3 transition-all ${
+								dragOverCol === col.status
+									? "ring-2 ring-primary border-primary bg-primary/10 shadow-md"
+									: ""
+							}`}
 						>
 							<div className="flex items-center justify-between border-b pb-2 px-1">
 								<span className="font-semibold text-xs text-foreground tracking-tight">
@@ -95,11 +146,34 @@ export function OpticalKanban({ searchQuery = "" }: { searchQuery?: string }) {
 											order.promisedDeliveryDate,
 											order.status,
 										);
+										const colIndex = KANBAN_COLUMNS.findIndex(
+											(c) => c.status === order.status,
+										);
+										const prevCol =
+											colIndex > 0 ? KANBAN_COLUMNS[colIndex - 1] : null;
+										const nextCol =
+											colIndex < KANBAN_COLUMNS.length - 1
+												? KANBAN_COLUMNS[colIndex + 1]
+												: null;
 
 										return (
 											<div
 												key={order.id}
-												className={`rounded-lg border bg-card p-3 shadow-xs hover:border-primary/50 transition-all ${col.color}`}
+												draggable
+												onDragStart={(e) => {
+													e.dataTransfer.setData("text/plain", order.id);
+													e.dataTransfer.dropEffect = "move";
+													setDraggedOrderId(order.id);
+												}}
+												onDragEnd={() => {
+													setDraggedOrderId(null);
+													setDragOverCol(null);
+												}}
+												className={`rounded-lg border bg-card p-3 shadow-xs hover:border-primary/50 transition-all cursor-grab active:cursor-grabbing ${col.color} ${
+													draggedOrderId === order.id
+														? "opacity-50 scale-[0.98] border-primary"
+														: ""
+												}`}
 											>
 												<button
 													type="button"
@@ -131,35 +205,126 @@ export function OpticalKanban({ searchQuery = "" }: { searchQuery?: string }) {
 													</div>
 												</button>
 
-												<div className="mt-2 flex items-center justify-between border-t pt-2">
-													<div className="flex flex-col">
-														<span className="text-[11px] font-bold font-mono text-foreground">
+												<div className="mt-2 flex items-center justify-between border-t pt-2 gap-1">
+													<div className="flex flex-col min-w-0 flex-1">
+														<span className="text-[11px] font-bold font-mono text-foreground truncate">
 															R$ {(Number(order.financials?.totalAmount) || 0).toFixed(2)}
 														</span>
 														{(Number(order.financials?.residualAmount) || 0) > 0 && (
-															<span className="text-[10px] font-bold font-mono text-rose-600 dark:text-rose-400">
+															<span className="text-[10px] font-bold font-mono text-rose-600 dark:text-rose-400 truncate">
 																Residual: R${" "}
 																{(Number(order.financials?.residualAmount) || 0).toFixed(2)}
 															</span>
 														)}
 													</div>
 
-													<Button
-														asChild
-														size="icon"
-														variant="ghost"
-														className="size-7 text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 focus-visible:ring-2 focus-visible:ring-emerald-500"
-													>
-														<a
-															href={whatsappUrl}
-															target="_blank"
-															rel="noopener noreferrer"
-															title={`Avisar paciente ${order.patient?.name || "cliente"} sobre a OS ${order.orderNumber} no WhatsApp`}
-															aria-label={`Avisar paciente ${order.patient?.name || "cliente"} sobre a OS ${order.orderNumber} no WhatsApp`}
+													<div className="flex items-center gap-0.5 shrink-0">
+														{/* Botão rápido: Etapa anterior */}
+														<Button
+															type="button"
+															size="icon"
+															variant="ghost"
+															disabled={!prevCol}
+															onClick={(e) => {
+																e.stopPropagation();
+																if (prevCol) handleDrop(order.id, prevCol.status);
+															}}
+															className="size-7 text-muted-foreground hover:text-foreground disabled:opacity-25 focus-visible:ring-2 focus-visible:ring-primary"
+															title={
+																prevCol
+																	? `Mover para ${prevCol.title}`
+																	: "Primeira etapa"
+															}
+															aria-label={
+																prevCol
+																	? `Mover OS ${order.orderNumber} para ${prevCol.title}`
+																	: "Primeira etapa"
+															}
 														>
-															<Icon icon={Phone} className="size-3.5" />
-														</a>
-													</Button>
+															<Icon icon={ChevronLeft} className="size-3.5" />
+														</Button>
+
+														{/* Botão rápido: Próxima etapa */}
+														<Button
+															type="button"
+															size="icon"
+															variant="ghost"
+															disabled={!nextCol}
+															onClick={(e) => {
+																e.stopPropagation();
+																if (nextCol) handleDrop(order.id, nextCol.status);
+															}}
+															className="size-7 text-muted-foreground hover:text-primary disabled:opacity-25 focus-visible:ring-2 focus-visible:ring-primary"
+															title={
+																nextCol
+																	? `Mover para ${nextCol.title}`
+																	: "Última etapa"
+															}
+															aria-label={
+																nextCol
+																	? `Mover OS ${order.orderNumber} para ${nextCol.title}`
+																	: "Última etapa"
+															}
+														>
+															<Icon icon={ChevronRight} className="size-3.5" />
+														</Button>
+
+														{/* Menu dropdown rápido para qualquer etapa */}
+														<DropdownMenu>
+															<DropdownMenuTrigger asChild>
+																<Button
+																	type="button"
+																	size="icon"
+																	variant="ghost"
+																	className="size-7 text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary"
+																	title="Mudar etapa da OS"
+																	aria-label={`Mudar etapa da OS ${order.orderNumber}`}
+																>
+																	<Icon
+																		icon={OverflowMenuHorizontal}
+																		className="size-3.5"
+																	/>
+																</Button>
+															</DropdownMenuTrigger>
+															<DropdownMenuContent align="end" className="w-48 text-xs">
+																<div className="px-2 py-1.5 font-semibold text-[10px] text-muted-foreground">
+																	Mover para etapa:
+																</div>
+																{KANBAN_COLUMNS.map((target) => (
+																	<DropdownMenuItem
+																		key={target.status}
+																		disabled={target.status === order.status}
+																		onClick={() => handleDrop(order.id, target.status)}
+																		className={`cursor-pointer ${
+																			target.status === order.status
+																				? "font-bold text-primary bg-muted/50"
+																				: ""
+																		}`}
+																	>
+																		{target.title}
+																	</DropdownMenuItem>
+																))}
+															</DropdownMenuContent>
+														</DropdownMenu>
+
+														{/* Botão WhatsApp */}
+														<Button
+															asChild
+															size="icon"
+															variant="ghost"
+															className="size-7 text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 focus-visible:ring-2 focus-visible:ring-emerald-500"
+														>
+															<a
+																href={whatsappUrl}
+																target="_blank"
+																rel="noopener noreferrer"
+																title={`Avisar paciente ${order.patient?.name || "cliente"} sobre a OS ${order.orderNumber} no WhatsApp`}
+																aria-label={`Avisar paciente ${order.patient?.name || "cliente"} sobre a OS ${order.orderNumber} no WhatsApp`}
+															>
+																<Icon icon={Phone} className="size-3.5" />
+															</a>
+														</Button>
+													</div>
 												</div>
 											</div>
 										);
