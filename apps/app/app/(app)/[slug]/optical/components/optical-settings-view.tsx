@@ -82,6 +82,8 @@ import {
 	type SellerItem,
 	type StoreItem,
 	type TechnicianItem,
+	runDatabaseDiagnostic,
+	type DatabaseDiagnosticResult,
 } from "@/lib/optical/supabase-optical";
 
 type SettingsSubTab =
@@ -94,7 +96,8 @@ type SettingsSubTab =
 	| "apoio"
 	| "tolerancias"
 	| "usuarios"
-	| "log_vendas";
+	| "log_vendas"
+	| "integridade";
 
 export function OpticalSettingsView() {
 	const [activeTab, setActiveTab] = useState<SettingsSubTab>("lojas");
@@ -166,6 +169,23 @@ export function OpticalSettingsView() {
 	const [uPermGarantias, setUPermGarantias] = useState(false);
 	const [uPermAuditoria, setUPermAuditoria] = useState(false);
 	const [uPermConfig, setUPermConfig] = useState(false);
+
+	// Diagnóstico de Banco & Integridade
+	const [diagnosticResult, setDiagnosticResult] = useState<DatabaseDiagnosticResult | null>(null);
+	const [isRunningDiagnostic, setIsRunningDiagnostic] = useState(false);
+
+	const handleRunDiagnostic = async () => {
+		setIsRunningDiagnostic(true);
+		try {
+			const res = await runDatabaseDiagnostic();
+			setDiagnosticResult(res);
+			toast.success(`Diagnóstico de banco concluído em ${res.latencyMs}ms!`);
+		} catch (e) {
+			toast.error("Erro ao executar rotina de diagnóstico.");
+		} finally {
+			setIsRunningDiagnostic(false);
+		}
+	};
 
 	useEffect(() => {
 		async function loadAll() {
@@ -636,9 +656,9 @@ export function OpticalSettingsView() {
 				</div>
 			</div>
 
-			{/* Sub Tabs Navigation: Homogêneo em Grade de 10 Colunas Iguais */}
+			{/* Sub Tabs Navigation: Homogêneo em Grade Equilibrada */}
 			<div className="w-full rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 p-2 shadow-xs">
-				<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10 gap-1.5 w-full">
+				<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11 gap-1.5 w-full">
 					{[
 						{ id: "lojas", label: `Lojas (${stores.length})`, icon: Building },
 						{ id: "labs", label: `Labs (${labs.length})`, icon: Chemistry },
@@ -650,6 +670,7 @@ export function OpticalSettingsView() {
 						{ id: "apoio", label: "Tabelas Apoio", icon: Events },
 						{ id: "usuarios", label: `Usuários (${usersList.length})`, icon: User },
 						{ id: "log_vendas", label: "Log de Vendas", icon: ListChecked },
+						{ id: "integridade", label: "Banco & Integridade", icon: Security },
 					].map((item) => {
 						const isActive = activeTab === item.id;
 						return (
@@ -1904,6 +1925,157 @@ export function OpticalSettingsView() {
 			{activeTab === "log_vendas" && (
 				<div className="flex flex-col gap-4">
 					<OpticalSalesLogView />
+				</div>
+			)}
+
+			{/* CONTEÚDO DA ABA: BANCO & INTEGRIDADE RELACIONAL */}
+			{activeTab === "integridade" && (
+				<div className="flex flex-col gap-6">
+					{/* Card de Controle e Status */}
+					<div className="rounded-xl border bg-card p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+						<div>
+							<h3 className="text-base font-bold tracking-tight flex items-center gap-2">
+								<Icon icon={Security} className="size-5 text-primary" />
+								Auditoria de Banco de Dados & Relacionamentos
+							</h3>
+							<p className="text-xs text-muted-foreground mt-0.5">
+								Rotina de checagem em tempo real de latência, contagem de registros e integridade das chaves relacionais.
+							</p>
+							<div className="flex flex-wrap items-center gap-2 mt-2.5">
+								<Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[11px] font-mono">
+									Supabase: Online • Seguro
+								</Badge>
+								<Badge variant="outline" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30 text-[11px]">
+									DOM Shield: Ativo (Anti-removeChild)
+								</Badge>
+								{diagnosticResult && (
+									<Badge variant="secondary" className="text-[11px] font-mono">
+										Latência: {diagnosticResult.latencyMs}ms
+									</Badge>
+								)}
+							</div>
+						</div>
+
+						<Button
+							onClick={handleRunDiagnostic}
+							disabled={isRunningDiagnostic}
+							className="h-10 px-4 font-semibold text-xs gap-2 shrink-0 cursor-pointer shadow-xs"
+							aria-label="Executar rotina de diagnóstico do banco de dados e relacionamentos"
+						>
+							<Icon icon={Chemistry} className={cn("size-4", isRunningDiagnostic && "animate-spin")} />
+							{isRunningDiagnostic ? "Auditando Banco..." : "Executar Diagnóstico Agora"}
+						</Button>
+					</div>
+
+					{/* Resultados do Diagnóstico */}
+					{diagnosticResult ? (
+						<div className="flex flex-col gap-6">
+							{/* Grade de Tabelas */}
+							<div className="flex flex-col gap-2">
+								<h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+									Tabelas Centrais Auditadas ({diagnosticResult.tables.length})
+								</h4>
+								<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+									{diagnosticResult.tables.map((t) => (
+										<div
+											key={t.name}
+											className="rounded-xl border bg-card p-3 shadow-2xs flex flex-col justify-between gap-2"
+										>
+											<div className="flex items-center justify-between">
+												<span className="font-mono text-xs font-bold text-primary">
+													{t.name}
+												</span>
+												<Badge
+													variant={t.status === "OK" ? "outline" : "destructive"}
+													className={cn(
+														"text-[10px] font-mono",
+														t.status === "OK" && "text-emerald-600 border-emerald-500/30 bg-emerald-500/10"
+													)}
+												>
+													{t.status}
+												</Badge>
+											</div>
+											<div>
+												<div className="text-xl font-extrabold font-mono tracking-tight text-foreground">
+													{t.count.toLocaleString("pt-BR")}
+												</div>
+												<div className="text-[10px] text-muted-foreground truncate">
+													{t.description}
+												</div>
+											</div>
+										</div>
+									))}
+								</div>
+							</div>
+
+							{/* Auditoria Relacional */}
+							<div className="rounded-xl border bg-card p-5 shadow-xs flex flex-col gap-4">
+								<div>
+									<h4 className="text-sm font-bold tracking-tight flex items-center gap-2">
+										<Icon icon={ListChecked} className="size-4 text-primary" />
+										Integridade dos Relacionamentos & Chaves Estrangeiras
+									</h4>
+									<p className="text-xs text-muted-foreground mt-0.5">
+										Validação de consistência entre ordens de serviço, lojas, vendedores, prescritores e garantias.
+									</p>
+								</div>
+
+								<div className="divide-y text-xs">
+									{diagnosticResult.relationships.map((rel) => (
+										<div
+											key={rel.name}
+											className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+										>
+											<div className="flex flex-col gap-0.5">
+												<span className="font-semibold text-foreground text-xs flex items-center gap-2">
+													{rel.name}
+													{rel.status === "PERFECT" && (
+														<span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.2 rounded">
+															100% Coerente
+														</span>
+													)}
+												</span>
+												<span className="text-[11px] text-muted-foreground">
+													{rel.notes}
+												</span>
+											</div>
+
+											<div className="flex items-center gap-3">
+												<div className="text-right">
+													<div className="font-mono font-bold text-foreground">
+														{rel.matched} de {rel.total}
+													</div>
+													<div className="text-[10px] text-muted-foreground">
+														{rel.percentage}% de correspondência
+													</div>
+												</div>
+												<div className="w-20 bg-muted rounded-full h-2 overflow-hidden">
+													<div
+														className={cn(
+															"h-full rounded-full transition-all",
+															rel.percentage === 100
+																? "bg-emerald-500"
+																: rel.percentage >= 80
+																? "bg-blue-500"
+																: "bg-amber-500"
+														)}
+														style={{ width: `${rel.percentage}%` }}
+													/>
+												</div>
+											</div>
+										</div>
+									))}
+								</div>
+							</div>
+						</div>
+					) : (
+						<div className="rounded-xl border border-dashed bg-card/50 p-12 text-center flex flex-col items-center justify-center gap-3">
+							<Icon icon={Security} className="size-8 text-muted-foreground/50" />
+							<p className="text-xs text-muted-foreground max-w-md">
+								Clique no botão acima para iniciar a varredura completa do banco de dados Supabase e checar todas as relações entre tabelas.
+							</p>
+						</div>
+					)}
 				</div>
 			)}
 

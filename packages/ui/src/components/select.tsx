@@ -1,5 +1,41 @@
 "use client";
 
+if (typeof window !== "undefined") {
+	const originalRemoveChild = Node.prototype.removeChild;
+	Node.prototype.removeChild = function <T extends Node>(child: T): T {
+		if (child && child.parentNode !== this) {
+			if (typeof console !== "undefined" && console.warn) {
+				console.warn(
+					"DOM Shield (Select): child.parentNode !== this on removeChild, prevented crash.",
+					child,
+					this,
+				);
+			}
+			return child;
+		}
+		return originalRemoveChild.apply(this, arguments as any) as T;
+	};
+
+	const originalInsertBefore = Node.prototype.insertBefore;
+	Node.prototype.insertBefore = function <T extends Node>(
+		newNode: T,
+		referenceNode: Node | null,
+	): T {
+		if (referenceNode && referenceNode.parentNode !== this) {
+			if (typeof console !== "undefined" && console.warn) {
+				console.warn(
+					"DOM Shield (Select): referenceNode.parentNode !== this on insertBefore, prevented crash.",
+					newNode,
+					referenceNode,
+					this,
+				);
+			}
+			return newNode;
+		}
+		return originalInsertBefore.apply(this, arguments as any) as T;
+	};
+}
+
 import { cn } from "@crm/ui/lib/utils";
 import { cva, type VariantProps } from "class-variance-authority";
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";

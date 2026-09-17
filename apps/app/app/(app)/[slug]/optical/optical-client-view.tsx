@@ -1,5 +1,6 @@
 "use client";
 
+import "@/lib/optical/dom-guard";
 import Column from "@carbon/icons-react/es/Column";
 import Reset from "@carbon/icons-react/es/Reset";
 import Search from "@carbon/icons-react/es/Search";
@@ -101,7 +102,10 @@ export function OpticalClientView() {
 	};
 
 	return (
-		<div className="flex flex-1 min-h-0 w-full h-full overflow-hidden bg-zinc-200 dark:bg-zinc-950">
+		<div
+			className="flex flex-1 min-h-0 w-full h-full overflow-hidden bg-zinc-200 dark:bg-zinc-950 notranslate"
+			translate="no"
+		>
 			{/* Main Workspace (Left) */}
 			<div className="flex flex-col min-h-0 flex-1 h-full overflow-hidden">
 				{/* Top Navigation Hub: ENGESSADO / FIXO NO TOPO */}
