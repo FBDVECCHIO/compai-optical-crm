@@ -29,6 +29,7 @@ import { MnocxCard } from "./mnocx-card";
 import { MnocxButton } from "./mnocx-button";
 import { CreateOpticalOrderSheet } from "./create-optical-order-sheet";
 import { OpticalOrdersTable } from "./optical-orders-table";
+import { SpeedometerGauge } from "./speedometer-gauge";
 
 interface SellerGoalItem {
 	id: string;
@@ -52,6 +53,7 @@ export function OpticalSalesPerformanceView() {
 	const [regimeSabado, setRegimeSabado] = useState(true);
 	const [customTotalDiasUteis, setCustomTotalDiasUteis] = useState<number>(26);
 	const [customDiasDecorridos, setCustomDiasDecorridos] = useState<number>(14);
+	const [gaugeMode, setGaugeMode] = useState<"speedometer" | "compact">("speedometer");
 
 	const totalDiasUteis = customTotalDiasUteis;
 	const diasDecorridos = Math.min(customDiasDecorridos, totalDiasUteis);
@@ -416,7 +418,7 @@ export function OpticalSalesPerformanceView() {
 								<Icon icon={Trophy} className="size-3.5" />
 							</div>
 							<h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-								Gestão de Metas por Vendedor • Medidor Salesforce
+								Gestão de Metas por Vendedor • Velocímetro Power BI
 							</h2>
 						</div>
 						<p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
@@ -425,31 +427,135 @@ export function OpticalSalesPerformanceView() {
 						</p>
 					</div>
 
-					{/* Ajustes rápidos de dias úteis */}
-					<div className="flex items-center gap-2 text-xs bg-white dark:bg-zinc-800 p-1.5 rounded-xl border border-zinc-300 dark:border-zinc-700">
-						<span className="text-zinc-500 font-medium pl-1">Dias Úteis Mês:</span>
-						<input
-							type="number"
-							min={10}
-							max={31}
-							value={customTotalDiasUteis}
-							onChange={(e) => setCustomTotalDiasUteis(Number(e.target.value) || 26)}
-							className="w-12 px-1.5 py-0.5 text-center font-bold font-mono text-zinc-900 dark:text-zinc-100 bg-zinc-100 dark:bg-zinc-700 rounded border"
-							title="Total de dias úteis no mês"
-						/>
-						<span className="text-zinc-400">•</span>
-						<span className="text-zinc-500 font-medium">Decorridos:</span>
-						<input
-							type="number"
-							min={1}
-							max={customTotalDiasUteis}
-							value={customDiasDecorridos}
-							onChange={(e) => setCustomDiasDecorridos(Number(e.target.value) || 1)}
-							className="w-12 px-1.5 py-0.5 text-center font-bold font-mono text-zinc-900 dark:text-zinc-100 bg-zinc-100 dark:bg-zinc-700 rounded border"
-							title="Dias úteis decorridos até hoje"
-						/>
+					<div className="flex flex-wrap items-center gap-2">
+						{/* Seletor de Modo de Exibição */}
+						<div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl border border-zinc-200 dark:border-zinc-700">
+							<button
+								type="button"
+								onClick={() => setGaugeMode("speedometer")}
+								className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+									gaugeMode === "speedometer"
+										? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-xs"
+										: "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+								}`}
+								title="Visualização com Velocímetro Radial estilo Power BI"
+							>
+								⚡ Velocímetro Power BI
+							</button>
+							<button
+								type="button"
+								onClick={() => setGaugeMode("compact")}
+								className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+									gaugeMode === "compact"
+										? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-xs"
+										: "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+								}`}
+								title="Visualização com Barra Linear Compacta"
+							>
+								📊 Barra Compacta
+							</button>
+						</div>
+
+						{/* Ajustes rápidos de dias úteis */}
+						<div className="flex items-center gap-2 text-xs bg-white dark:bg-zinc-800 p-1.5 rounded-xl border border-zinc-300 dark:border-zinc-700">
+							<span className="text-zinc-500 font-medium pl-1">Dias Úteis Mês:</span>
+							<input
+								type="number"
+								min={10}
+								max={31}
+								value={customTotalDiasUteis}
+								onChange={(e) => setCustomTotalDiasUteis(Number(e.target.value) || 26)}
+								className="w-12 px-1.5 py-0.5 text-center font-bold font-mono text-zinc-900 dark:text-zinc-100 bg-zinc-100 dark:bg-zinc-700 rounded border"
+								title="Total de dias úteis no mês"
+							/>
+							<span className="text-zinc-400">•</span>
+							<span className="text-zinc-500 font-medium">Decorridos:</span>
+							<input
+								type="number"
+								min={1}
+								max={customTotalDiasUteis}
+								value={customDiasDecorridos}
+								onChange={(e) => setCustomDiasDecorridos(Number(e.target.value) || 1)}
+								className="w-12 px-1.5 py-0.5 text-center font-bold font-mono text-zinc-900 dark:text-zinc-100 bg-zinc-100 dark:bg-zinc-700 rounded border"
+								title="Dias úteis decorridos até hoje"
+							/>
+						</div>
 					</div>
 				</div>
+
+				{/* VELOCÍMETRO CONSOLIDADO MASTER DA REDE / LOJA ESTILO POWER BI */}
+				{gaugeMode === "speedometer" && (
+					<div className="p-5 rounded-2xl bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-900/90 dark:via-zinc-900 dark:to-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+						<div className="w-full md:w-auto flex flex-col items-center">
+							<SpeedometerGauge
+								size="lg"
+								value={totalFaturadoGeral}
+								max={totalMetaLoja}
+								target={totalMetaLoja * (progressDiasUteisPct / 100)}
+								title="Velocímetro Geral da Equipe"
+								subtitle="Acompanhamento consolidado de vendas vs tempo decorrido"
+							/>
+						</div>
+
+						<div className="w-full md:flex-1 grid grid-cols-2 gap-3">
+							<div className="p-3.5 rounded-xl bg-white dark:bg-zinc-850/80 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+								<span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 block uppercase">
+									Faturamento Total
+								</span>
+								<span className="text-lg sm:text-xl font-extrabold font-mono text-zinc-900 dark:text-zinc-100 mt-0.5 block">
+									{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(totalFaturadoGeral)}
+								</span>
+								<span className="text-[10px] text-zinc-500 font-mono mt-0.5 block">
+									Meta: {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(totalMetaLoja)}
+								</span>
+							</div>
+
+							<div className="p-3.5 rounded-xl bg-white dark:bg-zinc-850/80 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+								<span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 block uppercase">
+									Alvo Esperado Hoje
+								</span>
+								<span className="text-lg sm:text-xl font-extrabold font-mono text-blue-600 dark:text-blue-400 mt-0.5 block">
+									{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(totalMetaLoja * (progressDiasUteisPct / 100))}
+								</span>
+								<span className="text-[10px] text-zinc-500 font-mono mt-0.5 block">
+									{progressDiasUteisPct.toFixed(1)}% do mês decorrido
+								</span>
+							</div>
+
+							<div className="p-3.5 rounded-xl bg-white dark:bg-zinc-850/80 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+								<span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 block uppercase">
+									Diferença de Ritmo
+								</span>
+								{totalFaturadoGeral >= totalMetaLoja * (progressDiasUteisPct / 100) ? (
+									<span className="text-lg sm:text-xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400 mt-0.5 block">
+										+{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(totalFaturadoGeral - totalMetaLoja * (progressDiasUteisPct / 100))}
+									</span>
+								) : (
+									<span className="text-lg sm:text-xl font-extrabold font-mono text-rose-600 dark:text-rose-400 mt-0.5 block">
+										{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(totalFaturadoGeral - totalMetaLoja * (progressDiasUteisPct / 100))}
+									</span>
+								)}
+								<span className="text-[10px] text-zinc-500 font-mono mt-0.5 block">
+									Pace atual vs data de hoje
+								</span>
+							</div>
+
+							<div className="p-3.5 rounded-xl bg-white dark:bg-zinc-850/80 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+								<span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 block uppercase">
+									Projeção de Fechamento
+								</span>
+								<span className="text-lg sm:text-xl font-extrabold font-mono text-zinc-900 dark:text-zinc-100 mt-0.5 block">
+									{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(
+										progressDiasUteisPct > 0 ? (totalFaturadoGeral / progressDiasUteisPct) * 100 : totalFaturadoGeral
+									)}
+								</span>
+								<span className="text-[10px] text-zinc-500 font-mono mt-0.5 block">
+									Baseado no ritmo atual
+								</span>
+							</div>
+						</div>
+					</div>
+				)}
 
 				{/* Grid de Vendedores com Medidor Salesforce */}
 				<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -516,91 +622,102 @@ export function OpticalSalesPerformanceView() {
 									</div>
 								</div>
 
-								{/* MEDIDOR ESTILO SALESFORCE (PACE GAUGE TRACKER) */}
-								<div className="bg-zinc-50 dark:bg-zinc-900/60 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-2">
-									<div className="flex items-center justify-between text-xs">
-										<div className="flex items-center gap-2">
-											<span className="font-semibold text-zinc-700 dark:text-zinc-300">
-												Medidor Salesforce (Pace de Metas)
-											</span>
-										</div>
-										<span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">
-											{new Intl.NumberFormat("pt-BR", {
-												style: "currency",
-												currency: "BRL",
-											}).format(seller.totalRealizado)}{" "}
-											/{" "}
-											<span className="text-zinc-500 font-normal">
-												{new Intl.NumberFormat("pt-BR", {
-													style: "currency",
-													currency: "BRL",
-												}).format(seller.metaMes)}
-											</span>
-										</span>
-									</div>
-
-									{/* Barra de Progresso com Marcador Salesforce de Tempo Útil */}
-									<div className="relative h-4 w-full bg-zinc-200 dark:bg-zinc-750 rounded-full overflow-hidden">
-										{/* Barra Realizada */}
-										<div
-											className={`h-full rounded-full transition-all duration-500 ${
-												isAhead
-													? "bg-emerald-600"
-													: isOnTrack
-														? "bg-blue-600"
-														: "bg-rose-500"
-											}`}
-											style={{
-												width: `${Math.min(100, seller.pctAtingidoMes)}%`,
-											}}
-										/>
-										{/* Marcador Vertical de Tempo Decorrido (Expected Marker) */}
-										<div
-											className="absolute top-0 bottom-0 w-1 bg-zinc-900 dark:bg-white z-10 shadow-xs"
-											style={{
-												left: `${Math.min(99, progressDiasUteisPct)}%`,
-											}}
-											title={`Meta Proporcional Hoje (${progressDiasUteisPct.toFixed(0)}% do tempo): R$ ${seller.metaEsperadaHoje.toFixed(0)}`}
+								{/* MEDIDOR DE METAS: VELOCÍMETRO POWER BI VS BARRA COMPACTA */}
+								{gaugeMode === "speedometer" ? (
+									<div className="bg-zinc-50 dark:bg-zinc-900/60 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center">
+										<SpeedometerGauge
+											size="sm"
+											value={seller.totalRealizado}
+											max={seller.metaMes}
+											target={seller.metaEsperadaHoje}
 										/>
 									</div>
-
-									{/* Legenda do Medidor */}
-									<div className="flex items-center justify-between text-[11px] text-zinc-500 pt-0.5">
-										<span>
-											Realizado:{" "}
-											<strong className="text-zinc-900 dark:text-zinc-100 font-mono">
-												{seller.pctAtingidoMes.toFixed(1)}%
-											</strong>
-										</span>
-										<span className="flex items-center gap-1 font-medium">
-											<span className="size-1.5 rounded-full bg-zinc-900 dark:bg-white" />
-											Esperado hoje:{" "}
-											<strong className="text-zinc-700 dark:text-zinc-300 font-mono">
-												{new Intl.NumberFormat("pt-BR", {
-													style: "currency",
-													currency: "BRL",
-												}).format(seller.metaEsperadaHoje)}
-											</strong>
-										</span>
-										<span>
-											{seller.diferencaRitmo >= 0 ? (
-												<span className="text-emerald-600 font-bold">
-													+{new Intl.NumberFormat("pt-BR", {
-														style: "currency",
-														currency: "BRL",
-													}).format(seller.diferencaRitmo)}
+								) : (
+									<div className="bg-zinc-50 dark:bg-zinc-900/60 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-2">
+										<div className="flex items-center justify-between text-xs">
+											<div className="flex items-center gap-2">
+												<span className="font-semibold text-zinc-700 dark:text-zinc-300">
+													Medidor de Metas (Pace)
 												</span>
-											) : (
-												<span className="text-rose-600 font-bold">
+											</div>
+											<span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">
+												{new Intl.NumberFormat("pt-BR", {
+													style: "currency",
+													currency: "BRL",
+												}).format(seller.totalRealizado)}{" "}
+												/{" "}
+												<span className="text-zinc-500 font-normal">
 													{new Intl.NumberFormat("pt-BR", {
 														style: "currency",
 														currency: "BRL",
-													}).format(seller.diferencaRitmo)}
+													}).format(seller.metaMes)}
 												</span>
-											)}
-										</span>
+											</span>
+										</div>
+
+										{/* Barra de Progresso com Marcador de Tempo Útil */}
+										<div className="relative h-4 w-full bg-zinc-200 dark:bg-zinc-750 rounded-full overflow-hidden">
+											{/* Barra Realizada */}
+											<div
+												className={`h-full rounded-full transition-all duration-500 ${
+													isAhead
+														? "bg-emerald-600"
+														: isOnTrack
+															? "bg-blue-600"
+															: "bg-rose-500"
+												}`}
+												style={{
+													width: `${Math.min(100, seller.pctAtingidoMes)}%`,
+												}}
+											/>
+											{/* Marcador Vertical de Tempo Decorrido */}
+											<div
+												className="absolute top-0 bottom-0 w-1 bg-zinc-900 dark:bg-white z-10 shadow-xs"
+												style={{
+													left: `${Math.min(99, progressDiasUteisPct)}%`,
+												}}
+												title={`Meta Proporcional Hoje (${progressDiasUteisPct.toFixed(0)}% do tempo): R$ ${seller.metaEsperadaHoje.toFixed(0)}`}
+											/>
+										</div>
+
+										{/* Legenda do Medidor */}
+										<div className="flex items-center justify-between text-[11px] text-zinc-500 pt-0.5">
+											<span>
+												Realizado:{" "}
+												<strong className="text-zinc-900 dark:text-zinc-100 font-mono">
+													{seller.pctAtingidoMes.toFixed(1)}%
+												</strong>
+											</span>
+											<span className="flex items-center gap-1 font-medium">
+												<span className="size-1.5 rounded-full bg-zinc-900 dark:bg-white" />
+												Esperado hoje:{" "}
+												<strong className="text-zinc-700 dark:text-zinc-300 font-mono">
+													{new Intl.NumberFormat("pt-BR", {
+														style: "currency",
+														currency: "BRL",
+													}).format(seller.metaEsperadaHoje)}
+												</strong>
+											</span>
+											<span>
+												{seller.diferencaRitmo >= 0 ? (
+													<span className="text-emerald-600 font-bold">
+														+{new Intl.NumberFormat("pt-BR", {
+															style: "currency",
+															currency: "BRL",
+														}).format(seller.diferencaRitmo)}
+													</span>
+												) : (
+													<span className="text-rose-600 font-bold">
+														{new Intl.NumberFormat("pt-BR", {
+															style: "currency",
+															currency: "BRL",
+														}).format(seller.diferencaRitmo)}
+													</span>
+												)}
+											</span>
+										</div>
 									</div>
-								</div>
+								)}
 
 								{/* DETALHES DE DIÁRIA, SEMANA E PRÊMIO */}
 								<div className="grid grid-cols-3 gap-2 pt-1">
