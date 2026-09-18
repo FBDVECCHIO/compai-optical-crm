@@ -21,7 +21,7 @@ export function CreateOpticalOrderSheet() {
 	return (
 		<Suspense
 			fallback={
-				<Button disabled size="sm">
+				<Button disabled size="sm" data-action="nova-venda">
 					<Icon icon={Add} data-icon="inline-start" />
 					Nova Venda de Balcão
 				</Button>
@@ -48,7 +48,7 @@ function CreateOpticalOrderSheetContent() {
 	return (
 		<Sheet open={isOpen} onOpenChange={setOpen}>
 			<SheetTrigger asChild>
-				<Button size="sm" className="font-semibold shadow-xs">
+				<Button size="sm" className="font-semibold shadow-xs" data-action="nova-venda">
 					<Icon icon={Add} data-icon="inline-start" />
 					Nova Venda de Balcão
 				</Button>

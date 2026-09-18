@@ -660,80 +660,83 @@ export function OpticalSalesPerformanceView() {
 									</div>
 								)}
 
-								{/* DETALHES DE DIÁRIA, SEMANA E PRÊMIO */}
-								<div className="grid grid-cols-3 gap-2 pt-1">
-									{/* Meta Diária Necessária */}
-									<div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800 text-center">
-										<span className="text-[10px] text-zinc-500 block uppercase font-medium">
-											Meta Diária
-										</span>
-										<span className="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100">
-											{new Intl.NumberFormat("pt-BR", {
-												style: "currency",
-												currency: "BRL",
-											}).format(seller.metaDiariaNecessaria)}
-										</span>
-										<span className="text-[9px] text-zinc-400 block mt-0.5">
-											{diasRestantes} dias úteis
-										</span>
+								{/* DETALHES DE DIÁRIA, SEMANA E PRÊMIO - LAYOUT ANTI-ENCAVALAMENTO */}
+								<div className="flex flex-col gap-1.5 pt-1">
+									{/* Linha 1: Meta Diária e Meta Semana lado a lado com largura confortável */}
+									<div className="grid grid-cols-2 gap-1.5">
+										{/* Meta Diária Necessária */}
+										<div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/70 dark:border-zinc-800 flex flex-col justify-between">
+											<div className="flex items-center justify-between gap-1 text-[10px] text-zinc-500 font-medium">
+												<span className="uppercase tracking-tight">Meta Diária</span>
+												<span className="text-[9px] text-zinc-400 font-normal">{diasRestantes}d úteis</span>
+											</div>
+											<div className="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 mt-1 truncate">
+												{new Intl.NumberFormat("pt-BR", {
+													style: "currency",
+													currency: "BRL",
+												}).format(seller.metaDiariaNecessaria)}
+											</div>
+										</div>
+
+										{/* Vendas da Semana */}
+										<div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/70 dark:border-zinc-800 flex flex-col justify-between">
+											<div className="flex items-center justify-between gap-1 text-[10px] text-zinc-500 font-medium">
+												<span className="uppercase tracking-tight">Meta Semana</span>
+											</div>
+											<div className="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 mt-1 truncate">
+												{new Intl.NumberFormat("pt-BR", {
+													style: "currency",
+													currency: "BRL",
+												}).format(seller.metaSemana)}
+											</div>
+											<div className="text-[9px] text-zinc-500 font-mono mt-0.5 truncate">
+												Feito: {new Intl.NumberFormat("pt-BR", {
+													style: "currency",
+													currency: "BRL",
+												}).format(seller.vendasSemana)}
+											</div>
+										</div>
 									</div>
 
-									{/* Vendas da Semana */}
-									<div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800 text-center">
-										<span className="text-[10px] text-zinc-500 block uppercase font-medium">
-											Meta Semana
-										</span>
-										<span className="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100">
-											{new Intl.NumberFormat("pt-BR", {
-												style: "currency",
-												currency: "BRL",
-											}).format(seller.metaSemana)}
-										</span>
-										<span className="text-[9px] text-zinc-500 font-mono block mt-0.5">
-											Feito: {new Intl.NumberFormat("pt-BR", {
-												style: "currency",
-												currency: "BRL",
-											}).format(seller.vendasSemana)}
-										</span>
-									</div>
-
-									{/* Prêmio da Semana */}
+									{/* Linha 2: Prêmio da Semana com barra horizontal dedicada sem cortes */}
 									<div
-										className={`p-2 rounded-lg border text-center transition-colors ${
+										className={`px-2.5 py-1.5 rounded-lg border flex items-center justify-between gap-2 transition-colors ${
 											seller.atingiuPremioSemana
 												? "bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200"
-												: "bg-zinc-50 dark:bg-zinc-800/40 border-zinc-100 dark:border-zinc-800"
+												: "bg-zinc-50 dark:bg-zinc-800/40 border-zinc-200/70 dark:border-zinc-800"
 										}`}
 									>
-										<div className="flex items-center justify-center gap-1">
+										<div className="flex items-center gap-1.5 min-w-0">
 											<Icon
 												icon={Trophy}
-												className={`size-3 ${
+												className={`size-3.5 shrink-0 ${
 													seller.atingiuPremioSemana
 														? "text-amber-500"
 														: "text-zinc-400"
 												}`}
 											/>
-											<span className="text-[10px] uppercase font-bold">
-												Prêmio Semana
-											</span>
+											<div className="min-w-0">
+												<span className="text-[10px] uppercase font-bold block leading-tight truncate">
+													Prêmio Semana
+												</span>
+												<span
+													className={`text-[9px] font-semibold block leading-tight ${
+														seller.atingiuPremioSemana
+															? "text-emerald-600 dark:text-emerald-400"
+															: "text-zinc-400"
+													}`}
+												>
+													{seller.atingiuPremioSemana
+														? "✓ Qualificado"
+														: "Em disputa"}
+												</span>
+											</div>
 										</div>
-										<span className="text-xs font-bold font-mono block text-zinc-900 dark:text-zinc-100">
+										<span className="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 shrink-0">
 											{new Intl.NumberFormat("pt-BR", {
 												style: "currency",
 												currency: "BRL",
 											}).format(seller.premioSemana)}
-										</span>
-										<span
-											className={`text-[9px] font-semibold block mt-0.5 ${
-												seller.atingiuPremioSemana
-													? "text-emerald-600 dark:text-emerald-400"
-													: "text-zinc-400"
-											}`}
-										>
-											{seller.atingiuPremioSemana
-												? "✓ Qualificado"
-												: "Em disputa"}
 										</span>
 									</div>
 								</div>

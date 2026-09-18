@@ -117,12 +117,13 @@ export function OpticalTopNav({
 			label: "Resumo Gerencial",
 			icon: Analytics,
 		},
-		{
-			id: "config",
-			label: "Configurações",
-			icon: Settings,
-		},
 	];
+
+	const configItem = {
+		id: "config" as OpticalModuleTab,
+		label: "Configurações",
+		icon: Settings,
+	};
 
 	const filterVisible = (items: typeof row1Items) =>
 		items.filter((item) => {
@@ -133,6 +134,8 @@ export function OpticalTopNav({
 
 	const visibleRow1 = filterVisible(row1Items);
 	const visibleRow2 = filterVisible(row2Items);
+	const isConfigVisible =
+		!userSession || userSession.isAdmin || userSession.permissions.config !== false;
 
 	const renderNavButton = (item: (typeof row1Items)[0]) => {
 		const isActive = activeModule === item.id;
@@ -162,6 +165,40 @@ export function OpticalTopNav({
 					)}
 				/>
 				<span className="whitespace-nowrap font-semibold text-xs leading-none">
+					{item.label}
+				</span>
+			</button>
+		);
+	};
+
+	const renderConfigButton = (item: typeof configItem) => {
+		const isActive = activeModule === item.id;
+		return (
+			<button
+				type="button"
+				key={item.id}
+				data-module={item.id}
+				onClick={() => onSelectModule(item.id)}
+				aria-label={`Acessar módulo de ${item.label}`}
+				aria-current={isActive ? "page" : undefined}
+				title={`Ir para ${item.label}`}
+				className={cn(
+					"w-full h-full min-h-[96px] px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer",
+					"flex flex-col items-center justify-center gap-1.5 text-center select-none",
+					"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-white focus-visible:ring-offset-2",
+					isActive
+						? "bg-zinc-900 text-white border-2 border-zinc-900 shadow-sm dark:bg-white dark:text-zinc-900 dark:border-white font-bold"
+						: "bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-2 border-zinc-300 dark:border-zinc-700 shadow-2xs hover:bg-zinc-50 hover:border-zinc-400 dark:hover:bg-zinc-700 dark:hover:border-zinc-600"
+				)}
+			>
+				<Icon
+					icon={item.icon}
+					className={cn(
+						"size-5 shrink-0 transition-transform duration-300 hover:rotate-45",
+						isActive ? "text-white dark:text-zinc-900" : "text-zinc-500 dark:text-zinc-400"
+					)}
+				/>
+				<span className="font-semibold text-xs leading-tight whitespace-nowrap">
 					{item.label}
 				</span>
 			</button>
@@ -246,20 +283,38 @@ export function OpticalTopNav({
 				</div>
 			</div>
 
-			{/* Grade de Navegação: 2 fileiras equilibradas de 5 e 6 colunas com largura generosa */}
-			{/* Textos NUNCA truncados, delimitação nítida e anel de foco acessível */}
+			{/* Grade de Navegação: 5 botões em cima, 5 embaixo (mesma largura) + Configurações à direita ocupando as duas linhas */}
 			<nav
 				aria-label="Navegação Principal do MNOC-X"
-				className="flex flex-col gap-2 w-full"
+				className="w-full"
 			>
-				{/* Linha 1: Operação Comercial & Balcão (5 colunas) */}
-				<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 w-full">
-					{visibleRow1.map(renderNavButton)}
+				<div className="flex flex-col md:flex-row items-stretch gap-2 w-full">
+					{/* Bloco Esquerda/Central: 2 fileiras perfeitamente simétricas com 5 botões de largura rigorosamente idêntica */}
+					<div className="flex-1 flex flex-col gap-2 min-w-0">
+						{/* Linha 1: Operação Comercial & Balcão (5 colunas) */}
+						<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 w-full">
+							{visibleRow1.map(renderNavButton)}
+						</div>
+						{/* Linha 2: Cadastros Técnicos, Relações Médicas & Gestão (5 colunas) */}
+						<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 w-full">
+							{visibleRow2.map(renderNavButton)}
+						</div>
+					</div>
+
+					{/* Bloco da Direita: Configurações ocupando a altura das 2 linhas no desktop */}
+					{isConfigVisible && (
+						<div className="hidden md:flex w-36 shrink-0">
+							{renderConfigButton(configItem)}
+						</div>
+					)}
 				</div>
-				{/* Linha 2: Cadastros Técnicos, Relações Médicas & Gestão (6 colunas) */}
-				<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 w-full">
-					{visibleRow2.map(renderNavButton)}
-				</div>
+
+				{/* Fallback Mobile para Configurações em telas menores que md */}
+				{isConfigVisible && (
+					<div className="md:hidden mt-2">
+						{renderNavButton(configItem)}
+					</div>
+				)}
 			</nav>
 		</div>
 	);

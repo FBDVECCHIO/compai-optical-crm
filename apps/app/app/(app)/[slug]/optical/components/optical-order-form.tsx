@@ -24,12 +24,16 @@ import { Spinner } from "@crm/ui/components/spinner";
 import { Switch } from "@crm/ui/components/switch";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { LAB_CATALOG } from "@/lib/optical/optical-mock-data";
+import { LAB_CATALOG, TREATMENT_OPTIONS } from "@/lib/optical/optical-mock-data";
 import { useOpticalOrders } from "@/lib/optical/optical-store";
-import { fetchLensCatalog } from "@/lib/optical/supabase-optical";
+import {
+	fetchLensCatalog,
+	fetchFrameCatalog,
+} from "@/lib/optical/supabase-optical";
 import type {
 	AroItem,
 	EyePrescription,
+	FrameCatalogItem,
 	LensCatalogItem,
 	OpticalOrder,
 	OpticalPatient,
@@ -60,10 +64,19 @@ const DEFAULT_ARO_1: AroItem = {
 	frameBrand: "Ray-Ban",
 	frameModel: "Acetato Preto Clássico",
 	framePrice: 590,
+	frameType: "RECEITUARIO",
+	frameFamily: "Wayfarer",
+	frameManufacturer: "Luxottica",
+	frameAro: "52",
+	framePonte: "18",
 	lab: "Essilor",
 	lensName: "Varilux Comfort Max 1.50",
 	quantity: 1,
 	lensPrice: 1890,
+	lensType: "MULTIFOCAL",
+	lensFamily: "Varilux",
+	lensIndex: "1.50",
+	lensTech: "Freeform",
 	treatment: "Crizal Rock",
 	noTreatment: false,
 	treatmentPrice: 390,
@@ -120,10 +133,19 @@ export function OpticalOrderForm({
 		frameBrand: "Vogue Eyewear",
 		frameModel: "Tartaruga Solar",
 		framePrice: 420,
+		frameType: "SOLAR",
+		frameFamily: "Gigi",
+		frameManufacturer: "Luxottica",
+		frameAro: "54",
+		framePonte: "19",
 		lab: "Essilor",
 		lensName: "Varilux Comfort Max 1.50",
 		quantity: 1,
 		lensPrice: 1400,
+		lensType: "MULTIFOCAL",
+		lensFamily: "Varilux",
+		lensIndex: "1.50",
+		lensTech: "Freeform",
 		treatment: "Crizal Sun UV",
 		noTreatment: false,
 		treatmentPrice: 280,
@@ -142,10 +164,29 @@ export function OpticalOrderForm({
 	const [invoiceIssued, setInvoiceIssued] = useState(false);
 	const [invoiceNumber, setInvoiceNumber] = useState("");
 	const [lensCatalog, setLensCatalog] = useState<LensCatalogItem[]>([]);
+	const [frameCatalog, setFrameCatalog] = useState<FrameCatalogItem[]>([]);
 
 	useEffect(() => {
 		fetchLensCatalog().then((items) => setLensCatalog(items));
+		fetchFrameCatalog().then((items) => setFrameCatalog(items));
 	}, []);
+
+	// Filtros inteligentes de lentes por laboratório selecionado
+	const filteredLensesAro1 = useMemo(() => {
+		if (!aro1.lab) return lensCatalog;
+		const filtered = lensCatalog.filter(
+			(l) => l.laboratorio.toLowerCase() === aro1.lab.toLowerCase(),
+		);
+		return filtered.length > 0 ? filtered : lensCatalog;
+	}, [lensCatalog, aro1.lab]);
+
+	const filteredLensesAro2 = useMemo(() => {
+		if (!aro2.lab) return lensCatalog;
+		const filtered = lensCatalog.filter(
+			(l) => l.laboratorio.toLowerCase() === aro2.lab.toLowerCase(),
+		);
+		return filtered.length > 0 ? filtered : lensCatalog;
+	}, [lensCatalog, aro2.lab]);
 
 	// CEP Handler
 	const handleSearchCep = async (cepToQuery?: string) => {
@@ -194,14 +235,35 @@ export function OpticalOrderForm({
 			lab: aro1.lab,
 			lensName: aro1.lensName,
 			lensPrice: Math.round(aro1.lensPrice * 0.7), // 30% desc 2º par
+			lensType: aro1.lensType,
+			lensFamily: aro1.lensFamily,
+			lensIndex: aro1.lensIndex,
+			lensTech: aro1.lensTech,
 			treatment: aro1.treatment,
 			treatmentPrice: Math.round(aro1.treatmentPrice * 0.7),
 			noTreatment: aro1.noTreatment,
+			differentLensesPerEye: aro1.differentLensesPerEye,
+			lensOd: aro1.lensOd,
+			lensPriceOd: aro1.lensPriceOd ? Math.round(aro1.lensPriceOd * 0.7) : undefined,
+			treatmentOd: aro1.treatmentOd,
+			labOd: aro1.labOd,
+			lensTypeOd: aro1.lensTypeOd,
+			lensFamilyOd: aro1.lensFamilyOd,
+			lensIndexOd: aro1.lensIndexOd,
+			lensTechOd: aro1.lensTechOd,
+			lensOe: aro1.lensOe,
+			lensPriceOe: aro1.lensPriceOe ? Math.round(aro1.lensPriceOe * 0.7) : undefined,
+			treatmentOe: aro1.treatmentOe,
+			labOe: aro1.labOe,
+			lensTypeOe: aro1.lensTypeOe,
+			lensFamilyOe: aro1.lensFamilyOe,
+			lensIndexOe: aro1.lensIndexOe,
+			lensTechOe: aro1.lensTechOe,
 		}));
 		setIsAro2Copy(true);
 		toast.success("Aro 1 copiado para o Aro 2!", {
 			description:
-				"Dioptrias OD/OE, lentes e tratamentos replicados instantaneamente com desconto de 2º par.",
+				"Dioptrias OD/OE, lentes, tratamentos e dados técnicos replicados com desconto de 2º par.",
 		});
 	};
 
@@ -693,55 +755,183 @@ export function OpticalOrderForm({
 						</div>
 
 						{/* Armação Aro 1 */}
-						<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-							<Field>
-								<FieldLabel>Cód. Armação</FieldLabel>
-								<Input
-									value={aro1.frameCode}
-									onChange={(e) =>
-										setAro1((a) => ({ ...a, frameCode: e.target.value }))
+						<div className="space-y-3">
+							{/* Seletor Dropdown do Catálogo de Armações & Solares */}
+							<div className="p-3 rounded-lg bg-muted/30 border">
+								<div className="flex items-center justify-between mb-1.5">
+									<FieldLabel className="text-xs font-semibold">
+										Selecionar Peça do Catálogo (Armações & Solares)
+									</FieldLabel>
+									<span className="text-[10px] text-muted-foreground">
+										{frameCatalog.length} peças disponíveis no estoque
+									</span>
+								</div>
+								<select
+									value={
+										frameCatalog.find(
+											(f) =>
+												f.produto === aro1.frameModel ||
+												(f.marca === aro1.frameBrand &&
+													f.produto.includes(aro1.frameCode)),
+										)?.id || ""
 									}
-									placeholder="RB5228"
-									className="h-8 text-xs font-mono"
-								/>
-							</Field>
-							<Field>
-								<FieldLabel>Marca</FieldLabel>
-								<Input
-									value={aro1.frameBrand}
-									onChange={(e) =>
-										setAro1((a) => ({ ...a, frameBrand: e.target.value }))
-									}
-									placeholder="Ray-Ban"
-									className="h-8 text-xs"
-								/>
-							</Field>
-							<Field>
-								<FieldLabel>Modelo</FieldLabel>
-								<Input
-									value={aro1.frameModel}
-									onChange={(e) =>
-										setAro1((a) => ({ ...a, frameModel: e.target.value }))
-									}
-									placeholder="Acetato Preto"
-									className="h-8 text-xs"
-								/>
-							</Field>
-							<Field>
-								<FieldLabel>R$ Armação</FieldLabel>
-								<Input
-									type="number"
-									step="0.01"
-									value={aro1.framePrice}
-									onChange={(e) =>
-										setAro1((a) => ({
-											...a,
-											framePrice: Number(e.target.value) || 0,
-										}))
-									}
-									className="h-8 text-xs font-semibold"
-								/>
-							</Field>
+									onChange={(e) => {
+										const selected = frameCatalog.find(
+											(f) => f.id === e.target.value,
+										);
+										if (selected) {
+											setAro1((a) => ({
+												...a,
+												frameCode:
+													selected.produto.split(" ")[1] ||
+													selected.produto.slice(0, 8),
+												frameBrand: selected.marca,
+												frameModel: selected.produto,
+												framePrice: selected.preco,
+												frameType: selected.tipo,
+												frameFamily: selected.familia,
+												frameManufacturer: selected.fabricante,
+												frameAro: selected.tamanhoAro,
+												framePonte: selected.tamanhoPonte,
+											}));
+										}
+									}}
+									className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs"
+								>
+									<option value="">Selecione uma armação/solar cadastrado...</option>
+									{frameCatalog.map((f) => (
+										<option key={f.id} value={f.id}>
+											[{f.marca}] {f.produto} ({f.tipo}) — Aro {f.tamanhoAro}/{f.tamanhoPonte} — R$ {f.preco} (Estoque: {f.estoque})
+										</option>
+									))}
+								</select>
+							</div>
+
+							<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+								<Field>
+									<FieldLabel>Cód. Armação</FieldLabel>
+									<Input
+										value={aro1.frameCode}
+										onChange={(e) =>
+											setAro1((a) => ({ ...a, frameCode: e.target.value }))
+										}
+										placeholder="RB5228"
+										className="h-8 text-xs font-mono"
+									/>
+								</Field>
+								<Field>
+									<FieldLabel>Marca</FieldLabel>
+									<Input
+										value={aro1.frameBrand}
+										onChange={(e) =>
+											setAro1((a) => ({ ...a, frameBrand: e.target.value }))
+										}
+										placeholder="Ray-Ban"
+										className="h-8 text-xs"
+									/>
+								</Field>
+								<Field>
+									<FieldLabel>Modelo</FieldLabel>
+									<Input
+										value={aro1.frameModel}
+										onChange={(e) =>
+											setAro1((a) => ({ ...a, frameModel: e.target.value }))
+										}
+										placeholder="Acetato Preto"
+										className="h-8 text-xs"
+									/>
+								</Field>
+								<Field>
+									<FieldLabel>R$ Armação</FieldLabel>
+									<Input
+										type="number"
+										step="0.01"
+										value={aro1.framePrice}
+										onChange={(e) =>
+											setAro1((a) => ({
+												...a,
+												framePrice: Number(e.target.value) || 0,
+											}))
+										}
+										className="h-8 text-xs font-semibold"
+									/>
+								</Field>
+							</div>
+
+							{/* Especificações Técnicas da Armação Espelhadas do Catálogo */}
+							<div className="p-2.5 rounded-lg bg-muted/20 border grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+								<div>
+									<FieldLabel className="text-[10px] text-muted-foreground">
+										Tipo da Peça
+									</FieldLabel>
+									<select
+										value={aro1.frameType || "RECEITUARIO"}
+										onChange={(e) =>
+											setAro1((a) => ({ ...a, frameType: e.target.value as any }))
+										}
+										className="w-full h-7 px-2 rounded border bg-background text-xs"
+									>
+										<option value="RECEITUARIO">Receituário</option>
+										<option value="SOLAR">Solar</option>
+										<option value="CLIP_ON">Clip-on</option>
+									</select>
+								</div>
+								<div>
+									<FieldLabel className="text-[10px] text-muted-foreground">
+										Família / Coleção
+									</FieldLabel>
+									<Input
+										value={aro1.frameFamily || ""}
+										onChange={(e) =>
+											setAro1((a) => ({ ...a, frameFamily: e.target.value }))
+										}
+										placeholder="Ex: Wayfarer"
+										className="h-7 text-xs"
+									/>
+								</div>
+								<div>
+									<FieldLabel className="text-[10px] text-muted-foreground">
+										Fabricante
+									</FieldLabel>
+									<Input
+										value={aro1.frameManufacturer || ""}
+										onChange={(e) =>
+											setAro1((a) => ({
+												...a,
+												frameManufacturer: e.target.value,
+											}))
+										}
+										placeholder="Ex: Luxottica"
+										className="h-7 text-xs"
+									/>
+								</div>
+								<div>
+									<FieldLabel className="text-[10px] text-muted-foreground">
+										Tamanho Aro (mm)
+									</FieldLabel>
+									<Input
+										value={aro1.frameAro || ""}
+										onChange={(e) =>
+											setAro1((a) => ({ ...a, frameAro: e.target.value }))
+										}
+										placeholder="Ex: 52"
+										className="h-7 text-xs font-mono"
+									/>
+								</div>
+								<div>
+									<FieldLabel className="text-[10px] text-muted-foreground">
+										Tamanho Ponte (mm)
+									</FieldLabel>
+									<Input
+										value={aro1.framePonte || ""}
+										onChange={(e) =>
+											setAro1((a) => ({ ...a, framePonte: e.target.value }))
+										}
+										placeholder="Ex: 18"
+										className="h-7 text-xs font-mono"
+									/>
+								</div>
+							</div>
 						</div>
 
 						{/* Toggle Variação de Lente por Olho */}
@@ -782,39 +972,63 @@ export function OpticalOrderForm({
 										<span className="text-xs font-bold text-blue-600 dark:text-blue-400">
 											Olho Direito (OD) — Peça Avulsa
 										</span>
-										{lensCatalog.length > 0 && (
-											<select
-												onChange={(e) => {
-													const selected = lensCatalog.find((l) => l.id === e.target.value);
-													if (selected) {
-														setAro1((a) => ({
-															...a,
-															lensOd: selected.produto,
-															labOd: selected.laboratorio,
-															lensPriceOd: selected.valorPeca || Math.round(selected.preco / 2),
-														}));
-													}
-												}}
-												className="text-[10px] py-0.5 px-1.5 rounded border bg-muted/50 max-w-[140px]"
-											>
-												<option value="">Catálogo OD...</option>
-												{lensCatalog.map((l) => (
-													<option key={l.id} value={l.id}>
-														{l.produto} (R$ {l.valorPeca || l.preco / 2})
-													</option>
-												))}
-											</select>
-										)}
 									</div>
+
+									{/* Dropdown Catálogo OD */}
+									<div>
+										<FieldLabel className="text-[10px] font-semibold text-muted-foreground mb-1 block">
+											Lente OD do Catálogo
+										</FieldLabel>
+										<select
+											value={
+												lensCatalog.find(
+													(l) =>
+														l.produto === aro1.lensOd &&
+														(!aro1.labOd ||
+															l.laboratorio.toLowerCase() === aro1.labOd.toLowerCase()),
+												)?.id || ""
+											}
+											onChange={(e) => {
+												const selected = lensCatalog.find((l) => l.id === e.target.value);
+												if (selected) {
+													setAro1((a) => ({
+														...a,
+														lensOd: selected.produto,
+														labOd: selected.laboratorio,
+														lensPriceOd: selected.valorPeca || Math.round(selected.preco / 2),
+														lensTypeOd: selected.tipo,
+														lensFamilyOd: selected.familia,
+														lensIndexOd: selected.indiceRefrativo,
+														lensTechOd: selected.tecnologia,
+													}));
+												}
+											}}
+											className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs"
+										>
+											<option value="">Selecione lente para OD...</option>
+											{lensCatalog.map((l) => (
+												<option key={l.id} value={l.id}>
+													[{l.laboratorio}] {l.produto} — R$ {l.valorPeca || l.preco / 2}
+												</option>
+											))}
+										</select>
+									</div>
+
 									<div className="grid grid-cols-2 gap-2">
 										<div>
 											<FieldLabel className="text-[10px]">Laboratório OD</FieldLabel>
-											<Input
+											<select
 												value={aro1.labOd || ""}
 												onChange={(e) => setAro1((a) => ({ ...a, labOd: e.target.value }))}
-												placeholder="Lab OD"
-												className="h-7 text-xs"
-											/>
+												className="w-full h-7 px-2 rounded border bg-background text-xs"
+											>
+												<option value="">Selecione...</option>
+												{LAB_CATALOG.map((lab) => (
+													<option key={lab} value={lab}>
+														{lab}
+													</option>
+												))}
+											</select>
 										</div>
 										<div>
 											<FieldLabel className="text-[10px]">R$ Peça OD</FieldLabel>
@@ -841,12 +1055,54 @@ export function OpticalOrderForm({
 											className="h-7 text-xs"
 										/>
 									</div>
+
+									{/* Especificações Técnicas Espelhadas OD */}
+									<div className="p-2 rounded bg-muted/30 border grid grid-cols-2 gap-1.5 text-[11px]">
+										<div>
+											<span className="text-[9px] text-muted-foreground block">Tipo OD</span>
+											<span className="font-semibold text-foreground truncate block">
+												{aro1.lensTypeOd || "MULTIFOCAL"}
+											</span>
+										</div>
+										<div>
+											<span className="text-[9px] text-muted-foreground block">IR / Tech</span>
+											<span className="font-semibold text-foreground truncate block">
+												{aro1.lensIndexOd || "1.50"} • {aro1.lensTechOd || "Freeform"}
+											</span>
+										</div>
+									</div>
+
+									{/* Tratamento OD */}
 									<div>
-										<FieldLabel className="text-[10px]">Tratamento OD</FieldLabel>
+										<FieldLabel className="text-[10px] mb-1 block">Tratamento OD</FieldLabel>
+										<select
+											value={
+												TREATMENT_OPTIONS.find((t) => t.name === aro1.treatmentOd)?.name ||
+												(aro1.treatmentOd ? "CUSTOM" : "")
+											}
+											onChange={(e) => {
+												const val = e.target.value;
+												if (val !== "CUSTOM") {
+													const selected = TREATMENT_OPTIONS.find((t) => t.name === val);
+													if (selected) {
+														setAro1((a) => ({ ...a, treatmentOd: selected.name }));
+													}
+												}
+											}}
+											className="w-full h-7 px-2 rounded border bg-background text-xs mb-1"
+										>
+											<option value="">Selecione tratamento OD...</option>
+											{TREATMENT_OPTIONS.map((t) => (
+												<option key={t.name} value={t.name}>
+													{t.name} (R$ {t.price})
+												</option>
+											))}
+											<option value="CUSTOM">Personalizado...</option>
+										</select>
 										<Input
 											value={aro1.treatmentOd || ""}
 											onChange={(e) => setAro1((a) => ({ ...a, treatmentOd: e.target.value }))}
-											placeholder="Ex: Antirreflexo BlueControl"
+											placeholder="Nome do tratamento OD"
 											className="h-7 text-xs"
 										/>
 									</div>
@@ -858,39 +1114,63 @@ export function OpticalOrderForm({
 										<span className="text-xs font-bold text-amber-600 dark:text-amber-400">
 											Olho Esquerdo (OE) — Peça Avulsa
 										</span>
-										{lensCatalog.length > 0 && (
-											<select
-												onChange={(e) => {
-													const selected = lensCatalog.find((l) => l.id === e.target.value);
-													if (selected) {
-														setAro1((a) => ({
-															...a,
-															lensOe: selected.produto,
-															labOe: selected.laboratorio,
-															lensPriceOe: selected.valorPeca || Math.round(selected.preco / 2),
-														}));
-													}
-												}}
-												className="text-[10px] py-0.5 px-1.5 rounded border bg-muted/50 max-w-[140px]"
-											>
-												<option value="">Catálogo OE...</option>
-												{lensCatalog.map((l) => (
-													<option key={l.id} value={l.id}>
-														{l.produto} (R$ {l.valorPeca || l.preco / 2})
-													</option>
-												))}
-											</select>
-										)}
 									</div>
+
+									{/* Dropdown Catálogo OE */}
+									<div>
+										<FieldLabel className="text-[10px] font-semibold text-muted-foreground mb-1 block">
+											Lente OE do Catálogo
+										</FieldLabel>
+										<select
+											value={
+												lensCatalog.find(
+													(l) =>
+														l.produto === aro1.lensOe &&
+														(!aro1.labOe ||
+															l.laboratorio.toLowerCase() === aro1.labOe.toLowerCase()),
+												)?.id || ""
+											}
+											onChange={(e) => {
+												const selected = lensCatalog.find((l) => l.id === e.target.value);
+												if (selected) {
+													setAro1((a) => ({
+														...a,
+														lensOe: selected.produto,
+														labOe: selected.laboratorio,
+														lensPriceOe: selected.valorPeca || Math.round(selected.preco / 2),
+														lensTypeOe: selected.tipo,
+														lensFamilyOe: selected.familia,
+														lensIndexOe: selected.indiceRefrativo,
+														lensTechOe: selected.tecnologia,
+													}));
+												}
+											}}
+											className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs"
+										>
+											<option value="">Selecione lente para OE...</option>
+											{lensCatalog.map((l) => (
+												<option key={l.id} value={l.id}>
+													[{l.laboratorio}] {l.produto} — R$ {l.valorPeca || l.preco / 2}
+												</option>
+											))}
+										</select>
+									</div>
+
 									<div className="grid grid-cols-2 gap-2">
 										<div>
 											<FieldLabel className="text-[10px]">Laboratório OE</FieldLabel>
-											<Input
+											<select
 												value={aro1.labOe || ""}
 												onChange={(e) => setAro1((a) => ({ ...a, labOe: e.target.value }))}
-												placeholder="Lab OE"
-												className="h-7 text-xs"
-											/>
+												className="w-full h-7 px-2 rounded border bg-background text-xs"
+											>
+												<option value="">Selecione...</option>
+												{LAB_CATALOG.map((lab) => (
+													<option key={lab} value={lab}>
+														{lab}
+													</option>
+												))}
+											</select>
 										</div>
 										<div>
 											<FieldLabel className="text-[10px]">R$ Peça OE</FieldLabel>
@@ -917,12 +1197,54 @@ export function OpticalOrderForm({
 											className="h-7 text-xs"
 										/>
 									</div>
+
+									{/* Especificações Técnicas Espelhadas OE */}
+									<div className="p-2 rounded bg-muted/30 border grid grid-cols-2 gap-1.5 text-[11px]">
+										<div>
+											<span className="text-[9px] text-muted-foreground block">Tipo OE</span>
+											<span className="font-semibold text-foreground truncate block">
+												{aro1.lensTypeOe || "MULTIFOCAL"}
+											</span>
+										</div>
+										<div>
+											<span className="text-[9px] text-muted-foreground block">IR / Tech</span>
+											<span className="font-semibold text-foreground truncate block">
+												{aro1.lensIndexOe || "1.50"} • {aro1.lensTechOe || "Freeform"}
+											</span>
+										</div>
+									</div>
+
+									{/* Tratamento OE */}
 									<div>
-										<FieldLabel className="text-[10px]">Tratamento OE</FieldLabel>
+										<FieldLabel className="text-[10px] mb-1 block">Tratamento OE</FieldLabel>
+										<select
+											value={
+												TREATMENT_OPTIONS.find((t) => t.name === aro1.treatmentOe)?.name ||
+												(aro1.treatmentOe ? "CUSTOM" : "")
+											}
+											onChange={(e) => {
+												const val = e.target.value;
+												if (val !== "CUSTOM") {
+													const selected = TREATMENT_OPTIONS.find((t) => t.name === val);
+													if (selected) {
+														setAro1((a) => ({ ...a, treatmentOe: selected.name }));
+													}
+												}
+											}}
+											className="w-full h-7 px-2 rounded border bg-background text-xs mb-1"
+										>
+											<option value="">Selecione tratamento OE...</option>
+											{TREATMENT_OPTIONS.map((t) => (
+												<option key={t.name} value={t.name}>
+													{t.name} (R$ {t.price})
+												</option>
+											))}
+											<option value="CUSTOM">Personalizado...</option>
+										</select>
 										<Input
 											value={aro1.treatmentOe || ""}
 											onChange={(e) => setAro1((a) => ({ ...a, treatmentOe: e.target.value }))}
-											placeholder="Ex: Antirreflexo BlueControl"
+											placeholder="Nome do tratamento OE"
 											className="h-7 text-xs"
 										/>
 									</div>
@@ -930,31 +1252,48 @@ export function OpticalOrderForm({
 							</div>
 						) : (
 							/* Lente Aro 1: Modo Par Único Padrão */
-							<div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-12">
-								<div className="sm:col-span-3">
-									<FieldLabel className="mb-1 text-xs">Laboratório</FieldLabel>
-									<Select
-										value={aro1.lab}
-										onValueChange={(val) => setAro1((a) => ({ ...a, lab: val }))}
-									>
-										<SelectTrigger className="h-8 text-xs">
-											<SelectValue placeholder="Selecione o Lab" />
-										</SelectTrigger>
-										<SelectContent>
-											{LAB_CATALOG.map((lab) => (
-												<SelectItem key={lab} value={lab}>
-													{lab}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-								</div>
-
-								<div className="sm:col-span-5">
-									<div className="flex items-center justify-between">
-										<FieldLabel className="mb-1 text-xs">Lente (Par)</FieldLabel>
-										{lensCatalog.length > 0 && (
+							<div className="mt-3 space-y-3">
+								{/* Seletor Dropdown do Catálogo de Lentes com Filtro de Lab */}
+								<div className="p-3 rounded-lg bg-muted/30 border space-y-2.5">
+									<div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+										{/* Laboratório Dropdown */}
+										<div className="sm:col-span-4">
+											<FieldLabel className="mb-1 text-xs font-semibold">
+												Laboratório Parceiro
+											</FieldLabel>
 											<select
+												value={aro1.lab}
+												onChange={(e) => setAro1((a) => ({ ...a, lab: e.target.value }))}
+												className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs"
+											>
+												<option value="">Todos os Labs...</option>
+												{LAB_CATALOG.map((lab) => (
+													<option key={lab} value={lab}>
+														{lab}
+													</option>
+												))}
+											</select>
+										</div>
+
+										{/* Lente do Catálogo Dropdown */}
+										<div className="sm:col-span-8">
+											<div className="flex items-center justify-between mb-1">
+												<FieldLabel className="text-xs font-semibold">
+													Lente do Catálogo (Par)
+												</FieldLabel>
+												<span className="text-[10px] text-muted-foreground font-normal">
+													{filteredLensesAro1.length} opções cadastradas
+												</span>
+											</div>
+											<select
+												value={
+													lensCatalog.find(
+														(l) =>
+															l.produto === aro1.lensName &&
+															(!aro1.lab ||
+																l.laboratorio.toLowerCase() === aro1.lab.toLowerCase()),
+													)?.id || ""
+												}
 												onChange={(e) => {
 													const selected = lensCatalog.find((l) => l.id === e.target.value);
 													if (selected) {
@@ -963,118 +1302,228 @@ export function OpticalOrderForm({
 															lensName: selected.produto,
 															lab: selected.laboratorio,
 															lensPrice: selected.preco,
+															lensType: selected.tipo,
+															lensFamily: selected.familia,
+															lensIndex: selected.indiceRefrativo,
+															lensTech: selected.tecnologia,
 														}));
 													}
 												}}
-												className="text-[10px] py-0.5 px-1 rounded border bg-muted/40 max-w-[130px]"
+												className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs"
 											>
-												<option value="">Do Catálogo...</option>
-												{lensCatalog.map((l) => (
+												<option value="">Selecione uma lente do catálogo...</option>
+												{filteredLensesAro1.map((l) => (
 													<option key={l.id} value={l.id}>
-														{l.produto} (R$ {l.preco})
+														[{l.laboratorio}] {l.produto} — {l.tipo} (IR {l.indiceRefrativo}) — R$ {l.preco}
 													</option>
 												))}
 											</select>
-										)}
+										</div>
 									</div>
-									<Input
-										value={aro1.lensName}
-										onChange={(e) =>
-											setAro1((a) => ({ ...a, lensName: e.target.value }))
-										}
-										placeholder="Nome / Design da Lente"
-										className="h-8 text-xs"
-									/>
+
+									{/* Campos Diretos da Lente */}
+									<div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+										<div className="sm:col-span-8">
+											<FieldLabel className="mb-1 text-xs">Nome / Design da Lente</FieldLabel>
+											<Input
+												value={aro1.lensName}
+												onChange={(e) =>
+													setAro1((a) => ({ ...a, lensName: e.target.value }))
+												}
+												placeholder="Nome / Design da Lente"
+												className="h-8 text-xs"
+											/>
+										</div>
+
+										<div className="sm:col-span-2">
+											<FieldLabel className="mb-1 text-xs">Qtd</FieldLabel>
+											<select
+												value={String(aro1.quantity)}
+												onChange={(e) =>
+													setAro1((a) => ({ ...a, quantity: Number(e.target.value) }))
+												}
+												className="w-full h-8 px-2 rounded-lg border border-input bg-background text-xs"
+											>
+												<option value="1">1 (Par)</option>
+												<option value="0.5">0.5 (Meio)</option>
+											</select>
+										</div>
+
+										<div className="sm:col-span-2">
+											<FieldLabel className="mb-1 text-xs">R$ Lente</FieldLabel>
+											<Input
+												type="number"
+												step="0.01"
+												value={aro1.lensPrice}
+												onChange={(e) =>
+													setAro1((a) => ({
+														...a,
+														lensPrice: Number(e.target.value) || 0,
+													}))
+												}
+												className="h-8 text-xs font-semibold text-primary"
+											/>
+										</div>
+									</div>
+
+									{/* Especificações Técnicas da Lente Espelhadas do Catálogo */}
+									<div className="p-2.5 rounded-lg bg-muted/20 border grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+										<div>
+											<FieldLabel className="text-[10px] text-muted-foreground">
+												Tipo Lente
+											</FieldLabel>
+											<select
+												value={aro1.lensType || "MULTIFOCAL"}
+												onChange={(e) =>
+													setAro1((a) => ({ ...a, lensType: e.target.value as any }))
+												}
+												className="w-full h-7 px-2 rounded border bg-background text-xs"
+											>
+												<option value="MONOFOCAL">Monofocal</option>
+												<option value="MULTIFOCAL">Multifocal</option>
+												<option value="BIFOCAL">Bifocal</option>
+												<option value="OCUPACIONAL">Ocupacional</option>
+											</select>
+										</div>
+										<div>
+											<FieldLabel className="text-[10px] text-muted-foreground">
+												Família
+											</FieldLabel>
+											<Input
+												value={aro1.lensFamily || ""}
+												onChange={(e) =>
+													setAro1((a) => ({ ...a, lensFamily: e.target.value }))
+												}
+												placeholder="Ex: Varilux"
+												className="h-7 text-xs"
+											/>
+										</div>
+										<div>
+											<FieldLabel className="text-[10px] text-muted-foreground">
+												Índice Refrativo (IR)
+											</FieldLabel>
+											<select
+												value={aro1.lensIndex || "1.50"}
+												onChange={(e) =>
+													setAro1((a) => ({ ...a, lensIndex: e.target.value }))
+												}
+												className="w-full h-7 px-2 rounded border bg-background text-xs"
+											>
+												<option value="1.50">1.50 (Resina CR-39)</option>
+												<option value="1.56">1.56 (Intermediário)</option>
+												<option value="1.59">1.59 (Policarbonato)</option>
+												<option value="1.60">1.60 (Alto Índice)</option>
+												<option value="1.67">1.67 (Ultra Fino)</option>
+												<option value="1.74">1.74 (Hi-Index)</option>
+											</select>
+										</div>
+										<div>
+											<FieldLabel className="text-[10px] text-muted-foreground">
+												Tecnologia
+											</FieldLabel>
+											<select
+												value={aro1.lensTech || "Freeform"}
+												onChange={(e) =>
+													setAro1((a) => ({ ...a, lensTech: e.target.value }))
+												}
+												className="w-full h-7 px-2 rounded border bg-background text-xs"
+											>
+												<option value="Freeform">Freeform</option>
+												<option value="Digital">Digital</option>
+												<option value="Surfaçada">Surfaçada</option>
+												<option value="Convencional">Convencional</option>
+												<option value="HD">HD</option>
+											</select>
+										</div>
+									</div>
 								</div>
 
-								<div className="sm:col-span-2">
-									<FieldLabel className="mb-1 text-xs">Qtd</FieldLabel>
-									<Select
-										value={String(aro1.quantity)}
-										onValueChange={(val) =>
-											setAro1((a) => ({ ...a, quantity: Number(val) }))
-										}
-									>
-										<SelectTrigger className="h-8 text-xs">
-											<SelectValue />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="1">1 (Par)</SelectItem>
-											<SelectItem value="0.5">0.5 (Meio)</SelectItem>
-										</SelectContent>
-									</Select>
-								</div>
+								{/* Tratamento Aro 1 */}
+								<div className="p-3 rounded-lg bg-muted/30 border space-y-2">
+									<div className="flex items-center justify-between">
+										<FieldLabel className="text-xs font-semibold">
+											Tratamento Antirreflexo / Proteção
+										</FieldLabel>
+										<div className="flex items-center gap-1.5 text-[11px] font-normal text-muted-foreground">
+											<Checkbox
+												id="aro1-no-treatment"
+												checked={aro1.noTreatment}
+												onCheckedChange={(c) =>
+													setAro1((a) => ({
+														...a,
+														noTreatment: Boolean(c),
+														treatmentPrice: c ? 0 : a.treatmentPrice,
+													}))
+												}
+											/>
+											<label htmlFor="aro1-no-treatment" className="cursor-pointer">
+												Sem Tratamento
+											</label>
+										</div>
+									</div>
 
-								<div className="sm:col-span-2">
-									<FieldLabel className="mb-1 text-xs">R$ Lente</FieldLabel>
-									<Input
-										type="number"
-										step="0.01"
-										value={aro1.lensPrice}
-										onChange={(e) =>
-											setAro1((a) => ({
-												...a,
-												lensPrice: Number(e.target.value) || 0,
-											}))
-										}
-										className="h-8 text-xs font-semibold"
-									/>
+									<div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+										<div className="sm:col-span-8 space-y-1.5">
+											{/* Dropdown de Tratamento */}
+											<select
+												disabled={aro1.noTreatment}
+												value={
+													TREATMENT_OPTIONS.find((t) => t.name === aro1.treatment)?.name ||
+													(aro1.treatment ? "CUSTOM" : "")
+												}
+												onChange={(e) => {
+													const val = e.target.value;
+													if (val !== "CUSTOM") {
+														const selected = TREATMENT_OPTIONS.find((t) => t.name === val);
+														if (selected) {
+															setAro1((a) => ({
+																...a,
+																treatment: selected.name,
+																treatmentPrice: selected.price,
+															}));
+														}
+													}
+												}}
+												className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs disabled:opacity-50"
+											>
+												<option value="">Selecione o Tratamento...</option>
+												{TREATMENT_OPTIONS.map((t) => (
+													<option key={t.name} value={t.name}>
+														[{t.lab}] {t.name} — R$ {t.price}
+													</option>
+												))}
+												<option value="CUSTOM">Outro (Digitar nome abaixo)...</option>
+											</select>
+											<Input
+												value={aro1.treatment}
+												disabled={aro1.noTreatment}
+												onChange={(e) =>
+													setAro1((a) => ({ ...a, treatment: e.target.value }))
+												}
+												placeholder="Ex: Crizal Rock / Antirreflexo"
+												className="h-8 text-xs"
+											/>
+										</div>
+										<div className="sm:col-span-4">
+											<FieldLabel className="mb-1 text-xs">R$ Tratamento</FieldLabel>
+											<Input
+												type="number"
+												step="0.01"
+												disabled={aro1.noTreatment}
+												value={aro1.treatmentPrice}
+												onChange={(e) =>
+													setAro1((a) => ({
+														...a,
+														treatmentPrice: Number(e.target.value) || 0,
+													}))
+												}
+												className="h-8 text-xs font-semibold text-primary"
+											/>
+										</div>
+									</div>
 								</div>
 							</div>
 						)}
-
-						{/* Tratamento Aro 1 */}
-						<div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-12">
-							<div className="sm:col-span-8">
-								<div className="flex items-center justify-between">
-									<FieldLabel className="mb-1 text-xs">Tratamento</FieldLabel>
-									<div className="flex items-center gap-1.5 text-[11px] font-normal text-muted-foreground">
-										<Checkbox
-											id="aro1-no-treatment"
-											checked={aro1.noTreatment}
-											onCheckedChange={(c) =>
-												setAro1((a) => ({
-													...a,
-													noTreatment: Boolean(c),
-													treatmentPrice: c ? 0 : a.treatmentPrice,
-												}))
-											}
-										/>
-										<label
-											htmlFor="aro1-no-treatment"
-											className="cursor-pointer"
-										>
-											Sem Tratamento
-										</label>
-									</div>
-								</div>
-								<Input
-									value={aro1.treatment}
-									disabled={aro1.noTreatment}
-									onChange={(e) =>
-										setAro1((a) => ({ ...a, treatment: e.target.value }))
-									}
-									placeholder="Ex: Crizal Rock / Antirreflexo"
-									className="h-8 text-xs"
-								/>
-							</div>
-							<div className="sm:col-span-4">
-								<FieldLabel className="mb-1 text-xs">R$ Tratamento</FieldLabel>
-								<Input
-									type="number"
-									step="0.01"
-									disabled={aro1.noTreatment}
-									value={aro1.treatmentPrice}
-									onChange={(e) =>
-										setAro1((a) => ({
-											...a,
-											treatmentPrice: Number(e.target.value) || 0,
-										}))
-									}
-									className="h-8 text-xs font-semibold"
-								/>
-							</div>
-						</div>
 
 						{/* Dioptrias Aro 1 */}
 						<div className="mt-4">
@@ -1124,139 +1573,396 @@ export function OpticalOrderForm({
 						</div>
 
 						{hasAro2 && (
-							<div className="mt-4 border-t pt-4">
+							<div className="mt-4 border-t pt-4 space-y-4">
 								{/* Armação Aro 2 */}
-								<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-									<Field>
-										<FieldLabel>Cód. Armação</FieldLabel>
-										<Input
-											value={aro2.frameCode}
-											onChange={(e) =>
-												setAro2((a) => ({ ...a, frameCode: e.target.value }))
+								<div className="space-y-3">
+									{/* Seletor Dropdown do Catálogo de Peças - Aro 2 */}
+									<div className="p-3 rounded-lg bg-muted/30 border">
+										<div className="flex items-center justify-between mb-1.5">
+											<FieldLabel className="text-xs font-semibold">
+												Selecionar Peça do Catálogo — Aro 2 (2º Par)
+											</FieldLabel>
+											<span className="text-[10px] text-muted-foreground">
+												{frameCatalog.length} peças disponíveis no estoque
+											</span>
+										</div>
+										<select
+											value={
+												frameCatalog.find(
+													(f) =>
+														f.produto === aro2.frameModel ||
+														(f.marca === aro2.frameBrand &&
+															f.produto.includes(aro2.frameCode)),
+												)?.id || ""
 											}
-											placeholder="VO5322"
-											className="h-8 text-xs font-mono"
-										/>
-									</Field>
-									<Field>
-										<FieldLabel>Marca</FieldLabel>
-										<Input
-											value={aro2.frameBrand}
-											onChange={(e) =>
-												setAro2((a) => ({ ...a, frameBrand: e.target.value }))
-											}
-											placeholder="Vogue"
-											className="h-8 text-xs"
-										/>
-									</Field>
-									<Field>
-										<FieldLabel>Modelo</FieldLabel>
-										<Input
-											value={aro2.frameModel}
-											onChange={(e) =>
-												setAro2((a) => ({ ...a, frameModel: e.target.value }))
-											}
-											placeholder="Solar Tartaruga"
-											className="h-8 text-xs"
-										/>
-									</Field>
-									<Field>
-										<FieldLabel>R$ Armação</FieldLabel>
-										<Input
-											type="number"
-											step="0.01"
-											value={aro2.framePrice}
-											onChange={(e) =>
-												setAro2((a) => ({
-													...a,
-													framePrice: Number(e.target.value) || 0,
-												}))
-											}
-											className="h-8 text-xs font-semibold"
-										/>
-									</Field>
+											onChange={(e) => {
+												const selected = frameCatalog.find(
+													(f) => f.id === e.target.value,
+												);
+												if (selected) {
+													setAro2((a) => ({
+														...a,
+														frameCode:
+															selected.produto.split(" ")[1] ||
+															selected.produto.slice(0, 8),
+														frameBrand: selected.marca,
+														frameModel: selected.produto,
+														framePrice: selected.preco,
+														frameType: selected.tipo,
+														frameFamily: selected.familia,
+														frameManufacturer: selected.fabricante,
+														frameAro: selected.tamanhoAro,
+														framePonte: selected.tamanhoPonte,
+													}));
+												}
+											}}
+											className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs"
+										>
+											<option value="">Selecione uma armação/solar para o 2º par...</option>
+											{frameCatalog.map((f) => (
+												<option key={f.id} value={f.id}>
+													[{f.marca}] {f.produto} ({f.tipo}) — Aro {f.tamanhoAro}/{f.tamanhoPonte} — R$ {f.preco} (Estoque: {f.estoque})
+												</option>
+											))}
+										</select>
+									</div>
+
+									<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+										<Field>
+											<FieldLabel>Cód. Armação</FieldLabel>
+											<Input
+												value={aro2.frameCode}
+												onChange={(e) =>
+													setAro2((a) => ({ ...a, frameCode: e.target.value }))
+												}
+												placeholder="VO5322"
+												className="h-8 text-xs font-mono"
+											/>
+										</Field>
+										<Field>
+											<FieldLabel>Marca</FieldLabel>
+											<Input
+												value={aro2.frameBrand}
+												onChange={(e) =>
+													setAro2((a) => ({ ...a, frameBrand: e.target.value }))
+												}
+												placeholder="Vogue"
+												className="h-8 text-xs"
+											/>
+										</Field>
+										<Field>
+											<FieldLabel>Modelo</FieldLabel>
+											<Input
+												value={aro2.frameModel}
+												onChange={(e) =>
+													setAro2((a) => ({ ...a, frameModel: e.target.value }))
+												}
+												placeholder="Solar Tartaruga"
+												className="h-8 text-xs"
+											/>
+										</Field>
+										<Field>
+											<FieldLabel>R$ Armação</FieldLabel>
+											<Input
+												type="number"
+												step="0.01"
+												value={aro2.framePrice}
+												onChange={(e) =>
+													setAro2((a) => ({
+														...a,
+														framePrice: Number(e.target.value) || 0,
+													}))
+												}
+												className="h-8 text-xs font-semibold"
+											/>
+										</Field>
+									</div>
+
+									{/* Especificações Técnicas da Armação Aro 2 */}
+									<div className="p-2.5 rounded-lg bg-muted/20 border grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+										<div>
+											<FieldLabel className="text-[10px] text-muted-foreground">
+												Tipo Peça
+											</FieldLabel>
+											<select
+												value={aro2.frameType || "SOLAR"}
+												onChange={(e) =>
+													setAro2((a) => ({ ...a, frameType: e.target.value as any }))
+												}
+												className="w-full h-7 px-2 rounded border bg-background text-xs"
+											>
+												<option value="RECEITUARIO">Receituário</option>
+												<option value="SOLAR">Solar</option>
+												<option value="CLIP_ON">Clip-on</option>
+											</select>
+										</div>
+										<div>
+											<FieldLabel className="text-[10px] text-muted-foreground">
+												Família / Coleção
+											</FieldLabel>
+											<Input
+												value={aro2.frameFamily || ""}
+												onChange={(e) =>
+													setAro2((a) => ({ ...a, frameFamily: e.target.value }))
+												}
+												placeholder="Ex: Gigi"
+												className="h-7 text-xs"
+											/>
+										</div>
+										<div>
+											<FieldLabel className="text-[10px] text-muted-foreground">
+												Fabricante
+											</FieldLabel>
+											<Input
+												value={aro2.frameManufacturer || ""}
+												onChange={(e) =>
+													setAro2((a) => ({
+														...a,
+														frameManufacturer: e.target.value,
+													}))
+												}
+												placeholder="Ex: Luxottica"
+												className="h-7 text-xs"
+											/>
+										</div>
+										<div>
+											<FieldLabel className="text-[10px] text-muted-foreground">
+												Tamanho Aro (mm)
+											</FieldLabel>
+											<Input
+												value={aro2.frameAro || ""}
+												onChange={(e) =>
+													setAro2((a) => ({ ...a, frameAro: e.target.value }))
+												}
+												placeholder="Ex: 54"
+												className="h-7 text-xs font-mono"
+											/>
+										</div>
+										<div>
+											<FieldLabel className="text-[10px] text-muted-foreground">
+												Tamanho Ponte (mm)
+											</FieldLabel>
+											<Input
+												value={aro2.framePonte || ""}
+												onChange={(e) =>
+													setAro2((a) => ({ ...a, framePonte: e.target.value }))
+												}
+												placeholder="Ex: 19"
+												className="h-7 text-xs font-mono"
+											/>
+										</div>
+									</div>
 								</div>
 
 								{/* Lente & Laboratório Aro 2 */}
-								<div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-12">
-									<div className="sm:col-span-3">
-										<FieldLabel className="mb-1 text-xs">
-											Laboratório
-										</FieldLabel>
-										<Select
-											value={aro2.lab}
-											onValueChange={(val) =>
-												setAro2((a) => ({ ...a, lab: val }))
-											}
-										>
-											<SelectTrigger className="h-8 text-xs">
-												<SelectValue />
-											</SelectTrigger>
-											<SelectContent>
-												{LAB_CATALOG.map((lab) => (
-													<SelectItem key={lab} value={lab}>
-														{lab}
-													</SelectItem>
-												))}
-											</SelectContent>
-										</Select>
+								<div className="space-y-3">
+									<div className="p-3 rounded-lg bg-muted/30 border space-y-2.5">
+										<div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+											{/* Laboratório Dropdown */}
+											<div className="sm:col-span-4">
+												<FieldLabel className="mb-1 text-xs font-semibold">
+													Laboratório (2º Par)
+												</FieldLabel>
+												<select
+													value={aro2.lab}
+													onChange={(e) =>
+														setAro2((a) => ({ ...a, lab: e.target.value }))
+													}
+													className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs"
+												>
+													<option value="">Todos os Labs...</option>
+													{LAB_CATALOG.map((lab) => (
+														<option key={lab} value={lab}>
+															{lab}
+														</option>
+													))}
+												</select>
+											</div>
+
+											{/* Lente do Catálogo Dropdown */}
+											<div className="sm:col-span-8">
+												<div className="flex items-center justify-between mb-1">
+													<FieldLabel className="text-xs font-semibold">
+														Lente do Catálogo (2º Par)
+													</FieldLabel>
+													<span className="text-[10px] text-muted-foreground font-normal">
+														{filteredLensesAro2.length} opções cadastradas
+													</span>
+												</div>
+												<select
+													value={
+														lensCatalog.find(
+															(l) =>
+																l.produto === aro2.lensName &&
+																(!aro2.lab ||
+																	l.laboratorio.toLowerCase() ===
+																		aro2.lab.toLowerCase()),
+														)?.id || ""
+													}
+													onChange={(e) => {
+														const selected = lensCatalog.find(
+															(l) => l.id === e.target.value,
+														);
+														if (selected) {
+															setAro2((a) => ({
+																...a,
+																lensName: selected.produto,
+																lab: selected.laboratorio,
+																lensPrice: Math.round(selected.preco * 0.7), // 30% desc
+																lensType: selected.tipo,
+																lensFamily: selected.familia,
+																lensIndex: selected.indiceRefrativo,
+																lensTech: selected.tecnologia,
+															}));
+														}
+													}}
+													className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs"
+												>
+													<option value="">Selecione uma lente para o 2º par...</option>
+													{filteredLensesAro2.map((l) => (
+														<option key={l.id} value={l.id}>
+															[{l.laboratorio}] {l.produto} — {l.tipo} (IR {l.indiceRefrativo}) — R$ {l.preco}
+														</option>
+													))}
+												</select>
+											</div>
+										</div>
+
+										<div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+											<div className="sm:col-span-8">
+												<FieldLabel className="mb-1 text-xs">
+													Nome / Design da Lente
+												</FieldLabel>
+												<Input
+													value={aro2.lensName}
+													onChange={(e) =>
+														setAro2((a) => ({ ...a, lensName: e.target.value }))
+													}
+													placeholder="Nome da Lente"
+													className="h-8 text-xs"
+												/>
+											</div>
+
+											<div className="sm:col-span-2">
+												<FieldLabel className="mb-1 text-xs">Qtd</FieldLabel>
+												<select
+													value={String(aro2.quantity)}
+													onChange={(e) =>
+														setAro2((a) => ({
+															...a,
+															quantity: Number(e.target.value),
+														}))
+													}
+													className="w-full h-8 px-2 rounded-lg border border-input bg-background text-xs"
+												>
+													<option value="1">1 (Par)</option>
+													<option value="0.5">0.5 (Meio)</option>
+												</select>
+											</div>
+
+											<div className="sm:col-span-2">
+												<FieldLabel className="mb-1 text-xs">R$ Lente</FieldLabel>
+												<Input
+													type="number"
+													step="0.01"
+													value={aro2.lensPrice}
+													onChange={(e) =>
+														setAro2((a) => ({
+															...a,
+															lensPrice: Number(e.target.value) || 0,
+														}))
+													}
+													className="h-8 text-xs font-semibold text-primary"
+												/>
+											</div>
+										</div>
+
+										{/* Especificações Técnicas da Lente Aro 2 */}
+										<div className="p-2.5 rounded-lg bg-muted/20 border grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+											<div>
+												<FieldLabel className="text-[10px] text-muted-foreground">
+													Tipo Lente
+												</FieldLabel>
+												<select
+													value={aro2.lensType || "MULTIFOCAL"}
+													onChange={(e) =>
+														setAro2((a) => ({
+															...a,
+															lensType: e.target.value as any,
+														}))
+													}
+													className="w-full h-7 px-2 rounded border bg-background text-xs"
+												>
+													<option value="MONOFOCAL">Monofocal</option>
+													<option value="MULTIFOCAL">Multifocal</option>
+													<option value="BIFOCAL">Bifocal</option>
+													<option value="OCUPACIONAL">Ocupacional</option>
+												</select>
+											</div>
+											<div>
+												<FieldLabel className="text-[10px] text-muted-foreground">
+													Família
+												</FieldLabel>
+												<Input
+													value={aro2.lensFamily || ""}
+													onChange={(e) =>
+														setAro2((a) => ({ ...a, lensFamily: e.target.value }))
+													}
+													placeholder="Ex: Varilux"
+													className="h-7 text-xs"
+												/>
+											</div>
+											<div>
+												<FieldLabel className="text-[10px] text-muted-foreground">
+													Índice Refrativo (IR)
+												</FieldLabel>
+												<select
+													value={aro2.lensIndex || "1.50"}
+													onChange={(e) =>
+														setAro2((a) => ({
+															...a,
+															lensIndex: e.target.value,
+														}))
+													}
+													className="w-full h-7 px-2 rounded border bg-background text-xs"
+												>
+													<option value="1.50">1.50 (Resina CR-39)</option>
+													<option value="1.56">1.56 (Intermediário)</option>
+													<option value="1.59">1.59 (Policarbonato)</option>
+													<option value="1.60">1.60 (Alto Índice)</option>
+													<option value="1.67">1.67 (Ultra Fino)</option>
+													<option value="1.74">1.74 (Hi-Index)</option>
+												</select>
+											</div>
+											<div>
+												<FieldLabel className="text-[10px] text-muted-foreground">
+													Tecnologia
+												</FieldLabel>
+												<select
+													value={aro2.lensTech || "Freeform"}
+													onChange={(e) =>
+														setAro2((a) => ({
+															...a,
+															lensTech: e.target.value,
+														}))
+													}
+													className="w-full h-7 px-2 rounded border bg-background text-xs"
+												>
+													<option value="Freeform">Freeform</option>
+													<option value="Digital">Digital</option>
+													<option value="Surfaçada">Surfaçada</option>
+													<option value="Convencional">Convencional</option>
+													<option value="HD">HD</option>
+												</select>
+											</div>
+										</div>
 									</div>
 
-									<div className="sm:col-span-5">
-										<FieldLabel className="mb-1 text-xs">
-											Lente (2º Par)
-										</FieldLabel>
-										<Input
-											value={aro2.lensName}
-											onChange={(e) =>
-												setAro2((a) => ({ ...a, lensName: e.target.value }))
-											}
-											placeholder="Nome da Lente"
-											className="h-8 text-xs"
-										/>
-									</div>
-
-									<div className="sm:col-span-2">
-										<FieldLabel className="mb-1 text-xs">Qtd</FieldLabel>
-										<Select
-											value={String(aro2.quantity)}
-											onValueChange={(val) =>
-												setAro2((a) => ({ ...a, quantity: Number(val) }))
-											}
-										>
-											<SelectTrigger className="h-8 text-xs">
-												<SelectValue />
-											</SelectTrigger>
-											<SelectContent>
-												<SelectItem value="1">1 (Par)</SelectItem>
-												<SelectItem value="0.5">0.5 (Meio)</SelectItem>
-											</SelectContent>
-										</Select>
-									</div>
-
-									<div className="sm:col-span-2">
-										<FieldLabel className="mb-1 text-xs">R$ Lente</FieldLabel>
-										<Input
-											type="number"
-											step="0.01"
-											value={aro2.lensPrice}
-											onChange={(e) =>
-												setAro2((a) => ({
-													...a,
-													lensPrice: Number(e.target.value) || 0,
-												}))
-											}
-											className="h-8 text-xs font-semibold"
-										/>
-									</div>
-								</div>
-
-								{/* Tratamento Aro 2 */}
-								<div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-12">
-									<div className="sm:col-span-8">
+									{/* Tratamento Aro 2 */}
+									<div className="p-3 rounded-lg bg-muted/30 border space-y-2">
 										<div className="flex items-center justify-between">
-											<FieldLabel className="mb-1 text-xs">
-												Tratamento
+											<FieldLabel className="text-xs font-semibold">
+												Tratamento Antirreflexo / Proteção (2º Par)
 											</FieldLabel>
 											<div className="flex items-center gap-1.5 text-[11px] font-normal text-muted-foreground">
 												<Checkbox
@@ -1278,33 +1984,67 @@ export function OpticalOrderForm({
 												</label>
 											</div>
 										</div>
-										<Input
-											value={aro2.treatment}
-											disabled={aro2.noTreatment}
-											onChange={(e) =>
-												setAro2((a) => ({ ...a, treatment: e.target.value }))
-											}
-											placeholder="Ex: Crizal Sun UV"
-											className="h-8 text-xs"
-										/>
-									</div>
-									<div className="sm:col-span-4">
-										<FieldLabel className="mb-1 text-xs">
-											R$ Tratamento
-										</FieldLabel>
-										<Input
-											type="number"
-											step="0.01"
-											disabled={aro2.noTreatment}
-											value={aro2.treatmentPrice}
-											onChange={(e) =>
-												setAro2((a) => ({
-													...a,
-													treatmentPrice: Number(e.target.value) || 0,
-												}))
-											}
-											className="h-8 text-xs font-semibold"
-										/>
+
+										<div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+											<div className="sm:col-span-8 space-y-1.5">
+												<select
+													disabled={aro2.noTreatment}
+													value={
+														TREATMENT_OPTIONS.find((t) => t.name === aro2.treatment)?.name ||
+														(aro2.treatment ? "CUSTOM" : "")
+													}
+													onChange={(e) => {
+														const val = e.target.value;
+														if (val !== "CUSTOM") {
+															const selected = TREATMENT_OPTIONS.find((t) => t.name === val);
+															if (selected) {
+																setAro2((a) => ({
+																	...a,
+																	treatment: selected.name,
+																	treatmentPrice: Math.round(selected.price * 0.7),
+																}));
+															}
+														}
+													}}
+													className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs disabled:opacity-50"
+												>
+													<option value="">Selecione o Tratamento...</option>
+													{TREATMENT_OPTIONS.map((t) => (
+														<option key={t.name} value={t.name}>
+															[{t.lab}] {t.name} — R$ {Math.round(t.price * 0.7)} (Desc. 2º par)
+														</option>
+													))}
+													<option value="CUSTOM">Outro (Digitar nome abaixo)...</option>
+												</select>
+												<Input
+													value={aro2.treatment}
+													disabled={aro2.noTreatment}
+													onChange={(e) =>
+														setAro2((a) => ({ ...a, treatment: e.target.value }))
+													}
+													placeholder="Ex: Crizal Sun UV"
+													className="h-8 text-xs"
+												/>
+											</div>
+											<div className="sm:col-span-4">
+												<FieldLabel className="mb-1 text-xs">
+													R$ Tratamento
+												</FieldLabel>
+												<Input
+													type="number"
+													step="0.01"
+													disabled={aro2.noTreatment}
+													value={aro2.treatmentPrice}
+													onChange={(e) =>
+														setAro2((a) => ({
+															...a,
+															treatmentPrice: Number(e.target.value) || 0,
+														}))
+													}
+													className="h-8 text-xs font-semibold text-primary"
+												/>
+											</div>
+										</div>
 									</div>
 								</div>
 

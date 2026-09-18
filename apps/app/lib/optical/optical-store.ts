@@ -152,24 +152,55 @@ export function sanitizeOrder(raw: any, index = 0): OpticalOrder {
 		notes: raw.financials?.notes,
 	};
 
-	const aro1 = {
-		frameCode: raw.aro1?.frameCode ? String(raw.aro1.frameCode) : "PADRAO",
-		frameBrand: String(raw.aro1?.frameBrand || "Armação"),
-		frameModel: raw.aro1?.frameModel ? String(raw.aro1.frameModel) : "Modelo",
-		framePrice: Number(raw.aro1?.framePrice) || 0,
-		lab: String(raw.aro1?.lab || "Laboratório"),
-		lensName: String(raw.aro1?.lensName || "Lente"),
-		quantity: Number(raw.aro1?.quantity) || 1,
-		lensPrice: Number(raw.aro1?.lensPrice) || 0,
-		treatment: raw.aro1?.treatment ? String(raw.aro1.treatment) : "Incolor",
-		noTreatment: Boolean(raw.aro1?.noTreatment),
-		treatmentPrice: Number(raw.aro1?.treatmentPrice) || 0,
-		diopters: raw.aro1?.diopters || {
+	const sanitizeAro = (aroRaw: any) => ({
+		frameCode: aroRaw?.frameCode ? String(aroRaw.frameCode) : "PADRAO",
+		frameBrand: String(aroRaw?.frameBrand || "Armação"),
+		frameModel: aroRaw?.frameModel ? String(aroRaw.frameModel) : "Modelo",
+		framePrice: Number(aroRaw?.framePrice) || 0,
+		frameType: aroRaw?.frameType,
+		frameFamily: aroRaw?.frameFamily,
+		frameManufacturer: aroRaw?.frameManufacturer,
+		frameAro: aroRaw?.frameAro,
+		framePonte: aroRaw?.framePonte,
+		lab: String(aroRaw?.lab || "Laboratório"),
+		lensName: String(aroRaw?.lensName || "Lente"),
+		quantity: Number(aroRaw?.quantity) || 1,
+		lensPrice: Number(aroRaw?.lensPrice) || 0,
+		lensType: aroRaw?.lensType,
+		lensFamily: aroRaw?.lensFamily,
+		lensIndex: aroRaw?.lensIndex,
+		lensTech: aroRaw?.lensTech,
+		treatment: aroRaw?.treatment ? String(aroRaw.treatment) : "Incolor",
+		noTreatment: Boolean(aroRaw?.noTreatment),
+		treatmentPrice: Number(aroRaw?.treatmentPrice) || 0,
+		diopters: aroRaw?.diopters || {
 			od: { esf: "0.00", cil: "0.00", eixo: "0", dnp: "0", alt: "0" },
 			oe: { esf: "0.00", cil: "0.00", eixo: "0", dnp: "0", alt: "0" },
 			adicao: "0.00",
 		},
-	};
+		differentLensesPerEye: aroRaw?.differentLensesPerEye,
+		lensOd: aroRaw?.lensOd,
+		lensPriceOd: aroRaw?.lensPriceOd,
+		treatmentOd: aroRaw?.treatmentOd,
+		treatmentPriceOd: aroRaw?.treatmentPriceOd,
+		labOd: aroRaw?.labOd,
+		lensTypeOd: aroRaw?.lensTypeOd,
+		lensFamilyOd: aroRaw?.lensFamilyOd,
+		lensIndexOd: aroRaw?.lensIndexOd,
+		lensTechOd: aroRaw?.lensTechOd,
+		lensOe: aroRaw?.lensOe,
+		lensPriceOe: aroRaw?.lensPriceOe,
+		treatmentOe: aroRaw?.treatmentOe,
+		treatmentPriceOe: aroRaw?.treatmentPriceOe,
+		labOe: aroRaw?.labOe,
+		lensTypeOe: aroRaw?.lensTypeOe,
+		lensFamilyOe: aroRaw?.lensFamilyOe,
+		lensIndexOe: aroRaw?.lensIndexOe,
+		lensTechOe: aroRaw?.lensTechOe,
+	});
+
+	const aro1 = sanitizeAro(raw.aro1);
+	const aro2 = raw.aro2 ? sanitizeAro(raw.aro2) : undefined;
 
 	const validStatuses: OpticalOrderStatus[] = [
 		"DIGITADA",
@@ -194,6 +225,7 @@ export function sanitizeOrder(raw: any, index = 0): OpticalOrder {
 		patient,
 		financials,
 		aro1,
+		aro2,
 		hasAro2: Boolean(raw.hasAro2),
 		isAro2CopyOfAro1: Boolean(raw.isAro2CopyOfAro1),
 		aiAudit: raw.aiAudit || fallbackAIAudit,

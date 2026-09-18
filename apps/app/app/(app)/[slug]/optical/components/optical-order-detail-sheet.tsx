@@ -295,6 +295,37 @@ export function OpticalOrderDetailSheet({
 								</div>
 							</div>
 
+							{/* Especificações Técnicas Espelhadas Aro 1 */}
+							{(order.aro1?.lensType || order.aro1?.lensIndex || order.aro1?.frameFamily || order.aro1?.frameAro) && (
+								<div className="flex flex-wrap gap-1.5 pt-1">
+									{order.aro1?.lensType && (
+										<Badge variant="outline" className="text-[10px]">
+											Tipo: {order.aro1.lensType}
+										</Badge>
+									)}
+									{order.aro1?.lensFamily && (
+										<Badge variant="outline" className="text-[10px]">
+											Família: {order.aro1.lensFamily}
+										</Badge>
+									)}
+									{order.aro1?.lensIndex && (
+										<Badge variant="outline" className="text-[10px]">
+											IR {order.aro1.lensIndex}
+										</Badge>
+									)}
+									{order.aro1?.lensTech && (
+										<Badge variant="outline" className="text-[10px]">
+											Tec: {order.aro1.lensTech}
+										</Badge>
+									)}
+									{order.aro1?.frameAro && (
+										<Badge variant="secondary" className="text-[10px]">
+											Aro {order.aro1.frameAro}/{order.aro1.framePonte || "—"}
+										</Badge>
+									)}
+								</div>
+							)}
+
 							<OpticalDioptersTable
 								idPrefix="detail-aro1"
 								title="Dioptrias Cadastradas — Aro 1"
@@ -346,6 +377,37 @@ export function OpticalOrderDetailSheet({
 										{order.aro2?.frameCode || "—"}
 									</div>
 								</div>
+
+								{/* Especificações Técnicas Espelhadas Aro 2 */}
+								{(order.aro2?.lensType || order.aro2?.lensIndex || order.aro2?.frameFamily || order.aro2?.frameAro) && (
+									<div className="flex flex-wrap gap-1.5 pt-1">
+										{order.aro2?.lensType && (
+											<Badge variant="outline" className="text-[10px]">
+												Tipo: {order.aro2.lensType}
+											</Badge>
+										)}
+										{order.aro2?.lensFamily && (
+											<Badge variant="outline" className="text-[10px]">
+												Família: {order.aro2.lensFamily}
+											</Badge>
+										)}
+										{order.aro2?.lensIndex && (
+											<Badge variant="outline" className="text-[10px]">
+												IR {order.aro2.lensIndex}
+											</Badge>
+										)}
+										{order.aro2?.lensTech && (
+											<Badge variant="outline" className="text-[10px]">
+												Tec: {order.aro2.lensTech}
+											</Badge>
+										)}
+										{order.aro2?.frameAro && (
+											<Badge variant="secondary" className="text-[10px]">
+												Aro {order.aro2.frameAro}/{order.aro2.framePonte || "—"}
+											</Badge>
+										)}
+									</div>
+								)}
 
 								<OpticalDioptersTable
 									idPrefix="detail-aro2"

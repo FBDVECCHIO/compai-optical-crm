@@ -39,15 +39,30 @@ export interface EyePrescription {
 	adicao?: string;
 }
 
+// Categorias de catálogo
+export type LensCategory = "MONOFOCAL" | "MULTIFOCAL" | "BIFOCAL" | "OCUPACIONAL";
+export type FrameCategory = "RECEITUARIO" | "SOLAR" | "CLIP_ON";
+
 export interface AroItem {
 	frameCode: string;
 	frameBrand: string;
 	frameModel: string;
 	framePrice: number;
+	frameType?: FrameCategory | string;
+	frameFamily?: string;
+	frameManufacturer?: string;
+	frameAro?: string;
+	framePonte?: string;
+
 	lab: string;
 	lensName: string;
 	quantity: number; // 1 (par) ou 0.5 (meio)
 	lensPrice: number;
+	lensType?: LensCategory | string;
+	lensFamily?: string;
+	lensIndex?: string;
+	lensTech?: string;
+
 	treatment: string;
 	noTreatment: boolean;
 	treatmentPrice: number;
@@ -60,12 +75,20 @@ export interface AroItem {
 	treatmentOd?: string;
 	treatmentPriceOd?: number;
 	labOd?: string;
+	lensTypeOd?: string;
+	lensFamilyOd?: string;
+	lensIndexOd?: string;
+	lensTechOd?: string;
 
 	lensOe?: string;
 	lensPriceOe?: number;
 	treatmentOe?: string;
 	treatmentPriceOe?: number;
 	labOe?: string;
+	lensTypeOe?: string;
+	lensFamilyOe?: string;
+	lensIndexOe?: string;
+	lensTechOe?: string;
 }
 
 export interface OpticalPatient {
@@ -194,7 +217,6 @@ export interface PostSalesRecord {
 // -------------------------------------------------------------
 // CATÁLOGO DE LENTES (ABASTECE A OS COM VARIAÇÃO POR OLHO)
 // -------------------------------------------------------------
-export type LensCategory = "MONOFOCAL" | "MULTIFOCAL" | "BIFOCAL" | "OCUPACIONAL";
 
 export interface LensCatalogItem {
 	id: string;
@@ -215,7 +237,6 @@ export interface LensCatalogItem {
 // -------------------------------------------------------------
 // CATÁLOGO DE PEÇAS (ARMAÇÕES & SOLARES)
 // -------------------------------------------------------------
-export type FrameCategory = "RECEITUARIO" | "SOLAR" | "CLIP_ON";
 
 export interface FrameCatalogItem {
 	id: string;
