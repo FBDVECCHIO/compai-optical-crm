@@ -111,7 +111,7 @@ export function OpticalKanban({ searchQuery = "" }: { searchQuery?: string }) {
 							onDrop={(e) => {
 								e.preventDefault();
 								setDragOverCol(null);
-								const orderId = e.dataTransfer.getData("text/plain");
+								const orderId = e.dataTransfer.getData("text/plain") || draggedOrderId;
 								if (orderId) {
 									handleDrop(orderId, col.status);
 								}

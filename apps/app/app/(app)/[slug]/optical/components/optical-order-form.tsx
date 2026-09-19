@@ -2,12 +2,20 @@
 
 import Checkmark from "@carbon/icons-react/es/Checkmark";
 import Copy from "@carbon/icons-react/es/Copy";
+import Locked from "@carbon/icons-react/es/Locked";
 import Money from "@carbon/icons-react/es/Money";
+import Percentage from "@carbon/icons-react/es/Percentage";
 import Search from "@carbon/icons-react/es/Search";
 import UserAvatar from "@carbon/icons-react/es/UserAvatar";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
 import { Checkbox } from "@crm/ui/components/checkbox";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@crm/ui/components/dialog";
 import { Field, FieldGroup, FieldLabel } from "@crm/ui/components/field";
 import { Icon } from "@crm/ui/components/icon";
 import Glasses from "@crm/ui/components/icons/glasses";
@@ -25,10 +33,11 @@ import { Switch } from "@crm/ui/components/switch";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { LAB_CATALOG, TREATMENT_OPTIONS } from "@/lib/optical/optical-mock-data";
-import { useOpticalOrders } from "@/lib/optical/optical-store";
+import { checkDiscountLimit, useOpticalOrders } from "@/lib/optical/optical-store";
 import {
 	fetchLensCatalog,
 	fetchFrameCatalog,
+	decrementFrameStock,
 } from "@/lib/optical/supabase-optical";
 import type {
 	AroItem,
@@ -152,8 +161,13 @@ export function OpticalOrderForm({
 		diopters: DEFAULT_DIOPTERS,
 	});
 
-	// Financial state
-	const [discount, setDiscount] = useState<number>(0);
+	// Financial & Discount state (R$ ou % com alçada e delegação ao gerente)
+	const [discountMode, setDiscountMode] = useState<"BRL" | "PCT">("BRL");
+	const [discountValue, setDiscountValue] = useState<number>(0);
+	const [isDiscountManagerApproved, setIsDiscountManagerApproved] = useState(false);
+	const [managerPasswordModalOpen, setManagerPasswordModalOpen] = useState(false);
+	const [managerPasswordInput, setManagerPasswordInput] = useState("");
+
 	const [paymentMode, setPaymentMode] = useState<OpticalPaymentMode>("TOTAL");
 	const [paymentMethod1, setPaymentMethod1] =
 		useState<OpticalPaymentMethod>("CARTAO_CREDITO");
@@ -166,27 +180,54 @@ export function OpticalOrderForm({
 	const [lensCatalog, setLensCatalog] = useState<LensCatalogItem[]>([]);
 	const [frameCatalog, setFrameCatalog] = useState<FrameCatalogItem[]>([]);
 
+	// Filtros avançados de Lentes (Tipo, IR, Busca) - Aro 1
+	const [lensTypeFilter1, setLensTypeFilter1] = useState<string>("ALL");
+	const [lensIndexFilter1, setLensIndexFilter1] = useState<string>("ALL");
+	const [lensSearchQuery1, setLensSearchQuery1] = useState<string>("");
+
+	// Filtros avançados de Lentes (Tipo, IR, Busca) - Aro 2
+	const [lensTypeFilter2, setLensTypeFilter2] = useState<string>("ALL");
+	const [lensIndexFilter2, setLensIndexFilter2] = useState<string>("ALL");
+	const [lensSearchQuery2, setLensSearchQuery2] = useState<string>("");
+
 	useEffect(() => {
 		fetchLensCatalog().then((items) => setLensCatalog(items));
 		fetchFrameCatalog().then((items) => setFrameCatalog(items));
 	}, []);
 
-	// Filtros inteligentes de lentes por laboratório selecionado
+	// Filtros inteligentes de lentes por laboratório, tipo, IR e busca - Aro 1
 	const filteredLensesAro1 = useMemo(() => {
-		if (!aro1.lab) return lensCatalog;
-		const filtered = lensCatalog.filter(
-			(l) => l.laboratorio.toLowerCase() === aro1.lab.toLowerCase(),
-		);
-		return filtered.length > 0 ? filtered : lensCatalog;
-	}, [lensCatalog, aro1.lab]);
+		return lensCatalog.filter((l) => {
+			if (aro1.lab && l.laboratorio.toLowerCase() !== aro1.lab.toLowerCase()) return false;
+			if (lensTypeFilter1 !== "ALL" && l.tipo.toUpperCase() !== lensTypeFilter1.toUpperCase()) return false;
+			if (lensIndexFilter1 !== "ALL" && l.indiceRefrativo !== lensIndexFilter1) return false;
+			if (lensSearchQuery1.trim()) {
+				const q = lensSearchQuery1.toLowerCase();
+				const matchName = l.produto.toLowerCase().includes(q);
+				const matchFamily = (l.familia || "").toLowerCase().includes(q);
+				const matchTech = (l.tecnologia || "").toLowerCase().includes(q);
+				if (!matchName && !matchFamily && !matchTech) return false;
+			}
+			return true;
+		});
+	}, [lensCatalog, aro1.lab, lensTypeFilter1, lensIndexFilter1, lensSearchQuery1]);
 
+	// Filtros inteligentes de lentes por laboratório, tipo, IR e busca - Aro 2
 	const filteredLensesAro2 = useMemo(() => {
-		if (!aro2.lab) return lensCatalog;
-		const filtered = lensCatalog.filter(
-			(l) => l.laboratorio.toLowerCase() === aro2.lab.toLowerCase(),
-		);
-		return filtered.length > 0 ? filtered : lensCatalog;
-	}, [lensCatalog, aro2.lab]);
+		return lensCatalog.filter((l) => {
+			if (aro2.lab && l.laboratorio.toLowerCase() !== aro2.lab.toLowerCase()) return false;
+			if (lensTypeFilter2 !== "ALL" && l.tipo.toUpperCase() !== lensTypeFilter2.toUpperCase()) return false;
+			if (lensIndexFilter2 !== "ALL" && l.indiceRefrativo !== lensIndexFilter2) return false;
+			if (lensSearchQuery2.trim()) {
+				const q = lensSearchQuery2.toLowerCase();
+				const matchName = l.produto.toLowerCase().includes(q);
+				const matchFamily = (l.familia || "").toLowerCase().includes(q);
+				const matchTech = (l.tecnologia || "").toLowerCase().includes(q);
+				if (!matchName && !matchFamily && !matchTech) return false;
+			}
+			return true;
+		});
+	}, [lensCatalog, aro2.lab, lensTypeFilter2, lensIndexFilter2, lensSearchQuery2]);
 
 	// CEP Handler
 	const handleSearchCep = async (cepToQuery?: string) => {
@@ -285,7 +326,30 @@ export function OpticalOrderForm({
 		(hasAro2 && !aro2.noTreatment ? Number(aro2.treatmentPrice) || 0 : 0);
 
 	const grossTotal = subtotalFrames + subtotalLenses + subtotalTreatments;
-	const totalAmount = Math.max(0, grossTotal - (Number(discount) || 0));
+
+	// Desconto efetivo em R$ e % com modalidade selecionável
+	const effectiveDiscountPct = useMemo(() => {
+		if (discountMode === "PCT") {
+			return Math.min(100, Math.max(0, discountValue));
+		}
+		return grossTotal > 0 ? (Math.min(grossTotal, discountValue) / grossTotal) * 100 : 0;
+	}, [discountMode, discountValue, grossTotal]);
+
+	const effectiveDiscountBrl = useMemo(() => {
+		if (discountMode === "BRL") {
+			return Math.min(grossTotal, Math.max(0, discountValue));
+		}
+		return Math.round((grossTotal * (effectiveDiscountPct / 100)) * 100) / 100;
+	}, [discountMode, discountValue, grossTotal, effectiveDiscountPct]);
+
+	const totalAmount = Math.max(0, grossTotal - effectiveDiscountBrl);
+
+	// Auditoria de alçada de desconto de vendedor vs gerente
+	const discountAudit = useMemo(() => {
+		return checkDiscountLimit("VENDEDOR", effectiveDiscountPct, aro1.lab);
+	}, [effectiveDiscountPct, aro1.lab]);
+
+	const exceedsSellerLimit = !discountAudit.allowed && !isDiscountManagerApproved;
 
 	const paidAmount = useMemo(() => {
 		if (paymentMode === "TOTAL") {
@@ -305,6 +369,20 @@ export function OpticalOrderForm({
 		}
 	}, [paymentMode, totalAmount, manualPaidAmount]);
 
+	// Autorização de Desconto pelo Gerente
+	const handleAuthorizeDiscount = () => {
+		if (managerPasswordInput === "120212") {
+			setIsDiscountManagerApproved(true);
+			setManagerPasswordModalOpen(false);
+			setManagerPasswordInput("");
+			toast.success(
+				`Desconto de ${effectiveDiscountPct.toFixed(1)}% autorizado pelo Gerente de Loja!`
+			);
+		} else {
+			toast.error("Senha de Gerente incorreta! Tente novamente.");
+		}
+	};
+
 	// Submit Order
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -321,6 +399,14 @@ export function OpticalOrderForm({
 		}
 		if (totalAmount <= 0) {
 			toast.error("O valor total da venda deve ser maior que zero.");
+			return;
+		}
+
+		if (exceedsSellerLimit) {
+			toast.error(
+				`Desconto de ${effectiveDiscountPct.toFixed(1)}% excede o limite do vendedor (${discountAudit.maxAllowed}%). Solicite a autorização do Gerente de Loja.`
+			);
+			setManagerPasswordModalOpen(true);
 			return;
 		}
 
@@ -349,7 +435,7 @@ export function OpticalOrderForm({
 					subtotalFrames,
 					subtotalLenses,
 					subtotalTreatments,
-					discount,
+					discount: effectiveDiscountBrl,
 					totalAmount,
 					paymentMode,
 					paidAmount,
@@ -397,10 +483,91 @@ export function OpticalOrderForm({
 				updatedAt: new Date().toISOString(),
 			};
 
+			// Baixa de estoque automática de armação (-1 un.)
+			if (aro1.frameCode) {
+				await decrementFrameStock(aro1.frameCode, 1);
+			}
+			if (hasAro2 && aro2.frameCode) {
+				await decrementFrameStock(aro2.frameCode, 1);
+			}
+
+			// Salvar OS principal
 			addOrder(newOrder);
-			toast.success(`Ordem de Serviço ${orderNumber} emitida com sucesso!`, {
-				description: `Paciente: ${patient.name.toUpperCase()} | Total: R$ ${totalAmount.toFixed(2)}`,
-			});
+
+			// Desdobramento automático de 2º Par (Aro 2) para laboratório
+			if (hasAro2) {
+				const childOrderNumber = `${orderNumber}-B`;
+				const childOrder: OpticalOrder = {
+					id: `ord_${Date.now() + 1}_b`,
+					orderNumber: childOrderNumber,
+					parentOrderId: newOrder.id,
+					store: { id: "store_matriz", name: storeName },
+					seller: { id: "user_rodrigo", name: sellerName },
+					doctor: doctorName ? { name: doctorName, crm: doctorCrm } : undefined,
+					status: "DIGITADA",
+					orderDate: new Date().toISOString(),
+					promisedDeliveryDate: new Date(`${promisedDate}T18:00:00Z`).toISOString(),
+					patient: {
+						...patient,
+						name: patient.name.toUpperCase(),
+					},
+					aro1: {
+						...aro2,
+					},
+					hasAro2: false,
+					isAro2CopyOfAro1: false,
+					financials: {
+						subtotalFrames: Number(aro2.framePrice) || 0,
+						subtotalLenses: aro2.differentLensesPerEye
+							? (Number(aro2.lensPriceOd) || 0) + (Number(aro2.lensPriceOe) || 0)
+							: Number(aro2.lensPrice) || 0,
+						subtotalTreatments: aro2.noTreatment ? 0 : Number(aro2.treatmentPrice) || 0,
+						discount: 0,
+						totalAmount: 0,
+						paymentMode: "TOTAL",
+						paidAmount: 0,
+						residualAmount: 0,
+						paymentMethod1,
+						paymentAmount1: 0,
+						cardInstallments1: 1,
+						notes: `OS vinculada de 2º Par (Dobro) desdobrada da OS Principal ${orderNumber}.`,
+					},
+					aiAudit: {
+						ocrConfidence: 0.99,
+						prescriptionVerified: true,
+						labCostCrosscheck: "APPROVED",
+						estimatedLabCost: Math.round((Number(aro2.lensPrice) || 0) * 0.42),
+						grossMarginPercent: 55,
+						cylinderTranspositionValid: true,
+						diameterThicknessCheck: "OK",
+						creditRiskCheck: "LOW",
+						agentNotes: [
+							`OS desdobrada de 2º Par da ${orderNumber} para conferência e montagem independente no laboratório ${aro2.lab}.`,
+						],
+						timelineEvents: [
+							{
+								id: `ev_${Date.now() + 2}`,
+								time: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+								title: "2º Par Desdobrado para Laboratório",
+								detail: `OS ${childOrderNumber} vinculada à OS principal ${orderNumber}.`,
+								status: "ok",
+							},
+						],
+					},
+					createdAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString(),
+				};
+				addOrder(childOrder);
+			}
+
+			toast.success(
+				hasAro2
+					? `Ordens de Serviço ${orderNumber} e 2º Par ${orderNumber}-B emitidas com sucesso!`
+					: `Ordem de Serviço ${orderNumber} emitida com sucesso!`,
+				{
+					description: `Paciente: ${patient.name.toUpperCase()} | Total: R$ ${totalAmount.toFixed(2)}`,
+				}
+			);
 
 			if (onSuccess) {
 				onSuccess(newOrder);
@@ -422,7 +589,7 @@ export function OpticalOrderForm({
 						<div>
 							<div className="flex items-center gap-2">
 								<h2 className="font-bold text-base tracking-tight text-foreground">
-									Venda Rápida de Balcão Óptico
+									Lançar OS — Venda de Balcão Óptico
 								</h2>
 								<Badge
 									variant="outline"
@@ -747,7 +914,7 @@ export function OpticalOrderForm({
 						<div className="mb-4 flex items-center justify-between border-b pb-3">
 							<div className="flex items-center gap-2 font-bold text-sm text-foreground">
 								<Icon icon={Glasses} className="size-4 text-primary" />
-								Dados da Compra — Aro 1 (Principal)
+								Aro 1
 							</div>
 							<Badge variant="outline" className="text-xs font-semibold">
 								1º Par
@@ -756,15 +923,34 @@ export function OpticalOrderForm({
 
 						{/* Armação Aro 1 */}
 						<div className="space-y-3">
-							{/* Seletor Dropdown do Catálogo de Armações & Solares */}
-							<div className="p-3 rounded-lg bg-muted/30 border">
-								<div className="flex items-center justify-between mb-1.5">
+							{/* Seletor Dropdown do Catálogo de Armações & Solares com Estoque */}
+							<div className="p-3.5 rounded-xl bg-muted/30 border space-y-2">
+								<div className="flex items-center justify-between">
 									<FieldLabel className="text-xs font-semibold">
-										Selecionar Peça do Catálogo (Armações & Solares)
+										Selecionar Armação / Peça do Estoque
 									</FieldLabel>
-									<span className="text-[10px] text-muted-foreground">
-										{frameCatalog.length} peças disponíveis no estoque
-									</span>
+									{(() => {
+										const currentFrame = frameCatalog.find(
+											(f) =>
+												f.produto === aro1.frameModel ||
+												(f.marca === aro1.frameBrand && f.produto.includes(aro1.frameCode))
+										);
+										if (!currentFrame) return null;
+										return (
+											<Badge
+												variant={currentFrame.estoque > 0 ? "secondary" : "destructive"}
+												className={`text-[10px] font-bold ${
+													currentFrame.estoque > 0
+														? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
+														: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20"
+												}`}
+											>
+												{currentFrame.estoque > 0
+													? `Estoque: ${currentFrame.estoque} un. disponíveis`
+													: "⚠️ Sem Estoque no Momento"}
+											</Badge>
+										);
+									})()}
 								</div>
 								<select
 									value={
@@ -796,12 +982,12 @@ export function OpticalOrderForm({
 											}));
 										}
 									}}
-									className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs"
+									className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
 								>
-									<option value="">Selecione uma armação/solar cadastrado...</option>
+									<option value="">Selecione uma armação do estoque...</option>
 									{frameCatalog.map((f) => (
 										<option key={f.id} value={f.id}>
-											[{f.marca}] {f.produto} ({f.tipo}) — Aro {f.tamanhoAro}/{f.tamanhoPonte} — R$ {f.preco} (Estoque: {f.estoque})
+											[{f.marca}] {f.produto} ({f.tipo}) — Aro {f.tamanhoAro}/{f.tamanhoPonte} — R$ {f.preco} (Estoque: {f.estoque} un.)
 										</option>
 									))}
 								</select>
@@ -1253,11 +1439,11 @@ export function OpticalOrderForm({
 						) : (
 							/* Lente Aro 1: Modo Par Único Padrão */
 							<div className="mt-3 space-y-3">
-								{/* Seletor Dropdown do Catálogo de Lentes com Filtro de Lab */}
-								<div className="p-3 rounded-lg bg-muted/30 border space-y-2.5">
-									<div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+								{/* Seletor Dropdown do Catálogo de Lentes com Filtro de Lab, Tipo, IR e Busca */}
+								<div className="p-3.5 rounded-xl bg-muted/30 border space-y-3">
+									<div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
 										{/* Laboratório Dropdown */}
-										<div className="sm:col-span-4">
+										<div>
 											<FieldLabel className="mb-1 text-xs font-semibold">
 												Laboratório Parceiro
 											</FieldLabel>
@@ -1275,50 +1461,101 @@ export function OpticalOrderForm({
 											</select>
 										</div>
 
-										{/* Lente do Catálogo Dropdown */}
-										<div className="sm:col-span-8">
-											<div className="flex items-center justify-between mb-1">
-												<FieldLabel className="text-xs font-semibold">
-													Lente do Catálogo (Par)
-												</FieldLabel>
-												<span className="text-[10px] text-muted-foreground font-normal">
-													{filteredLensesAro1.length} opções cadastradas
-												</span>
-											</div>
+										{/* Filtro Tipo */}
+										<div>
+											<FieldLabel className="mb-1 text-xs font-semibold">
+												Tipo de Lente
+											</FieldLabel>
 											<select
-												value={
-													lensCatalog.find(
-														(l) =>
-															l.produto === aro1.lensName &&
-															(!aro1.lab ||
-																l.laboratorio.toLowerCase() === aro1.lab.toLowerCase()),
-													)?.id || ""
-												}
-												onChange={(e) => {
-													const selected = lensCatalog.find((l) => l.id === e.target.value);
-													if (selected) {
-														setAro1((a) => ({
-															...a,
-															lensName: selected.produto,
-															lab: selected.laboratorio,
-															lensPrice: selected.preco,
-															lensType: selected.tipo,
-															lensFamily: selected.familia,
-															lensIndex: selected.indiceRefrativo,
-															lensTech: selected.tecnologia,
-														}));
-													}
-												}}
-												className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs"
+												value={lensTypeFilter1}
+												onChange={(e) => setLensTypeFilter1(e.target.value)}
+												className="w-full h-8 px-2 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
 											>
-												<option value="">Selecione uma lente do catálogo...</option>
-												{filteredLensesAro1.map((l) => (
-													<option key={l.id} value={l.id}>
-														[{l.laboratorio}] {l.produto} — {l.tipo} (IR {l.indiceRefrativo}) — R$ {l.preco}
-													</option>
-												))}
+												<option value="ALL">Todos os Tipos</option>
+												<option value="MULTIFOCAL">Multifocal</option>
+												<option value="MONOFOCAL">Monofocal</option>
+												<option value="BIFOCAL">Bifocal</option>
+												<option value="OCUPACIONAL">Ocupacional</option>
 											</select>
 										</div>
+
+										{/* Filtro IR */}
+										<div>
+											<FieldLabel className="mb-1 text-xs font-semibold">
+												Índice Refrativo (IR)
+											</FieldLabel>
+											<select
+												value={lensIndexFilter1}
+												onChange={(e) => setLensIndexFilter1(e.target.value)}
+												className="w-full h-8 px-2 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
+											>
+												<option value="ALL">Todos os Índices</option>
+												<option value="1.50">1.50 (Resina)</option>
+												<option value="1.56">1.56 (Interm.)</option>
+												<option value="1.59">1.59 (Poli)</option>
+												<option value="1.60">1.60 (Alto)</option>
+												<option value="1.67">1.67 (Ultra)</option>
+												<option value="1.74">1.74 (Hi-Index)</option>
+											</select>
+										</div>
+
+										{/* Busca */}
+										<div>
+											<FieldLabel className="mb-1 text-xs font-semibold">
+												Buscar Lente
+											</FieldLabel>
+											<Input
+												value={lensSearchQuery1}
+												onChange={(e) => setLensSearchQuery1(e.target.value)}
+												placeholder="Nome ou família..."
+												className="h-8 text-xs bg-background"
+											/>
+										</div>
+									</div>
+
+									{/* Lente do Catálogo Dropdown */}
+									<div>
+										<div className="flex items-center justify-between mb-1">
+											<FieldLabel className="text-xs font-semibold">
+												Lente do Catálogo (Par)
+											</FieldLabel>
+											<span className="text-[10px] text-muted-foreground font-normal">
+												{filteredLensesAro1.length} opções cadastradas
+											</span>
+										</div>
+										<select
+											value={
+												lensCatalog.find(
+													(l) =>
+														l.produto === aro1.lensName &&
+														(!aro1.lab ||
+															l.laboratorio.toLowerCase() === aro1.lab.toLowerCase()),
+												)?.id || ""
+											}
+											onChange={(e) => {
+												const selected = lensCatalog.find((l) => l.id === e.target.value);
+												if (selected) {
+													setAro1((a) => ({
+														...a,
+														lensName: selected.produto,
+														lab: selected.laboratorio,
+														lensPrice: selected.preco,
+														lensType: selected.tipo,
+														lensFamily: selected.familia,
+														lensIndex: selected.indiceRefrativo,
+														lensTech: selected.tecnologia,
+													}));
+												}
+											}}
+											className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
+										>
+											<option value="">Selecione uma lente do catálogo...</option>
+											{filteredLensesAro1.map((l) => (
+												<option key={l.id} value={l.id}>
+													[{l.laboratorio}] {l.produto} — {l.tipo} (IR {l.indiceRefrativo}) — R$ {l.preco}
+												</option>
+											))}
+										</select>
 									</div>
 
 									{/* Campos Diretos da Lente */}
@@ -1554,7 +1791,7 @@ export function OpticalOrderForm({
 									htmlFor="aro2-toggle"
 									className="cursor-pointer font-semibold text-sm text-foreground"
 								>
-									Ativar Aro 2 (Opção Dobro / 2º Par com Desconto)
+									Ativar Aro 2 / Dobro (2º Par com Desconto)
 								</label>
 							</div>
 
@@ -1564,7 +1801,7 @@ export function OpticalOrderForm({
 									variant="outline"
 									size="sm"
 									onClick={handleCopyAro1}
-									className="h-8 gap-1.5 text-xs font-medium text-primary hover:bg-primary/10"
+									className="h-8 gap-1.5 text-xs font-medium text-primary hover:bg-primary/10 cursor-pointer"
 								>
 									<Icon icon={Copy} className="size-3.5" />
 									Copiar Aro 1
@@ -1574,17 +1811,46 @@ export function OpticalOrderForm({
 
 						{hasAro2 && (
 							<div className="mt-4 border-t pt-4 space-y-4">
+								<div className="flex items-center justify-between pb-2 border-b">
+									<div className="flex items-center gap-2 font-bold text-sm text-foreground">
+										<Icon icon={Glasses} className="size-4 text-amber-600" />
+										Aro 2 / Dobro — Desdobramento Técnico de Laboratório
+									</div>
+									<Badge variant="outline" className="text-xs font-semibold border-amber-500/30 text-amber-600">
+										Gera OS Vinculada {orderNumber}-B
+									</Badge>
+								</div>
+
 								{/* Armação Aro 2 */}
 								<div className="space-y-3">
-									{/* Seletor Dropdown do Catálogo de Peças - Aro 2 */}
-									<div className="p-3 rounded-lg bg-muted/30 border">
-										<div className="flex items-center justify-between mb-1.5">
+									{/* Seletor Dropdown do Catálogo de Peças - Aro 2 com Estoque */}
+									<div className="p-3.5 rounded-xl bg-muted/30 border space-y-2">
+										<div className="flex items-center justify-between">
 											<FieldLabel className="text-xs font-semibold">
-												Selecionar Peça do Catálogo — Aro 2 (2º Par)
+												Selecionar Armação / Peça do Estoque — Aro 2 (2º Par)
 											</FieldLabel>
-											<span className="text-[10px] text-muted-foreground">
-												{frameCatalog.length} peças disponíveis no estoque
-											</span>
+											{(() => {
+												const currentFrame = frameCatalog.find(
+													(f) =>
+														f.produto === aro2.frameModel ||
+														(f.marca === aro2.frameBrand && f.produto.includes(aro2.frameCode))
+												);
+												if (!currentFrame) return null;
+												return (
+													<Badge
+														variant={currentFrame.estoque > 0 ? "secondary" : "destructive"}
+														className={`text-[10px] font-bold ${
+															currentFrame.estoque > 0
+																? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
+																: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20"
+														}`}
+													>
+														{currentFrame.estoque > 0
+															? `Estoque: ${currentFrame.estoque} un. disponíveis`
+															: "⚠️ Sem Estoque no Momento"}
+													</Badge>
+												);
+											})()}
 										</div>
 										<select
 											value={
@@ -1616,12 +1882,12 @@ export function OpticalOrderForm({
 													}));
 												}
 											}}
-											className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs"
+											className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
 										>
-											<option value="">Selecione uma armação/solar para o 2º par...</option>
+											<option value="">Selecione uma armação do estoque para o 2º par...</option>
 											{frameCatalog.map((f) => (
 												<option key={f.id} value={f.id}>
-													[{f.marca}] {f.produto} ({f.tipo}) — Aro {f.tamanhoAro}/{f.tamanhoPonte} — R$ {f.preco} (Estoque: {f.estoque})
+													[{f.marca}] {f.produto} ({f.tipo}) — Aro {f.tamanhoAro}/{f.tamanhoPonte} — R$ {f.preco} (Estoque: {f.estoque} un.)
 												</option>
 											))}
 										</select>
@@ -1756,10 +2022,10 @@ export function OpticalOrderForm({
 
 								{/* Lente & Laboratório Aro 2 */}
 								<div className="space-y-3">
-									<div className="p-3 rounded-lg bg-muted/30 border space-y-2.5">
-										<div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+									<div className="p-3.5 rounded-xl bg-muted/30 border space-y-3">
+										<div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
 											{/* Laboratório Dropdown */}
-											<div className="sm:col-span-4">
+											<div>
 												<FieldLabel className="mb-1 text-xs font-semibold">
 													Laboratório (2º Par)
 												</FieldLabel>
@@ -1779,53 +2045,104 @@ export function OpticalOrderForm({
 												</select>
 											</div>
 
-											{/* Lente do Catálogo Dropdown */}
-											<div className="sm:col-span-8">
-												<div className="flex items-center justify-between mb-1">
-													<FieldLabel className="text-xs font-semibold">
-														Lente do Catálogo (2º Par)
-													</FieldLabel>
-													<span className="text-[10px] text-muted-foreground font-normal">
-														{filteredLensesAro2.length} opções cadastradas
-													</span>
-												</div>
+											{/* Filtro Tipo */}
+											<div>
+												<FieldLabel className="mb-1 text-xs font-semibold">
+													Tipo de Lente (2º Par)
+												</FieldLabel>
 												<select
-													value={
-														lensCatalog.find(
-															(l) =>
-																l.produto === aro2.lensName &&
-																(!aro2.lab ||
-																	l.laboratorio.toLowerCase() ===
-																		aro2.lab.toLowerCase()),
-														)?.id || ""
-													}
-													onChange={(e) => {
-														const selected = lensCatalog.find(
-															(l) => l.id === e.target.value,
-														);
-														if (selected) {
-															setAro2((a) => ({
-																...a,
-																lensName: selected.produto,
-																lab: selected.laboratorio,
-																lensPrice: Math.round(selected.preco * 0.7), // 30% desc
-																lensType: selected.tipo,
-																lensFamily: selected.familia,
-																lensIndex: selected.indiceRefrativo,
-																lensTech: selected.tecnologia,
-															}));
-														}
-													}}
-													className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs"
+													value={lensTypeFilter2}
+													onChange={(e) => setLensTypeFilter2(e.target.value)}
+													className="w-full h-8 px-2 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
 												>
-													<option value="">Selecione uma lente para o 2º par...</option>
-													{filteredLensesAro2.map((l) => (
-														<option key={l.id} value={l.id}>
-															[{l.laboratorio}] {l.produto} — {l.tipo} (IR {l.indiceRefrativo}) — R$ {l.preco}
-														</option>
-													))}
+													<option value="ALL">Todos os Tipos</option>
+													<option value="MULTIFOCAL">Multifocal</option>
+													<option value="MONOFOCAL">Monofocal</option>
+													<option value="BIFOCAL">Bifocal</option>
+													<option value="OCUPACIONAL">Ocupacional</option>
 												</select>
 											</div>
+
+											{/* Filtro IR */}
+											<div>
+												<FieldLabel className="mb-1 text-xs font-semibold">
+													Índice Refrativo (IR)
+												</FieldLabel>
+												<select
+													value={lensIndexFilter2}
+													onChange={(e) => setLensIndexFilter2(e.target.value)}
+													className="w-full h-8 px-2 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
+												>
+													<option value="ALL">Todos os Índices</option>
+													<option value="1.50">1.50 (Resina)</option>
+													<option value="1.56">1.56 (Interm.)</option>
+													<option value="1.59">1.59 (Poli)</option>
+													<option value="1.60">1.60 (Alto)</option>
+													<option value="1.67">1.67 (Ultra)</option>
+													<option value="1.74">1.74 (Hi-Index)</option>
+												</select>
+											</div>
+
+											{/* Busca */}
+											<div>
+												<FieldLabel className="mb-1 text-xs font-semibold">
+													Buscar Lente (2º Par)
+												</FieldLabel>
+												<Input
+													value={lensSearchQuery2}
+													onChange={(e) => setLensSearchQuery2(e.target.value)}
+													placeholder="Nome ou família..."
+													className="h-8 text-xs bg-background"
+												/>
+											</div>
+										</div>
+
+										{/* Lente do Catálogo Dropdown */}
+										<div>
+											<div className="flex items-center justify-between mb-1">
+												<FieldLabel className="text-xs font-semibold">
+													Lente do Catálogo (2º Par com Desconto)
+												</FieldLabel>
+												<span className="text-[10px] text-muted-foreground font-normal">
+													{filteredLensesAro2.length} opções cadastradas
+												</span>
+											</div>
+											<select
+												value={
+													lensCatalog.find(
+														(l) =>
+															l.produto === aro2.lensName &&
+															(!aro2.lab ||
+																l.laboratorio.toLowerCase() ===
+																	aro2.lab.toLowerCase()),
+													)?.id || ""
+												}
+												onChange={(e) => {
+													const selected = lensCatalog.find(
+														(l) => l.id === e.target.value,
+													);
+													if (selected) {
+														setAro2((a) => ({
+															...a,
+															lensName: selected.produto,
+															lab: selected.laboratorio,
+															lensPrice: Math.round(selected.preco * 0.7), // 30% desc
+															lensType: selected.tipo,
+															lensFamily: selected.familia,
+															lensIndex: selected.indiceRefrativo,
+															lensTech: selected.tecnologia,
+														}));
+													}
+												}}
+												className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
+											>
+												<option value="">Selecione uma lente para o 2º par...</option>
+												{filteredLensesAro2.map((l) => (
+													<option key={l.id} value={l.id}>
+														[{l.laboratorio}] {l.produto} — {l.tipo} (IR {l.indiceRefrativo}) — R$ {l.preco}
+													</option>
+												))}
+											</select>
 										</div>
 
 										<div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
@@ -2164,18 +2481,83 @@ export function OpticalOrderForm({
 								</div>
 							)}
 
-							<div>
-								<FieldLabel className="mb-1 text-xs">
-									Desconto Especial (R$)
-								</FieldLabel>
-								<Input
-									type="number"
-									step="10"
-									value={discount || ""}
-									onChange={(e) => setDiscount(Number(e.target.value) || 0)}
-									placeholder="0,00"
-									className="h-8 text-xs font-semibold"
-								/>
+							<div className="space-y-1.5">
+								<div className="flex items-center justify-between">
+									<FieldLabel className="text-xs font-semibold">
+										Desconto Comercial
+									</FieldLabel>
+									<div className="flex items-center rounded-md border bg-muted/50 p-0.5 text-[11px] font-bold">
+										<button
+											type="button"
+											onClick={() => setDiscountMode("BRL")}
+											className={`px-2 py-0.5 rounded cursor-pointer transition-colors ${
+												discountMode === "BRL"
+													? "bg-primary text-primary-foreground shadow-2xs"
+													: "text-muted-foreground hover:text-foreground"
+											}`}
+										>
+											R$ Reais
+										</button>
+										<button
+											type="button"
+											onClick={() => setDiscountMode("PCT")}
+											className={`px-2 py-0.5 rounded cursor-pointer transition-colors ${
+												discountMode === "PCT"
+													? "bg-primary text-primary-foreground shadow-2xs"
+													: "text-muted-foreground hover:text-foreground"
+											}`}
+										>
+											% Porcento
+										</button>
+									</div>
+								</div>
+								<div className="relative">
+									<Input
+										type="number"
+										step={discountMode === "BRL" ? "10" : "1"}
+										max={discountMode === "PCT" ? 100 : undefined}
+										value={discountValue || ""}
+										onChange={(e) => {
+											setDiscountValue(Number(e.target.value) || 0);
+											setIsDiscountManagerApproved(false);
+										}}
+										placeholder={discountMode === "BRL" ? "0,00" : "0%"}
+										className="h-8 text-xs font-semibold pr-20"
+									/>
+									<span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-mono text-muted-foreground">
+										{discountMode === "BRL"
+											? `${effectiveDiscountPct.toFixed(1)}%`
+											: `R$ ${effectiveDiscountBrl.toFixed(2)}`}
+									</span>
+								</div>
+
+								{/* Indicador de Alçada / Delegação ao Gerente */}
+								{exceedsSellerLimit && (
+									<div className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-2 flex items-center justify-between gap-2 mt-1.5">
+										<div className="flex items-center gap-1.5 text-[11px] text-amber-800 dark:text-amber-300 font-medium">
+											<Icon icon={Locked} className="size-3.5 text-amber-600 shrink-0" />
+											<span>
+												{effectiveDiscountPct.toFixed(1)}% excede o teto ({discountAudit.maxAllowed}%).
+											</span>
+										</div>
+										<Button
+											type="button"
+											size="sm"
+											onClick={() => setManagerPasswordModalOpen(true)}
+											className="h-6 px-2 text-[10px] font-bold bg-amber-600 hover:bg-amber-700 text-white cursor-pointer gap-1 shrink-0"
+										>
+											<Icon icon={Locked} className="size-3" />
+											Delegar ao Gerente
+										</Button>
+									</div>
+								)}
+
+								{isDiscountManagerApproved && (
+									<div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-1.5 px-2.5 flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-400 font-bold mt-1">
+										<Icon icon={Checkmark} className="size-3.5" />
+										<span>Desconto autorizado pelo Gerente de Loja ({effectiveDiscountPct.toFixed(1)}%).</span>
+									</div>
+								)}
 							</div>
 
 							{paymentMode === "SINAL" && (
@@ -2216,11 +2598,11 @@ export function OpticalOrderForm({
 										R$ {subtotalTreatments.toFixed(2)}
 									</span>
 								</div>
-								{discount > 0 && (
-									<div className="flex justify-between text-emerald-600 dark:text-emerald-400">
-										<span>Desconto Concedido:</span>
-										<span className="font-mono font-semibold">
-											- R$ {discount.toFixed(2)}
+								{effectiveDiscountBrl > 0 && (
+									<div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
+										<span>Desconto Concedido ({effectiveDiscountPct.toFixed(1)}%):</span>
+										<span className="font-mono">
+											- R$ {effectiveDiscountBrl.toFixed(2)}
 										</span>
 									</div>
 								)}
@@ -2335,6 +2717,99 @@ export function OpticalOrderForm({
 						</div>
 				</div>
 			</div>
+
+			{/* MODAL DELEGAÇÃO AO GERENTE PARA AUTORIZAÇÃO DE DESCONTO */}
+			{managerPasswordModalOpen && (
+				<Dialog
+					open={true}
+					onOpenChange={(open) => {
+						if (!open) {
+							setManagerPasswordModalOpen(false);
+							setManagerPasswordInput("");
+						}
+					}}
+				>
+					<DialogContent className="sm:max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl">
+						<DialogHeader>
+							<DialogTitle className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+								<Icon icon={Locked} className="size-4 text-amber-500" />
+								Delegue ao Gerente • Autorização de Desconto
+							</DialogTitle>
+						</DialogHeader>
+
+						<div className="space-y-4 py-2 text-xs">
+							<div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 space-y-1.5">
+								<div className="flex justify-between">
+									<span className="text-muted-foreground">Vendedor Solicitante:</span>
+									<span className="font-bold text-foreground">{sellerName}</span>
+								</div>
+								<div className="flex justify-between">
+									<span className="text-muted-foreground">Desconto Solicitado:</span>
+									<span className="font-bold font-mono text-amber-700 dark:text-amber-300">
+										{effectiveDiscountPct.toFixed(1)}% (R$ {effectiveDiscountBrl.toFixed(2)})
+									</span>
+								</div>
+								<div className="flex justify-between">
+									<span className="text-muted-foreground">Teto do Vendedor:</span>
+									<span className="font-bold font-mono text-foreground">
+										{discountAudit.maxAllowed}%
+									</span>
+								</div>
+								<p className="text-[11px] text-muted-foreground pt-1 border-t border-amber-200 dark:border-amber-800">
+									Para liberar um desconto superior ao teto do vendedor (alçada até 20% do gerente), o gerente responsável deve autorizar com sua credencial de acesso.
+								</p>
+							</div>
+
+							<div className="space-y-1.5">
+								<label className="font-semibold text-foreground">
+									Senha do Gerente de Loja
+								</label>
+								<Input
+									type="password"
+									value={managerPasswordInput}
+									onChange={(e) => setManagerPasswordInput(e.target.value)}
+									placeholder="Digite a senha do gerente..."
+									className="h-9 text-sm font-mono"
+									autoFocus
+									onKeyDown={(e) => {
+										if (e.key === "Enter") {
+											e.preventDefault();
+											handleAuthorizeDiscount();
+										}
+									}}
+								/>
+								<span className="text-[10px] text-muted-foreground">
+									Dica de segurança da rede: credencial restrita do gerente (120212).
+								</span>
+							</div>
+
+							<div className="flex items-center justify-end gap-2 pt-2 border-t">
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={() => {
+										setManagerPasswordModalOpen(false);
+										setManagerPasswordInput("");
+									}}
+									className="h-8 text-xs cursor-pointer"
+								>
+									Cancelar
+								</Button>
+								<Button
+									type="button"
+									size="sm"
+									onClick={handleAuthorizeDiscount}
+									className="h-8 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white cursor-pointer gap-1.5"
+								>
+									<Icon icon={Checkmark} className="size-3.5" />
+									Autorizar Desconto
+								</Button>
+							</div>
+						</div>
+					</DialogContent>
+				</Dialog>
+			)}
 		</form>
 	);
 }

@@ -179,6 +179,8 @@ export interface OpticalOrder {
 	invoiceNumber?: string;
 	fiscalInfo?: FiscalInfo;
 
+	parentOrderId?: string;
+
 	aro1: AroItem;
 	hasAro2: boolean;
 	isAro2CopyOfAro1: boolean;
@@ -273,4 +275,18 @@ export interface MessageTemplateItem {
 	texto: string;
 	variaveis: string[]; // ["{{cliente}}", "{{os}}", "{{loja}}", "{{saldo}}", "{{lente}}"]
 	ativo: boolean;
+}
+
+// -------------------------------------------------------------
+// POLÍTICAS DE DESCONTO E ALÇADAS GERENCIAIS
+// -------------------------------------------------------------
+export type DiscountRole = "VENDEDOR" | "GERENTE" | "ADMIN";
+
+export interface DiscountPolicy {
+	id: string;
+	role: DiscountRole;
+	maxDiscountPct: number; // ex: 10, 20, 100
+	category?: "ARMAÇÃO" | "LENTE" | "GLOBAL";
+	brandOrLab?: string; // ex: "TODOS", "Hoya", "Zeiss", "Ray-Ban"
+	description?: string;
 }

@@ -3,18 +3,13 @@
 import Checkmark from "@carbon/icons-react/es/Checkmark";
 import ChevronLeft from "@carbon/icons-react/es/ChevronLeft";
 import ChevronRight from "@carbon/icons-react/es/ChevronRight";
-import OverflowMenuHorizontal from "@carbon/icons-react/es/OverflowMenuHorizontal";
+import Edit from "@carbon/icons-react/es/Edit";
 import Phone from "@carbon/icons-react/es/Phone";
+import Search from "@carbon/icons-react/es/Search";
 import Time from "@carbon/icons-react/es/Time";
 import Warning from "@carbon/icons-react/es/Warning";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@crm/ui/components/dropdown-menu";
 import { Icon } from "@crm/ui/components/icon";
 import Glasses from "@crm/ui/components/icons/glasses";
 import {
@@ -220,84 +215,74 @@ export function OpticalOrdersTable({
 											</div>
 										</TableCell>
 
-										{/* Ações */}
+										{/* Ações: 4 Ícones Diretos (Edição, WhatsApp, Detalhes & Dioptrias, Marcar Entregue) */}
 										<TableCell
 											className="py-2.5 text-left whitespace-nowrap"
 											onClick={(e) => e.stopPropagation()}
 										>
-											<div className="flex items-center justify-start gap-1.5">
+											<div className="flex items-center justify-start gap-1">
+												{/* 1. Edição */}
+												<Button
+													variant="ghost"
+													size="icon"
+													className="size-7 text-zinc-600 hover:text-blue-600 hover:bg-blue-50 dark:text-zinc-400 dark:hover:text-blue-400 dark:hover:bg-blue-950/40 rounded-lg"
+													aria-label={`Editar Ordem de Serviço ${order.orderNumber}`}
+													title={`Editar Ordem de Serviço ${order.orderNumber}`}
+													onClick={() => handleRowClick(order)}
+												>
+													<Icon icon={Edit} className="size-3.5" />
+												</Button>
+
+												{/* 2. WhatsApp Direto */}
 												<Button
 													asChild
-													variant="outline"
-													size="sm"
-													className="h-7 text-[11px] font-medium text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 gap-1 px-2 border-emerald-500/30"
+													variant="ghost"
+													size="icon"
+													className="size-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40 rounded-lg"
 												>
 													<a
 														href={whatsappUrl}
 														target="_blank"
 														rel="noopener noreferrer"
-														title={`Enviar mensagem personalizada via WhatsApp para ${order.patient?.name || "cliente"}`}
-														aria-label={`Enviar mensagem via WhatsApp para ${order.patient?.name || "cliente"} sobre a OS ${order.orderNumber}`}
+														title={`Enviar WhatsApp para ${order.patient?.name || "cliente"}`}
+														aria-label={`Enviar WhatsApp para ${order.patient?.name || "cliente"}`}
 													>
-														<Icon icon={Phone} className="size-3" />
-														WhatsApp
+														<Icon icon={Phone} className="size-3.5" />
 													</a>
 												</Button>
 
-												<DropdownMenu>
-													<DropdownMenuTrigger asChild>
-														<Button
-															variant="ghost"
-															size="icon"
-															className="size-7"
-															aria-label={`Mais opções para a OS ${order.orderNumber}`}
-															title={`Mais opções para a OS ${order.orderNumber}`}
-														>
-															<Icon
-																icon={OverflowMenuHorizontal}
-																className="size-4"
-															/>
-														</Button>
-													</DropdownMenuTrigger>
-													<DropdownMenuContent
-														align="end"
-														className="w-48 text-xs"
-													>
-														<DropdownMenuItem
-															onClick={() => handleRowClick(order)}
-														>
-															Ver Detalhes & Dioptrias
-														</DropdownMenuItem>
-														{(Number(order.financials?.residualAmount) || 0) > 0 && (
-															<DropdownMenuItem
-																onClick={() => {
-																	payResidual(order.id);
-																	toast.success("Saldo residual quitado!");
-																}}
-															>
-																Quitar Saldo Residual
-															</DropdownMenuItem>
-														)}
-														<DropdownMenuItem
-															onClick={() => {
-																updateOrderStatus(order.id, "PRONTA_LOJA");
-																toast.success(
-																	"OS marcada como Pronta na Loja!",
-																);
-															}}
-														>
-															Marcar como Pronta na Loja
-														</DropdownMenuItem>
-														<DropdownMenuItem
-															onClick={() => {
-																updateOrderStatus(order.id, "ENTREGUE");
-																toast.success("OS entregue ao cliente!");
-															}}
-														>
-															Marcar como Entregue
-														</DropdownMenuItem>
-													</DropdownMenuContent>
-												</DropdownMenu>
+												{/* 3. Detalhes & Dioptrias */}
+												<Button
+													variant="ghost"
+													size="icon"
+													className="size-7 text-zinc-600 hover:text-purple-600 hover:bg-purple-50 dark:text-zinc-400 dark:hover:text-purple-400 dark:hover:bg-purple-950/40 rounded-lg"
+													aria-label={`Ver Detalhes & Dioptrias da OS ${order.orderNumber}`}
+													title={`Ver Detalhes & Dioptrias da OS ${order.orderNumber}`}
+													onClick={() => handleRowClick(order)}
+												>
+													<Icon icon={Search} className="size-3.5" />
+												</Button>
+
+												{/* 4. Marcar como Entregue */}
+												<Button
+													variant="ghost"
+													size="icon"
+													className={`size-7 rounded-lg transition-colors ${
+														order.status === "ENTREGUE"
+															? "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 cursor-default"
+															: "text-zinc-600 hover:text-emerald-600 hover:bg-emerald-50 dark:text-zinc-400 dark:hover:text-emerald-400 dark:hover:bg-emerald-950/40"
+													}`}
+													aria-label={order.status === "ENTREGUE" ? "OS já está entregue ao cliente" : `Marcar OS ${order.orderNumber} como Entregue`}
+													title={order.status === "ENTREGUE" ? "OS já Entregue" : "Marcar como Entregue"}
+													onClick={() => {
+														if (order.status !== "ENTREGUE") {
+															updateOrderStatus(order.id, "ENTREGUE");
+															toast.success(`OS ${order.orderNumber} marcada como Entregue ao cliente!`);
+														}
+													}}
+												>
+													<Icon icon={Checkmark} className="size-3.5" />
+												</Button>
 											</div>
 										</TableCell>
 									</TableRow>

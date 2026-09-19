@@ -22,6 +22,7 @@ import ListChecked from "@carbon/icons-react/es/ListChecked";
 import Locked from "@carbon/icons-react/es/Locked";
 import Password from "@carbon/icons-react/es/Password";
 import Security from "@carbon/icons-react/es/Security";
+import Purchase from "@carbon/icons-react/es/Purchase";
 import { OpticalSalesLogView } from "./optical-sales-log-view";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
@@ -39,6 +40,13 @@ import {
 } from "@crm/ui/components/dialog";
 import { toast } from "sonner";
 import { useOpticalAuth } from "@/lib/optical/optical-auth-context";
+import {
+	getDiscountPolicies,
+	saveDiscountPolicies,
+	addOrUpdateDiscountPolicy,
+	deleteDiscountPolicy,
+} from "@/lib/optical/optical-store";
+import type { DiscountPolicy } from "@/lib/optical/optical-types";
 import {
 	type ClinicItem,
 	type CommissionSettings,
@@ -96,6 +104,7 @@ type SettingsSubTab =
 	| "apoio"
 	| "tolerancias"
 	| "usuarios"
+	| "descontos"
 	| "log_vendas"
 	| "integridade";
 
@@ -118,6 +127,14 @@ export function OpticalSettingsView() {
 	const [incidentReasons, setIncidentReasons] = useState<string[]>([]);
 	const [visitTopics, setVisitTopics] = useState<string[]>([]);
 	const [leadCapturers, setLeadCapturers] = useState<Array<{ nome: string }>>([]);
+
+	// Políticas de Desconto
+	const [discountPolicies, setDiscountPolicies] = useState<DiscountPolicy[]>([]);
+	const [newPolicyRole, setNewPolicyRole] = useState<"VENDEDOR" | "GERENTE" | "ADMIN">("VENDEDOR");
+	const [newPolicyMaxPct, setNewPolicyMaxPct] = useState<number>(10);
+	const [newPolicyBrand, setNewPolicyBrand] = useState<string>("TODOS");
+	const [newPolicyCategory, setNewPolicyCategory] = useState<"GLOBAL" | "ARMAÇÃO" | "LENTE">("GLOBAL");
+	const [newPolicyDesc, setNewPolicyDesc] = useState<string>("");
 
 	// Templates WhatsApp
 	const [templateTecnico, setTemplateTecnico] = useState("");
@@ -271,6 +288,7 @@ export function OpticalSettingsView() {
 				setTemplateTecnico(tTec);
 				setTemplateClienteConf(tConf);
 				setUsersList(uList);
+				setDiscountPolicies(getDiscountPolicies());
 				if (s.length > 0) setNewSellerStore(s[0]?.nome || "");
 			} catch (e) {
 				console.warn("Erro ao carregar configurações:", e);
@@ -636,6 +654,92 @@ export function OpticalSettingsView() {
 		await saveSupabaseDoctors(updated);
 	};
 
+	// Handlers de Políticas de Desconto
+	const handleAddPolicy = () => {
+		const pol: DiscountPolicy = {
+			id: `pol-${Date.now()}`,
+			role: newPolicyRole,
+			maxDiscountPct: Number(newPolicyMaxPct) || 0,
+			brandOrLab: newPolicyBrand || "TODOS",
+			category: newPolicyCategory,
+			description: newPolicyDesc.trim() || `Teto de ${newPolicyMaxPct}% para ${newPolicyRole}`,
+		};
+		addOrUpdateDiscountPolicy(pol);
+		setDiscountPolicies(getDiscountPolicies());
+		setNewPolicyDesc("");
+		toast.success(`Política de desconto para ${newPolicyRole} cadastrada com sucesso!`);
+	};
+
+	const handleDeletePolicy = (id: string) => {
+		deleteDiscountPolicy(id);
+		setDiscountPolicies(getDiscountPolicies());
+		toast.info("Política de desconto removida.");
+	};
+
+	const renderSubTabButton = (item: { id: SettingsSubTab; label: string; icon: any }) => {
+		const isActive = activeTab === item.id;
+		return (
+			<button
+				type="button"
+				key={item.id}
+				data-subtab={item.id}
+				onClick={() => setActiveTab(item.id)}
+				aria-label={`Acessar configurações de ${item.label}`}
+				aria-current={isActive ? "page" : undefined}
+				className={cn(
+					"w-full h-11 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer",
+					"flex items-center justify-center gap-2 text-center select-none whitespace-nowrap",
+					"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-white focus-visible:ring-offset-2",
+					isActive
+						? "bg-zinc-900 text-white border-2 border-zinc-900 shadow-sm dark:bg-white dark:text-zinc-900 dark:border-white font-bold"
+						: "bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-2 border-zinc-300 dark:border-zinc-700 shadow-2xs hover:bg-zinc-50 hover:border-zinc-400 dark:hover:bg-zinc-700 dark:hover:border-zinc-600"
+				)}
+			>
+				<Icon
+					icon={item.icon}
+					className={cn(
+						"size-4 shrink-0",
+						isActive ? "text-white dark:text-zinc-900" : "text-zinc-500 dark:text-zinc-400"
+					)}
+				/>
+				<span className="font-semibold text-xs leading-none">{item.label}</span>
+			</button>
+		);
+	};
+
+	const renderIntegrityButton = () => {
+		const isActive = activeTab === "integridade";
+		return (
+			<button
+				type="button"
+				data-subtab="integridade"
+				onClick={() => setActiveTab("integridade")}
+				aria-label="Acessar Banco & Integridade"
+				aria-current={isActive ? "page" : undefined}
+				title="Acessar Banco & Integridade"
+				className={cn(
+					"w-full h-full min-h-[96px] px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer",
+					"flex flex-col items-center justify-center gap-1.5 text-center select-none",
+					"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-white focus-visible:ring-offset-2",
+					isActive
+						? "bg-zinc-900 text-white border-2 border-zinc-900 shadow-sm dark:bg-white dark:text-zinc-900 dark:border-white font-bold"
+						: "bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-2 border-zinc-300 dark:border-zinc-700 shadow-2xs hover:bg-zinc-50 hover:border-zinc-400 dark:hover:bg-zinc-700 dark:hover:border-zinc-600"
+				)}
+			>
+				<Icon
+					icon={Security}
+					className={cn(
+						"size-5 shrink-0 transition-transform duration-300 hover:scale-110",
+						isActive ? "text-white dark:text-zinc-900" : "text-zinc-500 dark:text-zinc-400"
+					)}
+				/>
+				<span className="font-semibold text-xs leading-tight text-center">
+					Banco & Integridade
+				</span>
+			</button>
+		);
+	};
+
 	return (
 		<div className="flex flex-col gap-6 p-4 sm:p-6 min-h-0 flex-1 overflow-y-auto">
 			{/* Header */}
@@ -656,89 +760,43 @@ export function OpticalSettingsView() {
 				</div>
 			</div>
 
-			{/* Sub Tabs Navigation: Reorganizado no mesmo padrão e largura do TopNav */}
+			{/* Sub Tabs Navigation: 5 em cima, 5 embaixo e Banco & Integridade à direita ocupando as duas linhas */}
 			<div className="w-full rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 p-3 shadow-xs">
-				<div className="flex flex-col gap-2 w-full">
-					{/* Linha 1: Cadastros Operacionais (6 colunas) */}
-					<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 w-full">
-						{[
-							{ id: "lojas", label: `Lojas (${stores.length})`, icon: Building },
-							{ id: "labs", label: `Labs (${labs.length})`, icon: Chemistry },
-							{ id: "vendedores", label: `Vendedores (${sellers.length})`, icon: UserMultiple },
-							{ id: "medicos", label: "Médicos & Clínicas", icon: UserFollow },
-							{ id: "comissoes", label: "Comissões", icon: Money },
-							{ id: "tecnicos", label: "Técnicos & Zap", icon: Phone },
-						].map((item) => {
-							const isActive = activeTab === item.id;
-							return (
-								<button
-									type="button"
-									key={item.id}
-									data-subtab={item.id}
-									onClick={() => setActiveTab(item.id as SettingsSubTab)}
-									aria-label={`Acessar configurações de ${item.label}`}
-									aria-current={isActive ? "page" : undefined}
-									className={cn(
-										"w-full h-11 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer",
-										"flex items-center justify-center gap-2 text-center select-none whitespace-nowrap",
-										"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-white focus-visible:ring-offset-2",
-										isActive
-											? "bg-zinc-900 text-white border-2 border-zinc-900 shadow-sm dark:bg-white dark:text-zinc-900 dark:border-white font-bold"
-											: "bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-2 border-zinc-300 dark:border-zinc-700 shadow-2xs hover:bg-zinc-50 hover:border-zinc-400 dark:hover:bg-zinc-700 dark:hover:border-zinc-600"
-									)}
-								>
-									<Icon
-										icon={item.icon}
-										className={cn(
-											"size-4 shrink-0",
-											isActive ? "text-white dark:text-zinc-900" : "text-zinc-500 dark:text-zinc-400"
-										)}
-									/>
-									<span className="font-semibold text-xs leading-none">{item.label}</span>
-								</button>
-							);
-						})}
+				<div className="flex flex-col md:flex-row items-stretch gap-2 w-full">
+					{/* Bloco Esquerda/Central: 2 fileiras perfeitamente simétricas com 5 botões de largura rigorosamente idêntica */}
+					<div className="flex-1 flex flex-col gap-2 min-w-0">
+						{/* Linha 1: 5 botões */}
+						<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 w-full">
+							{[
+								{ id: "lojas" as SettingsSubTab, label: `Lojas (${stores.length})`, icon: Building },
+								{ id: "labs" as SettingsSubTab, label: `Labs (${labs.length})`, icon: Chemistry },
+								{ id: "vendedores" as SettingsSubTab, label: `Vendedores (${sellers.length})`, icon: UserMultiple },
+								{ id: "medicos" as SettingsSubTab, label: "Médicos & Clínicas", icon: UserFollow },
+								{ id: "comissoes" as SettingsSubTab, label: "Comissões", icon: Money },
+							].map(renderSubTabButton)}
+						</div>
+
+						{/* Linha 2: 5 botões */}
+						<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 w-full">
+							{[
+								{ id: "tecnicos" as SettingsSubTab, label: "Técnicos & Zap", icon: Phone },
+								{ id: "apoio" as SettingsSubTab, label: "Tabelas Apoio", icon: Events },
+								{ id: "tolerancias" as SettingsSubTab, label: "Tolerâncias ISO", icon: RulerAlt },
+								{ id: "usuarios" as SettingsSubTab, label: `Usuários (${usersList.length})`, icon: User },
+								{ id: "descontos" as SettingsSubTab, label: "Políticas Desconto", icon: Purchase },
+							].map(renderSubTabButton)}
+						</div>
 					</div>
 
-					{/* Linha 2: Parâmetros Técnicos & Governança (5 colunas) */}
-					<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 w-full">
-						{[
-							{ id: "tolerancias", label: "Tolerâncias ISO", icon: RulerAlt },
-							{ id: "apoio", label: "Tabelas Apoio", icon: Events },
-							{ id: "usuarios", label: `Usuários (${usersList.length})`, icon: User },
-							{ id: "log_vendas", label: "Log de Vendas", icon: ListChecked },
-							{ id: "integridade", label: "Banco & Integridade", icon: Security },
-						].map((item) => {
-							const isActive = activeTab === item.id;
-							return (
-								<button
-									type="button"
-									key={item.id}
-									data-subtab={item.id}
-									onClick={() => setActiveTab(item.id as SettingsSubTab)}
-									aria-label={`Acessar configurações de ${item.label}`}
-									aria-current={isActive ? "page" : undefined}
-									className={cn(
-										"w-full h-11 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer",
-										"flex items-center justify-center gap-2 text-center select-none whitespace-nowrap",
-										"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-white focus-visible:ring-offset-2",
-										isActive
-											? "bg-zinc-900 text-white border-2 border-zinc-900 shadow-sm dark:bg-white dark:text-zinc-900 dark:border-white font-bold"
-											: "bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-2 border-zinc-300 dark:border-zinc-700 shadow-2xs hover:bg-zinc-50 hover:border-zinc-400 dark:hover:bg-zinc-700 dark:hover:border-zinc-600"
-									)}
-								>
-									<Icon
-										icon={item.icon}
-										className={cn(
-											"size-4 shrink-0",
-											isActive ? "text-white dark:text-zinc-900" : "text-zinc-500 dark:text-zinc-400"
-										)}
-									/>
-									<span className="font-semibold text-xs leading-none">{item.label}</span>
-								</button>
-							);
-						})}
+					{/* Bloco da Direita: Banco & Integridade ocupando a altura das 2 linhas no desktop */}
+					<div className="hidden md:flex w-36 shrink-0">
+						{renderIntegrityButton()}
 					</div>
+				</div>
+
+				{/* Fallback Mobile para Banco & Integridade em telas menores que md */}
+				<div className="md:hidden mt-2">
+					{renderSubTabButton({ id: "integridade", label: "Banco & Integridade", icon: Security })}
 				</div>
 			</div>
 
@@ -1958,6 +2016,228 @@ export function OpticalSettingsView() {
 									)}
 								</tbody>
 							</table>
+						</div>
+					</div>
+				</div>
+			)}
+
+			{/* CONTEÚDO DA ABA: POLÍTICAS DE DESCONTO & GOVERNANÇA COMERCIAL */}
+			{activeTab === "descontos" && (
+				<div className="flex flex-col gap-6">
+					{/* Header de Governança */}
+					<div className="rounded-xl border bg-card p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+						<div>
+							<h3 className="text-base font-bold tracking-tight flex items-center gap-2">
+								<Icon icon={Purchase} className="size-5 text-primary" />
+								Políticas de Desconto & Alçadas Comerciais
+							</h3>
+							<p className="text-xs text-muted-foreground mt-0.5">
+								Definição de alçadas máximas de desconto por perfil e laboratório/marca. Descontos acima do teto do vendedor requerem autorização do gerente.
+							</p>
+						</div>
+						<div className="flex items-center gap-2">
+							<Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-xs font-mono">
+								{discountPolicies.length} Políticas Ativas
+							</Badge>
+						</div>
+					</div>
+
+					{/* 3 Cards de Alçadas Padrão */}
+					<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+						{/* Vendedor */}
+						<div className="rounded-xl border bg-card p-4 shadow-2xs space-y-2 border-l-4 border-l-blue-500">
+							<div className="flex items-center justify-between">
+								<span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+									Vendedor de Balcão
+								</span>
+								<Badge variant="secondary" className="font-mono text-xs font-bold">
+									Até 10%
+								</Badge>
+							</div>
+							<p className="text-xs text-muted-foreground">
+								Descontos em armações ou lentes até 10% são aplicados imediatamente. Acima de 10%, o sistema bloqueia e solicita validação do gerente.
+							</p>
+						</div>
+
+						{/* Gerente */}
+						<div className="rounded-xl border bg-card p-4 shadow-2xs space-y-2 border-l-4 border-l-amber-500">
+							<div className="flex items-center justify-between">
+								<span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+									Gerente de Loja
+								</span>
+								<Badge variant="secondary" className="font-mono text-xs font-bold">
+									Até 20%
+								</Badge>
+							</div>
+							<p className="text-xs text-muted-foreground">
+								Descontos até 20% mediante senha gerencial (120212). Registro de auditoria gravado no log de vendas da ordem de serviço.
+							</p>
+						</div>
+
+						{/* Admin */}
+						<div className="rounded-xl border bg-card p-4 shadow-2xs space-y-2 border-l-4 border-l-purple-500">
+							<div className="flex items-center justify-between">
+								<span className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+									Diretoria / Admin
+								</span>
+								<Badge variant="secondary" className="font-mono text-xs font-bold">
+									Até 100%
+								</Badge>
+							</div>
+							<p className="text-xs text-muted-foreground">
+								Alçada irrestrita para cortesias, vouchers, garantias da rede e parcerias institucionais sem bloqueio de margem.
+							</p>
+						</div>
+					</div>
+
+					{/* Formulário de Nova Política e Tabela de Regras */}
+					<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+						{/* Card Formulário */}
+						<div className="rounded-xl border bg-card p-5 shadow-xs space-y-4">
+							<h4 className="text-sm font-bold flex items-center gap-2">
+								<Icon icon={Add} className="size-4 text-primary" />
+								Nova Regra de Desconto
+							</h4>
+							<p className="text-xs text-muted-foreground">
+								Crie regras personalizadas para marcas específicas ou tetos customizados por cargo.
+							</p>
+
+							<div className="space-y-3">
+								<div>
+									<label className="text-xs font-semibold text-foreground mb-1 block">Perfil / Cargo</label>
+									<select
+										value={newPolicyRole}
+										onChange={(e) => setNewPolicyRole(e.target.value as any)}
+										className="h-8 w-full rounded-md border bg-background px-2 text-xs"
+									>
+										<option value="VENDEDOR">Vendedor</option>
+										<option value="GERENTE">Gerente</option>
+										<option value="ADMIN">Administrador</option>
+									</select>
+								</div>
+
+								<div>
+									<label className="text-xs font-semibold text-foreground mb-1 block">Teto Máximo de Desconto (%)</label>
+									<Input
+										type="number"
+										min={1}
+										max={100}
+										value={newPolicyMaxPct}
+										onChange={(e) => setNewPolicyMaxPct(Number(e.target.value) || 0)}
+										className="h-8 text-xs font-mono"
+									/>
+								</div>
+
+								<div>
+									<label className="text-xs font-semibold text-foreground mb-1 block">Marca / Laboratório</label>
+									<select
+										value={newPolicyBrand}
+										onChange={(e) => setNewPolicyBrand(e.target.value)}
+										className="h-8 w-full rounded-md border bg-background px-2 text-xs"
+									>
+										<option value="TODOS">Todas as Marcas / Labs</option>
+										<option value="Hoya">Hoya</option>
+										<option value="Zeiss">Zeiss</option>
+										<option value="Essilor">Essilor</option>
+										<option value="Personality">Personality</option>
+										<option value="Ray-Ban">Ray-Ban</option>
+										<option value="Oakley">Oakley</option>
+									</select>
+								</div>
+
+								<div>
+									<label className="text-xs font-semibold text-foreground mb-1 block">Categoria de Produto</label>
+									<select
+										value={newPolicyCategory}
+										onChange={(e) => setNewPolicyCategory(e.target.value as any)}
+										className="h-8 w-full rounded-md border bg-background px-2 text-xs"
+									>
+										<option value="GLOBAL">Global (Armação & Lentes)</option>
+										<option value="ARMAÇÃO">Apenas Armações</option>
+										<option value="LENTE">Apenas Lentes</option>
+									</select>
+								</div>
+
+								<div>
+									<label className="text-xs font-semibold text-foreground mb-1 block">Descrição / Observação</label>
+									<Input
+										placeholder="Ex: Campanha Ray-Ban Vendedor 15%"
+										value={newPolicyDesc}
+										onChange={(e) => setNewPolicyDesc(e.target.value)}
+										className="h-8 text-xs"
+									/>
+								</div>
+
+								<Button
+									size="sm"
+									onClick={handleAddPolicy}
+									className="w-full gap-1.5 font-semibold mt-2 cursor-pointer"
+								>
+									<Icon icon={Add} className="size-3.5" />
+									Cadastrar Política
+								</Button>
+							</div>
+						</div>
+
+						{/* Tabela de Políticas Cadastradas */}
+						<div className="lg:col-span-2 rounded-xl border bg-card shadow-xs overflow-hidden flex flex-col">
+							<div className="p-4 border-b bg-muted/20">
+								<h4 className="text-sm font-bold">Matriz de Políticas e Alçadas Ativas</h4>
+								<p className="text-xs text-muted-foreground">
+									Regras vigentes aplicadas em tempo real durante a digitação e fechamento da OS.
+								</p>
+							</div>
+
+							<div className="overflow-x-auto flex-1">
+								<table className="w-full text-xs">
+									<thead>
+										<tr className="border-b bg-muted/40 font-semibold text-muted-foreground">
+											<th className="py-2.5 px-3 text-left">Perfil</th>
+											<th className="py-2.5 px-3 text-left">Categoria</th>
+											<th className="py-2.5 px-3 text-left">Marca / Lab</th>
+											<th className="py-2.5 px-3 text-right">Teto Máx</th>
+											<th className="py-2.5 px-3 text-left">Descrição</th>
+											<th className="py-2.5 px-3 text-right">Ação</th>
+										</tr>
+									</thead>
+									<tbody className="divide-y">
+										{discountPolicies.map((pol) => (
+											<tr key={pol.id} className="hover:bg-muted/20 transition-colors">
+												<td className="py-2.5 px-3 font-bold">
+													<span
+														className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+															pol.role === "ADMIN"
+																? "bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300"
+																: pol.role === "GERENTE"
+																	? "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
+																	: "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300"
+														}`}
+													>
+														{pol.role}
+													</span>
+												</td>
+												<td className="py-2.5 px-3 text-muted-foreground">{pol.category || "GLOBAL"}</td>
+												<td className="py-2.5 px-3 font-medium">{pol.brandOrLab || "TODOS"}</td>
+												<td className="py-2.5 px-3 text-right font-mono font-bold text-foreground">
+													{pol.maxDiscountPct}%
+												</td>
+												<td className="py-2.5 px-3 text-muted-foreground">{pol.description || "—"}</td>
+												<td className="py-2.5 px-3 text-right">
+													<Button
+														variant="ghost"
+														size="icon"
+														onClick={() => handleDeletePolicy(pol.id)}
+														className="size-7 text-muted-foreground hover:text-rose-600 cursor-pointer"
+														title="Excluir política"
+													>
+														<Icon icon={TrashCan} className="size-3.5" />
+													</Button>
+												</td>
+											</tr>
+										))}
+									</tbody>
+								</table>
+							</div>
 						</div>
 					</div>
 				</div>

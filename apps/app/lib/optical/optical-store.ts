@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { INITIAL_OPTICAL_ORDERS } from "./optical-mock-data";
 import { fetchRealOrdersFromSupabase, saveOrderToSupabase } from "./supabase-optical";
-import type { OpticalOrder, OpticalOrderStatus } from "./optical-types";
+import type { OpticalOrder, OpticalOrderStatus, DiscountPolicy } from "./optical-types";
 
 export const CURRENT_STORAGE_KEY = "mnocx_optical_orders_v2";
 export const LEGACY_STORAGE_KEY = "compai_optical_orders_v1";
@@ -28,6 +28,18 @@ const fallbackAIAudit = {
 		},
 	],
 };
+
+export function normalizeOpticalStatus(rawStatus?: string | null): OpticalOrderStatus {
+	if (!rawStatus) return "DIGITADA";
+	const upper = String(rawStatus).toUpperCase().trim();
+	if (upper === "PEDIDO" || upper === "EM_LABORATORIO") return "EM_LABORATORIO";
+	if (upper === "MONTAGEM" || upper === "EM_MONTAGEM") return "EM_MONTAGEM";
+	if (upper === "CONFERIDO" || upper === "CONFERIDA") return "CONFERIDA";
+	if (upper === "LOJA" || upper === "PRONTA_LOJA") return "PRONTA_LOJA";
+	if (upper === "ENTREGUE") return "ENTREGUE";
+	if (upper === "CANCELADA") return "CANCELADA";
+	return "DIGITADA";
+}
 
 export function sanitizeOrder(raw: any, index = 0): OpticalOrder {
 	if (!raw || typeof raw !== "object") {
@@ -202,18 +214,7 @@ export function sanitizeOrder(raw: any, index = 0): OpticalOrder {
 	const aro1 = sanitizeAro(raw.aro1);
 	const aro2 = raw.aro2 ? sanitizeAro(raw.aro2) : undefined;
 
-	const validStatuses: OpticalOrderStatus[] = [
-		"DIGITADA",
-		"EM_LABORATORIO",
-		"EM_MONTAGEM",
-		"CONFERIDA",
-		"PRONTA_LOJA",
-		"ENTREGUE",
-		"CANCELADA",
-	];
-	const status: OpticalOrderStatus = validStatuses.includes(raw.status)
-		? raw.status
-		: "DIGITADA";
+	const status: OpticalOrderStatus = normalizeOpticalStatus(raw.status);
 
 	return {
 		...raw,
@@ -352,17 +353,18 @@ export function updateOrderStatus(
 	id: string,
 	newStatus: OpticalOrderStatus,
 ): OpticalOrder | undefined {
+	const normalizedStatus = normalizeOpticalStatus(newStatus);
 	let updatedOrder: OpticalOrder | undefined;
 	globalOrders = globalOrders.map((ord) => {
 		if (ord.id !== id) return ord;
 		const updated = {
 			...ord,
-			status: newStatus,
+			status: normalizedStatus,
 			updatedAt: new Date().toISOString(),
 		};
-		if (newStatus === "PRONTA_LOJA") {
+		if (normalizedStatus === "PRONTA_LOJA") {
 			updated.readyAt = new Date().toISOString();
-		} else if (newStatus === "ENTREGUE") {
+		} else if (normalizedStatus === "ENTREGUE") {
 			updated.deliveredAt = new Date().toISOString();
 		}
 		const sanitized = sanitizeOrder(updated);
@@ -453,5 +455,116 @@ export function useOpticalOrders() {
 		updateOrderStatus,
 		payResidual,
 		resetToDefaults,
+	};
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POLÍTICAS DE DESCONTO E ALÇADAS GERENCIAIS
+// ─────────────────────────────────────────────────────────────────────────────
+export const DISCOUNT_STORAGE_KEY = "mnocx_discount_policies";
+
+export const DEFAULT_DISCOUNT_POLICIES: DiscountPolicy[] = [
+	{
+		id: "pol-vendedor-geral",
+		role: "VENDEDOR",
+		maxDiscountPct: 10,
+		category: "GLOBAL",
+		brandOrLab: "TODOS",
+		description: "Teto padrão de desconto direto do vendedor (10%)",
+	},
+	{
+		id: "pol-gerente-geral",
+		role: "GERENTE",
+		maxDiscountPct: 20,
+		category: "GLOBAL",
+		brandOrLab: "TODOS",
+		description: "Alçada de gerente de loja para fechamento comercial (20%)",
+	},
+	{
+		id: "pol-admin-geral",
+		role: "ADMIN",
+		maxDiscountPct: 100,
+		category: "GLOBAL",
+		brandOrLab: "TODOS",
+		description: "Alçada irrestrita da diretoria e administração (até 100%)",
+	},
+];
+
+let globalDiscountPolicies: DiscountPolicy[] = DEFAULT_DISCOUNT_POLICIES;
+
+export function getDiscountPolicies(): DiscountPolicy[] {
+	if (typeof window === "undefined") return globalDiscountPolicies;
+	try {
+		const raw = localStorage.getItem(DISCOUNT_STORAGE_KEY);
+		if (raw) {
+			const parsed = JSON.parse(raw);
+			if (Array.isArray(parsed) && parsed.length > 0) {
+				globalDiscountPolicies = parsed;
+				return globalDiscountPolicies;
+			}
+		}
+	} catch (e) {
+		console.warn("Falha ao ler políticas de desconto:", e);
+	}
+	return globalDiscountPolicies;
+}
+
+export function saveDiscountPolicies(policies: DiscountPolicy[]): void {
+	globalDiscountPolicies = policies;
+	if (typeof window !== "undefined") {
+		try {
+			localStorage.setItem(DISCOUNT_STORAGE_KEY, JSON.stringify(policies));
+		} catch (e) {
+			console.warn("Falha ao salvar políticas de desconto:", e);
+		}
+	}
+}
+
+export function addOrUpdateDiscountPolicy(policy: DiscountPolicy): void {
+	const current = getDiscountPolicies();
+	const existingIndex = current.findIndex((p) => p.id === policy.id);
+	let updated: DiscountPolicy[];
+	if (existingIndex >= 0) {
+		updated = [...current];
+		updated[existingIndex] = policy;
+	} else {
+		updated = [...current, { ...policy, id: policy.id || `pol-${Date.now()}` }];
+	}
+	saveDiscountPolicies(updated);
+}
+
+export function deleteDiscountPolicy(id: string): void {
+	const current = getDiscountPolicies();
+	const updated = current.filter((p) => p.id !== id);
+	saveDiscountPolicies(updated);
+}
+
+export function checkDiscountLimit(
+	role: "VENDEDOR" | "GERENTE" | "ADMIN",
+	requestedPct: number,
+	brandOrLab?: string,
+): {
+	allowed: boolean;
+	maxAllowed: number;
+	requiresManager: boolean;
+} {
+	const policies = getDiscountPolicies();
+	const rolePolicies = policies.filter((p) => p.role === role);
+
+	let matched = rolePolicies.find(
+		(p) => brandOrLab && p.brandOrLab && p.brandOrLab !== "TODOS" && p.brandOrLab.toLowerCase() === brandOrLab.toLowerCase(),
+	);
+	if (!matched) {
+		matched = rolePolicies.find((p) => p.brandOrLab === "TODOS" || !p.brandOrLab) || rolePolicies[0];
+	}
+
+	const maxAllowed = matched ? matched.maxDiscountPct : role === "ADMIN" ? 100 : role === "GERENTE" ? 20 : 10;
+	const allowed = requestedPct <= maxAllowed;
+	const requiresManager = !allowed && role === "VENDEDOR";
+
+	return {
+		allowed,
+		maxAllowed,
+		requiresManager,
 	};
 }

@@ -12,6 +12,7 @@ import UserAvatar from "@carbon/icons-react/es/UserAvatar";
 import WarningAlt from "@carbon/icons-react/es/WarningAlt";
 import CheckmarkFilled from "@carbon/icons-react/es/CheckmarkFilled";
 import Reset from "@carbon/icons-react/es/Reset";
+import Password from "@carbon/icons-react/es/Password";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
 import { Icon } from "@crm/ui/components/icon";
@@ -53,7 +54,6 @@ export function OpticalSalesPerformanceView() {
 	const [regimeSabado, setRegimeSabado] = useState(true);
 	const [customTotalDiasUteis, setCustomTotalDiasUteis] = useState<number>(26);
 	const [customDiasDecorridos, setCustomDiasDecorridos] = useState<number>(14);
-	const [gaugeMode, setGaugeMode] = useState<"speedometer" | "compact">("speedometer");
 
 	const totalDiasUteis = customTotalDiasUteis;
 	const diasDecorridos = Math.min(customDiasDecorridos, totalDiasUteis);
@@ -97,6 +97,12 @@ export function OpticalSalesPerformanceView() {
 	const [editingSeller, setEditingSeller] = useState<SellerGoalItem | null>(null);
 	const [editMetaValue, setEditMetaValue] = useState<number>(0);
 	const [editPremioValue, setEditPremioValue] = useState<number>(0);
+
+	// Autenticação de Gerente para edição de metas (senha: 120212)
+	const [authModalOpen, setAuthModalOpen] = useState(false);
+	const [authPassword, setAuthPassword] = useState("");
+	const [sellerPendingAuth, setSellerPendingAuth] = useState<SellerGoalItem | null>(null);
+	const [authError, setAuthError] = useState("");
 
 	// Filtros da Lista de OSs
 	const [orderSearchQuery, setOrderSearchQuery] = useState("");
@@ -209,9 +215,27 @@ export function OpticalSalesPerformanceView() {
 			: 0;
 
 	const handleOpenEditSeller = (seller: SellerGoalItem) => {
-		setEditingSeller(seller);
-		setEditMetaValue(seller.metaMes);
-		setEditPremioValue(seller.premioSemana);
+		setSellerPendingAuth(seller);
+		setAuthPassword("");
+		setAuthError("");
+		setAuthModalOpen(true);
+	};
+
+	const handleVerifyManagerPassword = (e?: React.FormEvent) => {
+		if (e) e.preventDefault();
+		if (authPassword.trim() === "120212") {
+			toast.success("Autenticação de Gerente confirmada com sucesso!");
+			setAuthModalOpen(false);
+			if (sellerPendingAuth) {
+				setEditingSeller(sellerPendingAuth);
+				setEditMetaValue(sellerPendingAuth.metaMes);
+				setEditPremioValue(sellerPendingAuth.premioSemana);
+				setSellerPendingAuth(null);
+			}
+		} else {
+			setAuthError("Senha incorreta. Acesso restrito ao Gerente de Loja.");
+			toast.error("Senha de Gerente incorreta! Ação bloqueada e registrada em auditoria.");
+		}
 	};
 
 	const handleSaveSellerGoal = () => {
@@ -227,7 +251,7 @@ export function OpticalSalesPerformanceView() {
 					: s,
 			),
 		);
-		toast.success(`Metas de ${editingSeller.nome} atualizadas com sucesso!`);
+		toast.success(`Metas de ${editingSeller.nome} atualizadas com sucesso pelo gerente!`);
 		setEditingSeller(null);
 	};
 
@@ -276,36 +300,8 @@ export function OpticalSalesPerformanceView() {
 					</div>
 
 					<div className="flex flex-wrap items-center gap-2">
-						{/* Seletor de Modo de Exibição */}
-						<div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl border border-zinc-200 dark:border-zinc-700">
-							<button
-								type="button"
-								onClick={() => setGaugeMode("speedometer")}
-								className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-									gaugeMode === "speedometer"
-										? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-xs"
-										: "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
-								}`}
-								title="Visualização com Velocímetro Radial"
-							>
-								⚡ Velocímetro
-							</button>
-							<button
-								type="button"
-								onClick={() => setGaugeMode("compact")}
-								className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-									gaugeMode === "compact"
-										? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-xs"
-										: "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
-								}`}
-								title="Visualização com Barra Linear Compacta"
-							>
-								📊 Barra Compacta
-							</button>
-						</div>
-
 						{/* Ajustes rápidos de dias úteis */}
-						<div className="flex items-center gap-2 text-xs bg-white dark:bg-zinc-800 p-1.5 rounded-xl border border-zinc-300 dark:border-zinc-700">
+						<div className="flex items-center gap-2 text-xs bg-white dark:bg-zinc-800 p-1.5 rounded-xl border border-zinc-300 dark:border-zinc-700 shadow-xs">
 							<span className="text-zinc-500 font-medium pl-1">Dias Úteis Mês:</span>
 							<input
 								type="number"
@@ -332,8 +328,7 @@ export function OpticalSalesPerformanceView() {
 				</div>
 
 				{/* VELOCÍMETRO CONSOLIDADO MASTER COM CARDS DE PERFORMANCE NA VERTICAL AO LADO */}
-				{gaugeMode === "speedometer" ? (
-					<div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-900/90 dark:via-zinc-900 dark:to-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-6">
+				<div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-900/90 dark:via-zinc-900 dark:to-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-6">
 						{/* Medidor Master à esquerda */}
 						<div className="w-full lg:w-auto flex flex-col items-center shrink-0">
 							<SpeedometerGauge
@@ -482,28 +477,9 @@ export function OpticalSalesPerformanceView() {
 							</div>
 						</div>
 					</div>
-				) : (
-					/* Modo Barra Compacta */
-					<div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
-						<div className="flex items-center justify-between text-xs">
-							<span className="font-bold text-zinc-800 dark:text-zinc-200">
-								Progresso Consolidado da Loja: {((totalFaturadoGeral / (totalMetaLoja || 1)) * 100).toFixed(1)}%
-							</span>
-							<span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">
-								{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalFaturadoGeral)} / {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalMetaLoja)}
-							</span>
-						</div>
-						<div className="relative h-3 w-full bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
-							<div
-								className="h-full bg-emerald-500 rounded-full"
-								style={{ width: `${Math.min(100, (totalFaturadoGeral / (totalMetaLoja || 1)) * 100)}%` }}
-							/>
-						</div>
-					</div>
-				)}
 
 				{/* Grid de Vendedores: Otimizado na horizontal e vertical para caber o máximo de vendedores na tela */}
-				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
 					{sellerPerformance.map((seller) => {
 						// Salesforce Status colors & badge
 						const isAhead = seller.pacePct >= 105;
@@ -563,102 +539,15 @@ export function OpticalSalesPerformanceView() {
 									</div>
 								</div>
 
-								{/* MEDIDOR DE METAS: VELOCÍMETRO POWER BI VS BARRA COMPACTA */}
-								{gaugeMode === "speedometer" ? (
-									<div className="bg-zinc-50 dark:bg-zinc-900/60 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center">
-										<SpeedometerGauge
-											size="sm"
-											value={seller.totalRealizado}
-											max={seller.metaMes}
-											target={seller.metaEsperadaHoje}
-										/>
-									</div>
-								) : (
-									<div className="bg-zinc-50 dark:bg-zinc-900/60 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-2">
-										<div className="flex items-center justify-between text-xs">
-											<div className="flex items-center gap-2">
-												<span className="font-semibold text-zinc-700 dark:text-zinc-300">
-													Medidor de Metas (Pace)
-												</span>
-											</div>
-											<span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">
-												{new Intl.NumberFormat("pt-BR", {
-													style: "currency",
-													currency: "BRL",
-												}).format(seller.totalRealizado)}{" "}
-												/{" "}
-												<span className="text-zinc-500 font-normal">
-													{new Intl.NumberFormat("pt-BR", {
-														style: "currency",
-														currency: "BRL",
-													}).format(seller.metaMes)}
-												</span>
-											</span>
-										</div>
-
-										{/* Barra de Progresso com Marcador de Tempo Útil */}
-										<div className="relative h-4 w-full bg-zinc-200 dark:bg-zinc-750 rounded-full overflow-hidden">
-											{/* Barra Realizada */}
-											<div
-												className={`h-full rounded-full transition-all duration-500 ${
-													isAhead
-														? "bg-emerald-600"
-														: isOnTrack
-															? "bg-blue-600"
-															: "bg-rose-500"
-												}`}
-												style={{
-													width: `${Math.min(100, seller.pctAtingidoMes)}%`,
-												}}
-											/>
-											{/* Marcador Vertical de Tempo Decorrido */}
-											<div
-												className="absolute top-0 bottom-0 w-1 bg-zinc-900 dark:bg-white z-10 shadow-xs"
-												style={{
-													left: `${Math.min(99, progressDiasUteisPct)}%`,
-												}}
-												title={`Meta Proporcional Hoje (${progressDiasUteisPct.toFixed(0)}% do tempo): R$ ${seller.metaEsperadaHoje.toFixed(0)}`}
-											/>
-										</div>
-
-										{/* Legenda do Medidor */}
-										<div className="flex items-center justify-between text-[11px] text-zinc-500 pt-0.5">
-											<span>
-												Realizado:{" "}
-												<strong className="text-zinc-900 dark:text-zinc-100 font-mono">
-													{seller.pctAtingidoMes.toFixed(1)}%
-												</strong>
-											</span>
-											<span className="flex items-center gap-1 font-medium">
-												<span className="size-1.5 rounded-full bg-zinc-900 dark:bg-white" />
-												Esperado hoje:{" "}
-												<strong className="text-zinc-700 dark:text-zinc-300 font-mono">
-													{new Intl.NumberFormat("pt-BR", {
-														style: "currency",
-														currency: "BRL",
-													}).format(seller.metaEsperadaHoje)}
-												</strong>
-											</span>
-											<span>
-												{seller.diferencaRitmo >= 0 ? (
-													<span className="text-emerald-600 font-bold">
-														+{new Intl.NumberFormat("pt-BR", {
-															style: "currency",
-															currency: "BRL",
-														}).format(seller.diferencaRitmo)}
-													</span>
-												) : (
-													<span className="text-rose-600 font-bold">
-														{new Intl.NumberFormat("pt-BR", {
-															style: "currency",
-															currency: "BRL",
-														}).format(seller.diferencaRitmo)}
-													</span>
-												)}
-											</span>
-										</div>
-									</div>
-								)}
+								{/* MEDIDOR DE METAS: VELOCÍMETRO POWER BI */}
+								<div className="bg-zinc-50 dark:bg-zinc-900/60 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center">
+									<SpeedometerGauge
+										size="sm"
+										value={seller.totalRealizado}
+										max={seller.metaMes}
+										target={seller.metaEsperadaHoje}
+									/>
+								</div>
 
 								{/* DETALHES DE DIÁRIA, SEMANA E PRÊMIO - LAYOUT ANTI-ENCAVALAMENTO */}
 								<div className="flex flex-col gap-1.5 pt-1">
@@ -870,6 +759,77 @@ export function OpticalSalesPerformanceView() {
 					</DialogContent>
 				</Dialog>
 			)}
+
+			{/* MODAL DE AUTENTICAÇÃO DE GERENTE (SENHA: 120212) */}
+			<Dialog open={authModalOpen} onOpenChange={setAuthModalOpen}>
+				<DialogContent className="sm:max-w-[420px]">
+					<DialogHeader>
+						<DialogTitle className="flex items-center gap-2 text-base">
+							<Icon icon={Password} className="size-5 text-amber-500" />
+							Autenticação Gerencial Requerida
+						</DialogTitle>
+					</DialogHeader>
+
+					<form onSubmit={handleVerifyManagerPassword} className="space-y-4 py-2">
+						<p className="text-xs text-zinc-600 dark:text-zinc-400">
+							A alteração de metas e premiações de vendedores exige validação de senha do <strong>Gerente de Loja</strong> com registro de auditoria.
+						</p>
+
+						{sellerPendingAuth && (
+							<div className="p-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 text-xs">
+								<span className="text-zinc-500">Vendedor selecionado:</span>{" "}
+								<strong className="text-zinc-900 dark:text-zinc-100">{sellerPendingAuth.nome}</strong>{" "}
+								<span className="text-zinc-400">({sellerPendingAuth.loja})</span>
+							</div>
+						)}
+
+						<div className="space-y-1.5">
+							<label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+								Senha do Gerente
+							</label>
+							<Input
+								type="password"
+								placeholder="Digite a senha gerencial (ex: 120212)"
+								value={authPassword}
+								onChange={(e) => {
+									setAuthPassword(e.target.value);
+									if (authError) setAuthError("");
+								}}
+								autoFocus
+								className="text-sm font-mono tracking-widest"
+							/>
+							{authError ? (
+								<p className="text-[11px] text-rose-600 font-semibold">{authError}</p>
+							) : (
+								<span className="text-[10px] text-zinc-400">
+									Acesso monitorado e registrado no log de segurança operacional.
+								</span>
+							)}
+						</div>
+
+						<DialogFooter className="gap-2 pt-2">
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={() => {
+									setAuthModalOpen(false);
+									setSellerPendingAuth(null);
+								}}
+							>
+								Cancelar
+							</Button>
+							<MnocxButton
+								type="submit"
+								variant="primary"
+								size="sm"
+							>
+								Validar e Liberar Edição
+							</MnocxButton>
+						</DialogFooter>
+					</form>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

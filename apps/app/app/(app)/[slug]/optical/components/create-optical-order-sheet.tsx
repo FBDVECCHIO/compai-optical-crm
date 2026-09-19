@@ -23,7 +23,7 @@ export function CreateOpticalOrderSheet() {
 			fallback={
 				<Button disabled size="sm" data-action="nova-venda">
 					<Icon icon={Add} data-icon="inline-start" />
-					Nova Venda de Balcão
+					Lançar OS (Nova Venda)
 				</Button>
 			}
 		>
@@ -50,7 +50,7 @@ function CreateOpticalOrderSheetContent() {
 			<SheetTrigger asChild>
 				<Button size="sm" className="font-semibold shadow-xs" data-action="nova-venda">
 					<Icon icon={Add} data-icon="inline-start" />
-					Nova Venda de Balcão
+					Lançar OS (Nova Venda)
 				</Button>
 			</SheetTrigger>
 			<SheetContent
@@ -61,7 +61,7 @@ function CreateOpticalOrderSheetContent() {
 				<SheetHeader className="mb-4 pb-2 border-b">
 					<SheetTitle className="flex items-center gap-2 text-lg font-bold">
 						<Icon icon={Glasses} className="size-5 text-primary" />
-						Balcão de Venda e Ordem de Serviço Óptica
+						Lançar OS — Balcão de Venda e Ordem de Serviço Óptica
 					</SheetTitle>
 					<SheetDescription>
 						Cadastre pacientes, configure armações e lentes para Aro 1 e Aro 2

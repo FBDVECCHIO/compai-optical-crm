@@ -5,6 +5,9 @@ import Add from "@carbon/icons-react/es/Add";
 import Checkmark from "@carbon/icons-react/es/Checkmark";
 import CheckmarkOutline from "@carbon/icons-react/es/CheckmarkOutline";
 import DocumentExport from "@carbon/icons-react/es/DocumentExport";
+import Edit from "@carbon/icons-react/es/Edit";
+import ChevronLeft from "@carbon/icons-react/es/ChevronLeft";
+import ChevronRight from "@carbon/icons-react/es/ChevronRight";
 import Erase from "@carbon/icons-react/es/Erase";
 import Reset from "@carbon/icons-react/es/Reset";
 import Search from "@carbon/icons-react/es/Search";
@@ -43,6 +46,13 @@ export function OpticalConferenceView() {
 	const [selectedLabFilter, setSelectedLabFilter] = useState("TODOS");
 	const [startDateFilter, setStartDateFilter] = useState("");
 	const [endDateFilter, setEndDateFilter] = useState("");
+
+	// Paginação
+	const [currentPage, setCurrentPage] = useState(1);
+	const [pageSize, setPageSize] = useState(10);
+
+	// Edição de Conferência
+	const [editingConferenceId, setEditingConferenceId] = useState<number | null>(null);
 
 	// Formulário de Conferência - Estados
 	const [isDobro, setIsDobro] = useState(false);
@@ -127,6 +137,7 @@ export function OpticalConferenceView() {
 
 	// Reset Formulário
 	const resetForm = () => {
+		setEditingConferenceId(null);
 		setIsDobro(false);
 		setConfOS("");
 		setConfIDLab("");
@@ -156,7 +167,61 @@ export function OpticalConferenceView() {
 		setConfSemTratamentoEf2(false);
 	};
 
-	// Salvar Conferência
+	// Carregar para Edição
+	const handleEditConference = (c: ConferenciaItem) => {
+		setEditingConferenceId(c.id || null);
+		setConfData(c.data || new Date().toISOString().slice(0, 10));
+		setConfLoja(c.loja || "");
+		setConfOS(c.osLoja || "");
+		setConfIDLab(c.idLab || "");
+		setConfLab(c.labPedido || "");
+		setConfBeneficio(c.confBeneficio || "");
+		setConfBeneficioCodigo(c.confBeneficioCodigo || "");
+
+		// Oficial 1
+		setConfLente(c.lente || "");
+		setConfQtdd(c.qtyLente || 1);
+		setConfPrecoLente(c.precoLente || 0);
+		setConfSemTratamento(c.semTratamento === "SIM");
+		setConfTratamento(c.tratamento || "");
+		setConfPrecoTrat(c.precoTratamento || 0);
+
+		// Adaptado 1
+		setConfLabEfetivo(c.labEfetivo || c.labPedido || "");
+		setConfLenteEfetiva(c.lenteEfetiva || "");
+		setConfQtddEf(c.qtyLenteEfetiva || 1);
+		setConfPrecoLenteEfetiva(c.precoLenteEfetiva || 0);
+		setConfSemTratamentoEf(c.semTratamentoEf === "SIM");
+		setConfTratEfetivo(c.tratEfetivo || "");
+		setConfPrecoTratEfetivo(c.precoTratEfetivo || 0);
+
+		// Dobro
+		const dobro = c.confDobro === "SIM";
+		setIsDobro(dobro);
+		if (dobro) {
+			setConfOS2(c.osLoja2 || "");
+			setConfIDLab2(c.idLab2 || "");
+			setConfLente2(c.lente2 || "");
+			setConfQtdd2(c.qtyLente2 || 1);
+			setConfPrecoLente2(c.precoLente2 || 0);
+			setConfSemTratamento2(c.semTratamento2 === "SIM");
+			setConfTratamento2(c.tratamento2 || "");
+			setConfPrecoTrat2(c.precoTratamento2 || 0);
+
+			setConfLenteEfetiva2(c.lenteEfetiva2 || "");
+			setConfQtddEf2(c.qtyLenteEfetiva2 || 1);
+			setConfPrecoLenteEfetiva2(c.precoLenteEfetiva2 || 0);
+			setConfSemTratamentoEf2(c.semTratamentoEf2 === "SIM");
+			setConfTratEfetivo2(c.tratEfetivo2 || "");
+			setConfPrecoTratEfetivo2(c.precoTratEfetivo2 || 0);
+		}
+
+		toast.info(`Conferência da OS #${c.osLoja} carregada para edição no formulário.`);
+		const el = document.getElementById("form-conferencia-section");
+		if (el) el.scrollIntoView({ behavior: "smooth" });
+	};
+
+	// Salvar Conferência (Novo ou Atualização)
 	async function handleSubmit(e: React.FormEvent) {
 		e.preventDefault();
 		if (!confLoja || !confOS.trim() || !confIDLab.trim()) {
@@ -166,6 +231,7 @@ export function OpticalConferenceView() {
 
 		setSubmitting(true);
 		const payload: ConferenciaItem = {
+			id: editingConferenceId || undefined,
 			data: confData,
 			loja: confLoja,
 			osLoja: confOS.trim().toUpperCase(),
@@ -208,9 +274,14 @@ export function OpticalConferenceView() {
 		setSubmitting(false);
 
 		if (ok) {
-			toast.success(`Conferência da OS ${payload.osLoja} registrada com sucesso!`, {
-				description: economiaAtual > 0 ? `Economia gerada: R$ ${economiaAtual.toFixed(2)}` : undefined,
-			});
+			toast.success(
+				editingConferenceId
+					? `Conferência da OS ${payload.osLoja} atualizada com sucesso!`
+					: `Conferência da OS ${payload.osLoja} registrada com sucesso!`,
+				{
+					description: economiaAtual > 0 ? `Economia gerada: R$ ${economiaAtual.toFixed(2)}` : undefined,
+				}
+			);
 			resetForm();
 			loadData();
 		} else {
@@ -249,6 +320,18 @@ export function OpticalConferenceView() {
 			return true;
 		});
 	}, [conferencias, searchOsOrLab, selectedStoreFilter, selectedLabFilter, startDateFilter, endDateFilter]);
+
+	// Reset de página ao alterar filtros
+	useEffect(() => {
+		setCurrentPage(1);
+	}, [searchOsOrLab, selectedStoreFilter, selectedLabFilter, startDateFilter, endDateFilter]);
+
+	// Paginação
+	const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+	const paginatedConferencias = useMemo(() => {
+		const start = (currentPage - 1) * pageSize;
+		return filtered.slice(start, start + pageSize);
+	}, [filtered, currentPage, pageSize]);
 
 	// KPIs Gerais
 	const totalConferidas = conferencias.length;
@@ -387,7 +470,26 @@ export function OpticalConferenceView() {
 					</div>
 
 					{/* Formulário de Conferência: Oficial vs Adaptado */}
-					<form onSubmit={handleSubmit} className="space-y-4">
+					<form id="form-conferencia-section" onSubmit={handleSubmit} className="space-y-4">
+						{editingConferenceId && (
+							<div className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 flex items-center justify-between">
+								<div className="flex items-center gap-2">
+									<Icon icon={Edit} className="size-4 text-amber-600" />
+									<span className="text-xs font-bold text-amber-800 dark:text-amber-300">
+										Modo de Edição Ativo — Editando dados da OS #{confOS || "—"}
+									</span>
+								</div>
+								<Button
+									type="button"
+									size="sm"
+									variant="outline"
+									onClick={resetForm}
+									className="h-7 text-xs cursor-pointer border-amber-300 dark:border-amber-700"
+								>
+									Cancelar Edição
+								</Button>
+							</div>
+						)}
 						{/* Card Dobro Toggle */}
 						<div className="rounded-xl border bg-card p-3.5 shadow-2xs flex items-center justify-between">
 							<label className="flex items-center gap-2.5 font-semibold text-xs cursor-pointer select-none">
@@ -799,13 +901,27 @@ export function OpticalConferenceView() {
 									</div>
 								)}
 
-								<div className="pt-4 mt-auto">
+								<div className="pt-4 mt-auto flex items-center gap-2">
+									{editingConferenceId && (
+										<Button
+											type="button"
+											variant="outline"
+											onClick={resetForm}
+											className="h-9 text-xs font-semibold cursor-pointer border-neutral-300 dark:border-neutral-700"
+										>
+											Cancelar Edição
+										</Button>
+									)}
 									<Button
 										type="submit"
 										disabled={submitting}
-										className="w-full h-9 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs cursor-pointer"
+										className="flex-1 h-9 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs cursor-pointer"
 									>
-										{submitting ? "Gravando..." : "Salvar Lançamento de Conferência"}
+										{submitting
+											? "Gravando..."
+											: editingConferenceId
+												? "Atualizar Conferência"
+												: "Salvar Lançamento de Conferência"}
 									</Button>
 								</div>
 							</div>
@@ -903,7 +1019,7 @@ export function OpticalConferenceView() {
 											</td>
 										</tr>
 									) : (
-										filtered.map((c) => {
+										paginatedConferencias.map((c) => {
 											const custoEf =
 												(c.precoLenteEfetiva || 0) * (c.qtyLenteEfetiva || 1) +
 												(c.precoTratEfetivo || 0);
@@ -942,15 +1058,26 @@ export function OpticalConferenceView() {
 														)}
 													</td>
 													<td className="py-2.5 px-3 text-right">
-														<Button
-															variant="ghost"
-															size="icon"
-															onClick={() => handleDelete(c.id)}
-															className="size-7 text-muted-foreground hover:text-rose-600 cursor-pointer"
-															title="Excluir lançamento"
-														>
-															<Icon icon={TrashCan} className="size-3.5" />
-														</Button>
+														<div className="flex items-center justify-end gap-1">
+															<Button
+																variant="ghost"
+																size="icon"
+																onClick={() => handleEditConference(c)}
+																className="size-7 text-muted-foreground hover:text-primary cursor-pointer"
+																title="Editar lançamento de conferência"
+															>
+																<Icon icon={Edit} className="size-3.5" />
+															</Button>
+															<Button
+																variant="ghost"
+																size="icon"
+																onClick={() => handleDelete(c.id)}
+																className="size-7 text-muted-foreground hover:text-rose-600 cursor-pointer"
+																title="Excluir lançamento"
+															>
+																<Icon icon={TrashCan} className="size-3.5" />
+															</Button>
+														</div>
 													</td>
 												</tr>
 											);
@@ -958,6 +1085,67 @@ export function OpticalConferenceView() {
 									)}
 								</tbody>
 							</table>
+						</div>
+
+						{/* Barra de Paginação Responsiva */}
+						<div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs text-muted-foreground">
+							<div className="flex items-center gap-2">
+								<span>
+									Mostrando{" "}
+									<strong className="text-foreground">
+										{filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}
+									</strong>{" "}
+									a{" "}
+									<strong className="text-foreground">
+										{Math.min(currentPage * pageSize, filtered.length)}
+									</strong>{" "}
+									de <strong className="text-foreground">{filtered.length}</strong> conferências
+								</span>
+								<span className="text-muted-foreground/40">•</span>
+								<div className="flex items-center gap-1.5">
+									<span>Exibir:</span>
+									<select
+										value={pageSize}
+										onChange={(e) => {
+											setPageSize(Number(e.target.value));
+											setCurrentPage(1);
+										}}
+										className="h-7 rounded-md border bg-background px-2 text-xs font-semibold text-foreground cursor-pointer"
+									>
+										<option value={10}>10 / pág</option>
+										<option value={20}>20 / pág</option>
+										<option value={50}>50 / pág</option>
+									</select>
+								</div>
+							</div>
+
+							<div className="flex items-center gap-1.5">
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={currentPage <= 1}
+									onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+									className="h-7 px-2.5 text-xs gap-1 cursor-pointer disabled:opacity-40"
+								>
+									<Icon icon={ChevronLeft} className="size-3" />
+									Anterior
+								</Button>
+
+								<div className="px-2 font-mono text-xs font-bold text-foreground">
+									Pág. {currentPage} de {totalPages}
+								</div>
+
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={currentPage >= totalPages}
+									onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+									className="h-7 px-2.5 text-xs gap-1 cursor-pointer disabled:opacity-40"
+								>
+									Próxima
+									<Icon icon={ChevronRight} className="size-3" />
+								</Button>
+							</div>
 						</div>
 					</div>
 				</>

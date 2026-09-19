@@ -17,7 +17,7 @@ import View from "@carbon/icons-react/es/View";
 import { Badge } from "@crm/ui/components/badge";
 import { Input } from "@crm/ui/components/input";
 import { toast } from "sonner";
-import { useOpticalOrders } from "@/lib/optical/optical-store";
+import { useOpticalOrders, normalizeOpticalStatus } from "@/lib/optical/optical-store";
 import { generateWhatsAppLink } from "@/lib/optical/optical-mock-data";
 import { createPostSalesFromOrder } from "@/lib/optical/supabase-optical";
 import type { OpticalOrder, OpticalOrderStatus } from "@/lib/optical/optical-types";
@@ -38,25 +38,25 @@ export const JOURNEY_STAGES: {
 		color: "bg-amber-500",
 	},
 	{
-		id: "PEDIDO",
+		id: "EM_LABORATORIO",
 		label: "2. Pedido Lab",
 		description: "Lentes aguardando pedido ao laboratório",
 		color: "bg-blue-500",
 	},
 	{
-		id: "MONTAGEM",
+		id: "EM_MONTAGEM",
 		label: "3. Montagem",
 		description: "Lente chegou, casou com aro em montagem",
 		color: "bg-indigo-500",
 	},
 	{
-		id: "CONFERIDO",
+		id: "CONFERIDA",
 		label: "4. Conferido",
 		description: "Conferência técnica feita, saindo para loja",
 		color: "bg-purple-500",
 	},
 	{
-		id: "LOJA",
+		id: "PRONTA_LOJA",
 		label: "5. Em Loja",
 		description: "Pronto na loja para retirada do cliente",
 		color: "bg-emerald-500",
@@ -77,13 +77,9 @@ export function OpticalOsJourneyView() {
 	const [selectedLab, setSelectedLab] = useState("TODOS");
 	const [selectedOrderDetails, setSelectedOrderDetails] = useState<OpticalOrder | null>(null);
 
-	// Normaliza status legados para os 6 estágios oficiais da jornada
+	// Normaliza status para os 6 estágios oficiais canônicos da jornada
 	const normalizeStatus = (status: string): OpticalOrderStatus => {
-		if (status === "EM_LABORATORIO") return "PEDIDO";
-		if (status === "EM_MONTAGEM") return "MONTAGEM";
-		if (status === "CONFERIDA") return "CONFERIDO";
-		if (status === "PRONTA_LOJA") return "LOJA";
-		return status as OpticalOrderStatus;
+		return normalizeOpticalStatus(status);
 	};
 
 	// Lista de ordens filtradas
@@ -115,10 +111,10 @@ export function OpticalOsJourneyView() {
 	const stageCounts = useMemo(() => {
 		const counts: Record<string, number> = {
 			DIGITADA: 0,
-			PEDIDO: 0,
-			MONTAGEM: 0,
-			CONFERIDO: 0,
-			LOJA: 0,
+			EM_LABORATORIO: 0,
+			EM_MONTAGEM: 0,
+			CONFERIDA: 0,
+			PRONTA_LOJA: 0,
 			ENTREGUE: 0,
 		};
 		for (const ord of orders) {
@@ -133,7 +129,7 @@ export function OpticalOsJourneyView() {
 	// Agrupamento para a Tela Resumida de Pedidos de Laboratório
 	const labSummary = useMemo(() => {
 		const pendingLabOrders = orders.filter(
-			(o) => normalizeStatus(o.status) === "PEDIDO" || normalizeStatus(o.status) === "DIGITADA"
+			(o) => normalizeStatus(o.status) === "EM_LABORATORIO" || normalizeStatus(o.status) === "DIGITADA"
 		);
 		const grouped: Record<string, OpticalOrder[]> = {};
 		for (const ord of pendingLabOrders) {
@@ -689,7 +685,7 @@ export function OpticalOsJourneyView() {
 												disabled={normStage === "ENTREGUE"}
 												icon={ArrowRight}
 											>
-												{normStage === "LOJA"
+												{normStage === "PRONTA_LOJA"
 													? "Entregar Óculos"
 													: normStage === "ENTREGUE"
 													? "Concluído"

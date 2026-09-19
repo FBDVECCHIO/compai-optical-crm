@@ -1617,6 +1617,29 @@ export async function importFrameCatalogBatch(items: FrameCatalogItem[]): Promis
 	return updated;
 }
 
+export async function decrementFrameStock(frameCodeOrId: string, quantity = 1): Promise<FrameCatalogItem[] | null> {
+	if (!frameCodeOrId) return null;
+	const current = await fetchFrameCatalog();
+	const targetLower = frameCodeOrId.toLowerCase().trim();
+	const idx = current.findIndex(
+		(f) =>
+			f.id.toLowerCase() === targetLower ||
+			f.produto.toLowerCase().includes(targetLower) ||
+			(f.marca && f.marca.toLowerCase().includes(targetLower) && f.produto.toLowerCase().includes(targetLower))
+	);
+	if (idx >= 0 && current[idx]) {
+		const targetItem = current[idx]!;
+		const updatedItem: FrameCatalogItem = {
+			...targetItem,
+			id: targetItem.id,
+			estoque: Math.max(0, targetItem.estoque - quantity),
+		};
+		return await saveFrameCatalogItem(updatedItem);
+	}
+	return null;
+}
+
+
 // -------------------------------------------------------------
 // MNOC-X: PÓS-VENDA (EXPERIÊNCIA DO CONSUMIDOR)
 // -------------------------------------------------------------
