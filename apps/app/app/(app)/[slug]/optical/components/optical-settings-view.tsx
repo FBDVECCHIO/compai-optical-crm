@@ -45,7 +45,11 @@ import {
 	saveDiscountPolicies,
 	addOrUpdateDiscountPolicy,
 	deleteDiscountPolicy,
+	clearOpticalStorage,
+	isDatabaseZeroed,
+	getOpticalOrders,
 } from "@/lib/optical/optical-store";
+import { fetchLensCatalog, fetchFrameCatalog } from "@/lib/optical/supabase-optical";
 import type { DiscountPolicy } from "@/lib/optical/optical-types";
 import {
 	type ClinicItem,
@@ -191,6 +195,57 @@ export function OpticalSettingsView() {
 	const [diagnosticResult, setDiagnosticResult] = useState<DatabaseDiagnosticResult | null>(null);
 	const [isRunningDiagnostic, setIsRunningDiagnostic] = useState(false);
 
+	// Gestão de Dados & Inicialização de Testes
+	const [ordersCount, setOrdersCount] = useState<number>(() => getOpticalOrders().length);
+	const [lensCount, setLensCount] = useState<number>(0);
+	const [frameCount, setFrameCount] = useState<number>(0);
+	const [zeroModalOpen, setZeroModalOpen] = useState(false);
+	const [zeroPassword, setZeroPassword] = useState("");
+	const [zeroPasswordError, setZeroPasswordError] = useState("");
+	const [isZeroing, setIsZeroing] = useState(false);
+
+	const refreshDataCounts = async () => {
+		setOrdersCount(getOpticalOrders().length);
+		try {
+			const [lenses, frames] = await Promise.all([fetchLensCatalog(), fetchFrameCatalog()]);
+			setLensCount(lenses.length);
+			setFrameCount(frames.length);
+		} catch {}
+	};
+
+	const handleZeroDatabase = (e?: React.FormEvent) => {
+		if (e) e.preventDefault();
+		if (zeroPassword.trim() !== "120212") {
+			setZeroPasswordError("Senha incorreta. Apenas o Gerente ou Administrador pode zerar o banco.");
+			toast.error("Senha gerencial incorreta! Ação de limpeza bloqueada.");
+			return;
+		}
+
+		setIsZeroing(true);
+		try {
+			clearOpticalStorage("ORDERS_ONLY");
+			setOrdersCount(0);
+			setZeroModalOpen(false);
+			setZeroPassword("");
+			setZeroPasswordError("");
+			toast.success("Banco de Ordens & Vendas zerado com sucesso!", {
+				description: "O sistema agora está com 0 OSs ativas, pronto para testes operacionais limpos.",
+			});
+		} catch (err) {
+			toast.error("Erro ao zerar o banco de dados.");
+		} finally {
+			setIsZeroing(false);
+		}
+	};
+
+	const handleRestoreDemo = () => {
+		clearOpticalStorage("DEMO");
+		setOrdersCount(getOpticalOrders().length);
+		toast.success("Dados de demonstração restaurados com sucesso!", {
+			description: "As ordens de serviço de teste foram recarregadas no sistema.",
+		});
+	};
+
 	const handleRunDiagnostic = async () => {
 		setIsRunningDiagnostic(true);
 		try {
@@ -289,6 +344,7 @@ export function OpticalSettingsView() {
 				setTemplateClienteConf(tConf);
 				setUsersList(uList);
 				setDiscountPolicies(getDiscountPolicies());
+				refreshDataCounts();
 				if (s.length > 0) setNewSellerStore(s[0]?.nome || "");
 			} catch (e) {
 				console.warn("Erro ao carregar configurações:", e);
@@ -298,6 +354,12 @@ export function OpticalSettingsView() {
 		}
 		loadAll();
 	}, []);
+
+	useEffect(() => {
+		if (activeTab === "integridade") {
+			refreshDataCounts();
+		}
+	}, [activeTab]);
 
 	// Handlers de Usuários
 	const handleOpenCreateUser = () => {
@@ -2253,6 +2315,80 @@ export function OpticalSettingsView() {
 			{/* CONTEÚDO DA ABA: BANCO & INTEGRIDADE RELACIONAL */}
 			{activeTab === "integridade" && (
 				<div className="flex flex-col gap-6">
+					{/* CARD DE GESTÃO DE DADOS & INICIALIZAÇÃO DE TESTES */}
+					<div className="rounded-xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10 p-5 shadow-xs flex flex-col gap-4">
+						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+							<div>
+								<h3 className="text-base font-bold tracking-tight flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+									<Icon icon={TrashCan} className="size-5 text-amber-500" />
+									Gestão de Dados & Inicialização de Testes Operacionais
+								</h3>
+								<p className="text-xs text-muted-foreground mt-0.5">
+									Zere o banco de dados de vendas para iniciar testes limpos com 0 OSs, ou restaure o conjunto completo de demonstração.
+								</p>
+							</div>
+							<div className="flex flex-wrap items-center gap-2 shrink-0">
+								<Button
+									variant="destructive"
+									onClick={() => {
+										setZeroPassword("");
+										setZeroPasswordError("");
+										setZeroModalOpen(true);
+									}}
+									className="h-9 px-3.5 text-xs font-semibold gap-1.5 cursor-pointer shadow-xs"
+								>
+									<Icon icon={TrashCan} className="size-4" />
+									Zerar Ordens & Vendas (Testes Limpos)
+								</Button>
+								<Button
+									variant="outline"
+									onClick={handleRestoreDemo}
+									className="h-9 px-3.5 text-xs font-semibold gap-1.5 cursor-pointer shadow-xs bg-card"
+								>
+									<Icon icon={Checkmark} className="size-4 text-emerald-500" />
+									Restaurar Demonstração
+								</Button>
+							</div>
+						</div>
+
+						{/* Métricas dos dados do sistema */}
+						<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5 pt-1">
+							<div className="rounded-lg bg-card p-3 border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+								<span className="text-[10px] text-muted-foreground uppercase font-bold block">OSs Ativas</span>
+								<div className="flex items-baseline gap-1.5 mt-0.5">
+									<span className={cn("text-xl font-mono font-extrabold", ordersCount === 0 ? "text-emerald-500" : "text-foreground")}>
+										{ordersCount}
+									</span>
+									{ordersCount === 0 && (
+										<span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-1 rounded">
+											Limpo
+										</span>
+									)}
+								</div>
+							</div>
+							<div className="rounded-lg bg-card p-3 border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+								<span className="text-[10px] text-muted-foreground uppercase font-bold block">Lentes Cadastradas</span>
+								<span className="text-xl font-mono font-extrabold text-foreground mt-0.5 block">{lensCount}</span>
+							</div>
+							<div className="rounded-lg bg-card p-3 border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+								<span className="text-[10px] text-muted-foreground uppercase font-bold block">Peças / Armações</span>
+								<span className="text-xl font-mono font-extrabold text-foreground mt-0.5 block">{frameCount}</span>
+							</div>
+							<div className="rounded-lg bg-card p-3 border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+								<span className="text-[10px] text-muted-foreground uppercase font-bold block">Médicos Prescritores</span>
+								<span className="text-xl font-mono font-extrabold text-foreground mt-0.5 block">{doctors.length}</span>
+							</div>
+							<div className="rounded-lg bg-card p-3 border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+								<span className="text-[10px] text-muted-foreground uppercase font-bold block">Lojas Físicas</span>
+								<span className="text-xl font-mono font-extrabold text-foreground mt-0.5 block">{stores.length}</span>
+							</div>
+							<div className="rounded-lg bg-card p-3 border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+								<span className="text-[10px] text-muted-foreground uppercase font-bold block">Vendedores</span>
+								<span className="text-xl font-mono font-extrabold text-foreground mt-0.5 block">{sellers.length}</span>
+							</div>
+						</div>
+					</div>
+
 					{/* Card de Controle e Status */}
 					<div className="rounded-xl border bg-card p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 						<div>
@@ -2567,6 +2703,73 @@ export function OpticalSettingsView() {
 							Salvar Usuário
 						</Button>
 					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			{/* MODAL DE AUTENTICAÇÃO GERENCIAL PARA ZERAR BANCO */}
+			<Dialog open={zeroModalOpen} onOpenChange={setZeroModalOpen}>
+				<DialogContent className="sm:max-w-md">
+					<DialogHeader>
+						<DialogTitle className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+							<Icon icon={TrashCan} className="size-5" />
+							Zerar Ordens & Vendas (Testes Limpos)
+						</DialogTitle>
+						<DialogDescription>
+							Esta ação removerá todas as ordens de serviço, registros de pós-venda e conferências de laboratório do sistema para que você possa iniciar testes operacionais a partir do zero (0 OSs). Os cadastros de peças, lentes, lojas e vendedores serão preservados.
+						</DialogDescription>
+					</DialogHeader>
+
+					<form onSubmit={handleZeroDatabase} className="space-y-4 py-2">
+						<div className="space-y-2">
+							<label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+								<Icon icon={Password} className="size-3.5 text-amber-500" />
+								Senha de Gerente ou Administrador Requerida
+							</label>
+							<Input
+								type="password"
+								placeholder="Digite a senha (padrão: 120212)"
+								value={zeroPassword}
+								onChange={(e) => {
+									setZeroPassword(e.target.value);
+									if (zeroPasswordError) setZeroPasswordError("");
+								}}
+								autoFocus
+								className="text-sm font-mono tracking-widest"
+							/>
+							{zeroPasswordError ? (
+								<p className="text-[11px] text-rose-600 font-semibold">{zeroPasswordError}</p>
+							) : (
+								<p className="text-[10px] text-muted-foreground">
+									Ação crítica monitorada com registro de auditoria.
+								</p>
+							)}
+						</div>
+
+						<DialogFooter className="gap-2 pt-2">
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={() => {
+									setZeroModalOpen(false);
+									setZeroPassword("");
+									setZeroPasswordError("");
+								}}
+							>
+								Cancelar
+							</Button>
+							<Button
+								type="submit"
+								variant="destructive"
+								size="sm"
+								disabled={isZeroing || !zeroPassword.trim()}
+								className="font-bold gap-1.5"
+							>
+								<Icon icon={TrashCan} className="size-4" />
+								{isZeroing ? "Zerando..." : "Confirmar e Zerar Ordens"}
+							</Button>
+						</DialogFooter>
+					</form>
 				</DialogContent>
 			</Dialog>
 		</div>
