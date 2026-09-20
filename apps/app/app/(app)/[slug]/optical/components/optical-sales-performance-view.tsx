@@ -327,22 +327,22 @@ export function OpticalSalesPerformanceView() {
 					</div>
 				</div>
 
-				{/* VELOCÍMETRO CONSOLIDADO MASTER COM CARDS DE PERFORMANCE NA VERTICAL AO LADO */}
-				<div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-900/90 dark:via-zinc-900 dark:to-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-6">
-						{/* Medidor Master à esquerda */}
-						<div className="w-full lg:w-auto flex flex-col items-center shrink-0">
+				{/* VELOCÍMETRO CONSOLIDADO MASTER COM CARDS DE PERFORMANCE EM 4 COLUNAS HORIZONTAIS */}
+				<div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-900/90 dark:via-zinc-900 dark:to-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col items-center gap-5">
+						{/* Medidor Master Centralizado */}
+						<div className="w-full flex flex-col items-center justify-center">
 							<SpeedometerGauge
-								size="lg"
+								size="md"
 								value={totalFaturadoGeral}
 								max={totalMetaLoja}
 								target={totalMetaLoja * (progressDiasUteisPct / 100)}
 								title="Velocímetro Geral da Equipe"
-								subtitle="Acompanhamento consolidado de vendas vs tempo decorrido"
+								subtitle="Acompanhamento consolidado de vendas vs tempo decorrido no mês"
 							/>
 						</div>
 
-						{/* Cards de Performance Consolidada posicionados ao lado na vertical / 2 colunas */}
-						<div className="w-full lg:flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+						{/* 4 Cards de Métricas da Rede em Linha Ampla (4 colunas no desktop) */}
+						<div className="w-full grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
 							{/* Card 1: Faturamento do Mês */}
 							<div className="p-3.5 rounded-xl bg-white dark:bg-zinc-850/90 border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col justify-between">
 								<div className="flex items-center justify-between">
@@ -351,8 +351,8 @@ export function OpticalSalesPerformanceView() {
 									</span>
 									<Icon icon={Money} className="size-4 text-emerald-600" />
 								</div>
-								<div className="my-1.5 flex items-baseline justify-between">
-									<span className="text-xl font-bold text-zinc-900 dark:text-zinc-100 font-mono">
+								<div className="my-1.5 flex items-baseline justify-between gap-2">
+									<span className="text-xl font-bold text-zinc-900 dark:text-zinc-100 font-mono truncate">
 										{new Intl.NumberFormat("pt-BR", {
 											style: "currency",
 											currency: "BRL",
@@ -360,10 +360,10 @@ export function OpticalSalesPerformanceView() {
 									</span>
 									<Badge
 										variant="default"
-										className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
+										className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 whitespace-nowrap shrink-0"
 									>
 										{totalMetaLoja > 0
-											? `${((totalFaturadoGeral / totalMetaLoja) * 100).toFixed(1)}% da Meta`
+											? `${((totalFaturadoGeral / totalMetaLoja) * 100).toFixed(1)}%`
 											: "100%"}
 									</Badge>
 								</div>
@@ -386,20 +386,20 @@ export function OpticalSalesPerformanceView() {
 									</span>
 									<Icon icon={Calendar} className="size-4 text-blue-600" />
 								</div>
-								<div className="my-1.5 flex items-baseline justify-between">
-									<span className="text-xl font-bold text-blue-700 dark:text-blue-400 font-mono">
+								<div className="my-1.5 flex items-baseline justify-between gap-2">
+									<span className="text-xl font-bold text-blue-700 dark:text-blue-400 font-mono truncate">
 										{new Intl.NumberFormat("pt-BR", {
 											style: "currency",
 											currency: "BRL",
 										}).format(metaDiariaLojaNecessaria)}
-										<span className="text-xs font-normal text-zinc-500">/dia</span>
+										<span className="text-xs font-normal text-zinc-500">/d</span>
 									</span>
-									<span className="text-[10px] font-semibold text-zinc-500">
-										{diasRestantes} dias restantes
+									<span className="text-[10px] font-semibold text-zinc-500 whitespace-nowrap shrink-0">
+										{diasRestantes}d restantes
 									</span>
 								</div>
 								<div className="text-[11px] text-zinc-500 flex justify-between border-t pt-1.5 border-zinc-100 dark:border-zinc-800">
-									<span>Falta Faturar:</span>
+									<span>Falta:</span>
 									<span className="font-semibold text-zinc-700 dark:text-zinc-300 font-mono">
 										{new Intl.NumberFormat("pt-BR", {
 											style: "currency",
@@ -417,19 +417,19 @@ export function OpticalSalesPerformanceView() {
 									</span>
 									<Icon icon={ChartLineData} className="size-4 text-zinc-500" />
 								</div>
-								<div className="my-1.5 flex items-baseline justify-between">
-									<span className="text-xl font-bold text-zinc-900 dark:text-zinc-100 font-mono">
+								<div className="my-1.5 flex items-baseline justify-between gap-2">
+									<span className="text-xl font-bold text-zinc-900 dark:text-zinc-100 font-mono truncate">
 										{new Intl.NumberFormat("pt-BR", {
 											style: "currency",
 											currency: "BRL",
 										}).format(ticketMedioGeral)}
 									</span>
-									<span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+									<span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 whitespace-nowrap shrink-0">
 										{orders.length} OSs
 									</span>
 								</div>
 								<div className="text-[11px] text-zinc-500 flex justify-between border-t pt-1.5 border-zinc-100 dark:border-zinc-800">
-									<span>Ritmo da Loja:</span>
+									<span>Ritmo Loja:</span>
 									<span
 										className={`font-semibold font-mono ${
 											diferencaLojaRitmo >= 0
@@ -454,8 +454,8 @@ export function OpticalSalesPerformanceView() {
 									</span>
 									<Icon icon={WarningAlt} className="size-4 text-rose-500" />
 								</div>
-								<div className="my-1.5 flex items-baseline justify-between">
-									<span className="text-xl font-bold text-rose-600 dark:text-rose-400 font-mono">
+								<div className="my-1.5 flex items-baseline justify-between gap-2">
+									<span className="text-xl font-bold text-rose-600 dark:text-rose-400 font-mono truncate">
 										{new Intl.NumberFormat("pt-BR", {
 											style: "currency",
 											currency: "BRL",
@@ -463,15 +463,15 @@ export function OpticalSalesPerformanceView() {
 									</span>
 									<Badge
 										variant="outline"
-										className="text-[10px] text-rose-600 border-rose-200"
+										className="text-[10px] text-rose-600 border-rose-200 whitespace-nowrap shrink-0"
 									>
 										{orders.filter((o) => o.financials.residualAmount > 0).length} OSs
 									</Badge>
 								</div>
 								<div className="text-[11px] text-zinc-500 flex justify-between border-t pt-1.5 border-zinc-100 dark:border-zinc-800">
-									<span>Receber na Retirada:</span>
+									<span>Receber Retirada:</span>
 									<span className="font-semibold text-zinc-700 dark:text-zinc-300">
-										Aviso automático ativo
+										Ativo
 									</span>
 								</div>
 							</div>
