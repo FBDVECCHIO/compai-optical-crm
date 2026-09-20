@@ -478,8 +478,8 @@ export function OpticalSalesPerformanceView() {
 						</div>
 					</div>
 
-				{/* Grid de Vendedores: Otimizado na horizontal e vertical para caber o máximo de vendedores na tela */}
-				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+				{/* Grid de Vendedores: Reestruturado na horizontal ampla para eliminar qualquer encavalamento */}
+				<div className="grid grid-cols-1 xl:grid-cols-2 gap-4 w-full">
 					{sellerPerformance.map((seller) => {
 						// Salesforce Status colors & badge
 						const isAhead = seller.pacePct >= 105;
@@ -490,142 +490,187 @@ export function OpticalSalesPerformanceView() {
 							<MnocxCard
 								key={seller.id}
 								variant="info"
-								padding="sm"
-								className="space-y-2.5 relative overflow-hidden flex flex-col justify-between"
+								padding="md"
+								className="relative overflow-hidden flex flex-col md:flex-row items-stretch gap-4 shadow-xs"
 							>
-								{/* Header do Vendedor */}
-								<div className="flex items-start justify-between gap-1.5">
-									<div className="flex items-center gap-2 min-w-0">
-										<div className="flex size-7 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 font-bold shrink-0">
-											<Icon icon={UserAvatar} className="size-3.5" />
-										</div>
-										<div className="min-w-0">
-											<div className="flex items-center gap-1">
-												<h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
+								{/* Bloco Esquerdo: Perfil do Vendedor, Badge de Ritmo e Velocímetro Power BI */}
+								<div className="w-full md:w-64 shrink-0 flex flex-col justify-between bg-zinc-50/80 dark:bg-zinc-900/60 p-3.5 rounded-xl border border-zinc-200/80 dark:border-zinc-800">
+									<div className="flex items-start justify-between gap-2">
+										<div className="flex items-center gap-2.5 min-w-0">
+											<div className="flex size-8 items-center justify-center rounded-lg bg-zinc-800 text-white font-bold shrink-0 shadow-xs">
+												<Icon icon={UserAvatar} className="size-4" />
+											</div>
+											<div className="min-w-0">
+												<h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">
 													{seller.nome}
 												</h3>
+												<span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono block truncate">
+													{seller.osCount} OSs • {seller.loja}
+												</span>
 											</div>
-											<span className="text-[10px] text-zinc-400 font-mono block truncate">
-												{seller.osCount} OSs • {seller.loja}
-											</span>
 										</div>
-									</div>
-
-									<div className="flex items-center gap-1 shrink-0">
-										{isAhead && (
-											<span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-												🚀 {seller.paceMultiplier.toFixed(1)}x
-											</span>
-										)}
-										{isOnTrack && (
-											<span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20">
-												🎯 {seller.paceMultiplier.toFixed(1)}x
-											</span>
-										)}
-										{isBehind && (
-											<span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20">
-												⚠️ {seller.paceMultiplier.toFixed(1)}x
-											</span>
-										)}
 
 										<button
 											type="button"
 											onClick={() => handleOpenEditSeller(seller)}
-											className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
-											title="Editar metas"
+											className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 cursor-pointer transition-colors shrink-0"
+											title="Editar metas do vendedor"
 										>
-											<Icon icon={Edit} className="size-3" />
+											<Icon icon={Edit} className="size-3.5" />
 										</button>
 									</div>
+
+									{/* Velocímetro com tamanho confortável */}
+									<div className="my-2 flex flex-col items-center justify-center">
+										<SpeedometerGauge
+											size="sm"
+											value={seller.totalRealizado}
+											max={seller.metaMes}
+											target={seller.metaEsperadaHoje}
+										/>
+									</div>
+
+									{/* Badge de Pace / Ritmo Salesforce */}
+									<div className="flex items-center justify-between border-t border-zinc-200 dark:border-zinc-800 pt-2">
+										<span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+											Ritmo (Pace)
+										</span>
+										{isAhead && (
+											<span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+												🚀 {seller.paceMultiplier.toFixed(1)}x Acima
+											</span>
+										)}
+										{isOnTrack && (
+											<span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20">
+												🎯 {seller.paceMultiplier.toFixed(1)}x No Ritmo
+											</span>
+										)}
+										{isBehind && (
+											<span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20">
+												⚠️ {seller.paceMultiplier.toFixed(1)}x Abaixo
+											</span>
+										)}
+									</div>
 								</div>
 
-								{/* MEDIDOR DE METAS: VELOCÍMETRO POWER BI */}
-								<div className="bg-zinc-50 dark:bg-zinc-900/60 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center">
-									<SpeedometerGauge
-										size="sm"
-										value={seller.totalRealizado}
-										max={seller.metaMes}
-										target={seller.metaEsperadaHoje}
-									/>
-								</div>
+								{/* Bloco Direito: 4 Caixas de Métricas Horizontais com Ampla Distribuição */}
+								<div className="flex-1 flex flex-col justify-between gap-2.5 min-w-0">
+									{/* Caixa 1: Faturamento do Mês vs Meta */}
+									<div className="p-3 rounded-xl bg-white dark:bg-zinc-850 border border-zinc-200/80 dark:border-zinc-800 shadow-2xs">
+										<div className="flex items-center justify-between gap-2 text-xs">
+											<span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+												Faturamento no Mês
+											</span>
+											<Badge
+												variant="outline"
+												className={`text-[10px] font-bold font-mono px-2 py-0 ${
+													seller.pctAtingidoMes >= 100
+														? "text-emerald-700 bg-emerald-50 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-400"
+														: "text-zinc-700 bg-zinc-100 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300"
+												}`}
+											>
+												{seller.pctAtingidoMes.toFixed(1)}% da Meta
+											</Badge>
+										</div>
+										<div className="flex items-baseline justify-between mt-1">
+											<span className="text-lg font-bold font-mono text-zinc-900 dark:text-zinc-100">
+												{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(seller.totalRealizado)}
+											</span>
+											<span className="text-xs text-zinc-500 font-mono">
+												Meta: {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(seller.metaMes)}
+											</span>
+										</div>
+										{/* Barra de Progresso Suave */}
+										<div className="w-full bg-zinc-100 dark:bg-zinc-800 h-1.5 rounded-full mt-2 overflow-hidden">
+											<div
+												className={`h-full rounded-full transition-all ${
+													seller.pctAtingidoMes >= 100
+														? "bg-emerald-500"
+														: isAhead
+															? "bg-blue-500"
+															: isBehind
+																? "bg-amber-500"
+																: "bg-primary"
+												}`}
+												style={{ width: `${Math.min(100, seller.pctAtingidoMes)}%` }}
+											/>
+										</div>
+									</div>
 
-								{/* DETALHES DE DIÁRIA, SEMANA E PRÊMIO - LAYOUT ANTI-ENCAVALAMENTO */}
-								<div className="flex flex-col gap-1.5 pt-1">
-									{/* Linha 1: Meta Diária e Meta Semana lado a lado com largura confortável */}
-									<div className="grid grid-cols-2 gap-1.5">
-										{/* Meta Diária Necessária */}
-										<div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/70 dark:border-zinc-800 flex flex-col justify-between">
-											<div className="flex items-center justify-between gap-1 text-[10px] text-zinc-500 font-medium">
-												<span className="uppercase tracking-tight">Meta Diária</span>
-												<span className="text-[9px] text-zinc-400 font-normal">{diasRestantes}d úteis</span>
+									{/* Linha Dupla Horizontal: Meta Diária e Meta da Semana */}
+									<div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+										{/* Caixa 2: Meta Diária Necessária */}
+										<div className="p-3 rounded-xl bg-white dark:bg-zinc-850 border border-zinc-200/80 dark:border-zinc-800 shadow-2xs flex flex-col justify-between">
+											<div className="flex items-center justify-between text-[11px] text-zinc-500">
+												<span className="font-semibold uppercase tracking-wider">Meta Diária</span>
+												<span className="text-[10px] text-zinc-400 font-medium">{diasRestantes} dias úteis</span>
 											</div>
-											<div className="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 mt-1 truncate">
-												{new Intl.NumberFormat("pt-BR", {
-													style: "currency",
-													currency: "BRL",
-												}).format(seller.metaDiariaNecessaria)}
+											<div className="text-base font-bold font-mono text-blue-700 dark:text-blue-400 my-1">
+												{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(seller.metaDiariaNecessaria)}
+												<span className="text-xs font-normal text-zinc-400">/dia</span>
+											</div>
+											<div className="text-[10px] text-zinc-500 font-mono pt-1 border-t border-zinc-100 dark:border-zinc-800 flex justify-between">
+												<span>Falta:</span>
+												<span className="font-semibold text-zinc-700 dark:text-zinc-300">
+													{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Math.max(0, seller.metaMes - seller.totalRealizado))}
+												</span>
 											</div>
 										</div>
 
-										{/* Vendas da Semana */}
-										<div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/70 dark:border-zinc-800 flex flex-col justify-between">
-											<div className="flex items-center justify-between gap-1 text-[10px] text-zinc-500 font-medium">
-												<span className="uppercase tracking-tight">Meta Semana</span>
+										{/* Caixa 3: Meta da Semana */}
+										<div className="p-3 rounded-xl bg-white dark:bg-zinc-850 border border-zinc-200/80 dark:border-zinc-800 shadow-2xs flex flex-col justify-between">
+											<div className="flex items-center justify-between text-[11px] text-zinc-500">
+												<span className="font-semibold uppercase tracking-wider">Meta Semana</span>
+												<span className="text-[10px] text-zinc-400 font-medium">Ciclo 6d</span>
 											</div>
-											<div className="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 mt-1 truncate">
-												{new Intl.NumberFormat("pt-BR", {
-													style: "currency",
-													currency: "BRL",
-												}).format(seller.metaSemana)}
+											<div className="text-base font-bold font-mono text-zinc-900 dark:text-zinc-100 my-1">
+												{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(seller.metaSemana)}
 											</div>
-											<div className="text-[9px] text-zinc-500 font-mono mt-0.5 truncate">
-												Feito: {new Intl.NumberFormat("pt-BR", {
-													style: "currency",
-													currency: "BRL",
-												}).format(seller.vendasSemana)}
+											<div className="text-[10px] text-zinc-500 font-mono pt-1 border-t border-zinc-100 dark:border-zinc-800 flex justify-between">
+												<span>Realizado:</span>
+												<span className="font-semibold text-zinc-700 dark:text-zinc-300">
+													{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(seller.vendasSemana)}
+												</span>
 											</div>
 										</div>
 									</div>
 
-									{/* Linha 2: Prêmio da Semana com barra horizontal dedicada sem cortes */}
+									{/* Caixa 4: Prêmio da Semana (Horizontal e Destacado) */}
 									<div
-										className={`px-2.5 py-1.5 rounded-lg border flex items-center justify-between gap-2 transition-colors ${
+										className={`p-3 rounded-xl border flex items-center justify-between gap-3 transition-colors ${
 											seller.atingiuPremioSemana
-												? "bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200"
-												: "bg-zinc-50 dark:bg-zinc-800/40 border-zinc-200/70 dark:border-zinc-800"
+												? "bg-amber-500/10 border-amber-500/30 text-amber-950 dark:text-amber-200"
+												: "bg-white dark:bg-zinc-850 border-zinc-200/80 dark:border-zinc-800"
 										}`}
 									>
-										<div className="flex items-center gap-1.5 min-w-0">
-											<Icon
-												icon={Trophy}
-												className={`size-3.5 shrink-0 ${
-													seller.atingiuPremioSemana
-														? "text-amber-500"
-														: "text-zinc-400"
-												}`}
-											/>
+										<div className="flex items-center gap-2.5 min-w-0">
+											<div className={`p-2 rounded-lg ${seller.atingiuPremioSemana ? "bg-amber-500/20 text-amber-600" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400"}`}>
+												<Icon icon={Trophy} className="size-4" />
+											</div>
 											<div className="min-w-0">
-												<span className="text-[10px] uppercase font-bold block leading-tight truncate">
-													Prêmio Semana
-												</span>
-												<span
-													className={`text-[9px] font-semibold block leading-tight ${
-														seller.atingiuPremioSemana
-															? "text-emerald-600 dark:text-emerald-400"
-															: "text-zinc-400"
-													}`}
-												>
-													{seller.atingiuPremioSemana
-														? "✓ Qualificado"
-														: "Em disputa"}
+												<div className="flex items-center gap-2">
+													<span className="text-xs font-bold uppercase tracking-wider">
+														Prêmio da Semana
+													</span>
+													<Badge
+														variant={seller.atingiuPremioSemana ? "default" : "outline"}
+														className={`text-[10px] font-bold px-2 py-0 ${
+															seller.atingiuPremioSemana
+																? "bg-emerald-600 text-white"
+																: "text-zinc-500 border-zinc-300 dark:border-zinc-700"
+														}`}
+													>
+														{seller.atingiuPremioSemana ? "✓ Qualificado" : "Em disputa"}
+													</Badge>
+												</div>
+												<span className="text-[11px] text-zinc-500 dark:text-zinc-400 block mt-0.5">
+													{seller.atingiuPremioSemana ? "Meta semanal superada ou ritmo acima de 100%" : "Alcance a meta semanal para liberar a bonificação"}
 												</span>
 											</div>
 										</div>
-										<span className="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 shrink-0">
-											{new Intl.NumberFormat("pt-BR", {
-												style: "currency",
-												currency: "BRL",
-											}).format(seller.premioSemana)}
+
+										<span className="text-base font-bold font-mono text-zinc-900 dark:text-zinc-100 shrink-0">
+											{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(seller.premioSemana)}
 										</span>
 									</div>
 								</div>

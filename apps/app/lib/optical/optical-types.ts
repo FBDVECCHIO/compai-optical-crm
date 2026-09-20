@@ -193,6 +193,7 @@ export interface OpticalOrder {
 	doctor?: {
 		name: string;
 		crm?: string;
+		clinic?: string;
 	};
 	captador?: {
 		id: string;

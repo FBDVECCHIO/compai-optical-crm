@@ -276,11 +276,7 @@ export async function createSupabaseStore(nome: string): Promise<boolean> {
 
 export async function deleteSupabaseStore(id: number): Promise<boolean> {
 	try {
-		const res = await fetch(`${SUPABASE_URL}/rest/v1/lojas?id=eq.${id}`, {
-			method: "DELETE",
-			headers: defaultHeaders,
-		});
-		return res.ok;
+		return await mnocxDatabaseClient.deleteStore(id);
 	} catch {
 		return false;
 	}
@@ -292,38 +288,24 @@ export async function deleteSupabaseStore(id: number): Promise<boolean> {
 
 export async function fetchSupabaseLabs(): Promise<LabItem[]> {
 	try {
-		const res = await fetch(`${SUPABASE_URL}/rest/v1/laboratorios?order=id.asc`, {
-			headers: defaultHeaders,
-		});
-		if (res.ok) {
-			const rows = await res.json();
-			return rows.map((r: any) => ({
-				id: r.id,
-				nome: r.nome,
-				slaDias: r.sla_dias || 5,
-			}));
-		}
+		return await mnocxDatabaseClient.getLabs();
 	} catch (e) {
-		console.warn("Erro ao carregar laboratorios do Supabase:", e);
+		console.warn("Erro ao carregar laboratórios:", e);
+		return [
+			{ id: 13, nome: "Sorolab", slaDias: 4 },
+			{ id: 14, nome: "Alex LP", slaDias: 3 },
+			{ id: 15, nome: "Visionex", slaDias: 5 },
+			{ id: 16, nome: "Zeiss", slaDias: 6 },
+			{ id: 17, nome: "Hoya", slaDias: 5 },
+			{ id: 18, nome: "Essilor", slaDias: 5 },
+		];
 	}
-	return [
-		{ id: 13, nome: "Sorolab", slaDias: 4 },
-		{ id: 14, nome: "Alex LP", slaDias: 3 },
-		{ id: 15, nome: "Visionex", slaDias: 5 },
-		{ id: 16, nome: "Zeiss", slaDias: 6 },
-		{ id: 17, nome: "Hoya", slaDias: 5 },
-		{ id: 18, nome: "Essilor", slaDias: 5 },
-	];
 }
 
 export async function createSupabaseLab(nome: string, slaDias = 5): Promise<boolean> {
 	try {
-		const res = await fetch(`${SUPABASE_URL}/rest/v1/laboratorios`, {
-			method: "POST",
-			headers: { ...defaultHeaders, "Content-Type": "application/json" },
-			body: JSON.stringify({ nome, sla_dias: slaDias }),
-		});
-		return res.ok;
+		await mnocxDatabaseClient.saveLab({ nome, slaDias });
+		return true;
 	} catch {
 		return false;
 	}
@@ -331,11 +313,7 @@ export async function createSupabaseLab(nome: string, slaDias = 5): Promise<bool
 
 export async function deleteSupabaseLab(id: number): Promise<boolean> {
 	try {
-		const res = await fetch(`${SUPABASE_URL}/rest/v1/laboratorios?id=eq.${id}`, {
-			method: "DELETE",
-			headers: defaultHeaders,
-		});
-		return res.ok;
+		return await mnocxDatabaseClient.deleteLab(id);
 	} catch {
 		return false;
 	}
@@ -347,30 +325,23 @@ export async function deleteSupabaseLab(id: number): Promise<boolean> {
 
 export async function fetchSupabaseSellers(): Promise<SellerItem[]> {
 	try {
-		const res = await fetch(`${SUPABASE_URL}/rest/v1/vendedores?order=id.asc`, {
-			headers: defaultHeaders,
-		});
-		if (res.ok) return await res.json();
+		return await mnocxDatabaseClient.getSellers();
 	} catch (e) {
 		console.warn("Erro ao carregar vendedores:", e);
+		return [
+			{ id: 1, nome: "Fabio Del Vecchio", loja: "Conceição (Matriz)" },
+			{ id: 2, nome: "Paloma", loja: "MN Nova Campinas" },
+			{ id: 3, nome: "Fabiano", loja: "MN Dpedro" },
+			{ id: 4, nome: "Andreza", loja: "Qualy Vsion" },
+			{ id: 5, nome: "Demetrius", loja: "Conceição (Matriz)" },
+		];
 	}
-	return [
-		{ id: 1, nome: "Fabio Del Vecchio", loja: "Conceição (Matriz)" },
-		{ id: 2, nome: "Paloma", loja: "MN Nova Campinas" },
-		{ id: 3, nome: "Fabiano", loja: "MN Dpedro" },
-		{ id: 4, nome: "Andreza", loja: "Qualy Vsion" },
-		{ id: 5, nome: "Demetrius", loja: "Conceição (Matriz)" },
-	];
 }
 
 export async function createSupabaseSeller(nome: string, loja?: string): Promise<boolean> {
 	try {
-		const res = await fetch(`${SUPABASE_URL}/rest/v1/vendedores`, {
-			method: "POST",
-			headers: { ...defaultHeaders, "Content-Type": "application/json" },
-			body: JSON.stringify({ nome, loja }),
-		});
-		return res.ok;
+		await mnocxDatabaseClient.saveSeller({ nome, loja });
+		return true;
 	} catch {
 		return false;
 	}
@@ -378,11 +349,7 @@ export async function createSupabaseSeller(nome: string, loja?: string): Promise
 
 export async function deleteSupabaseSeller(id: number): Promise<boolean> {
 	try {
-		const res = await fetch(`${SUPABASE_URL}/rest/v1/vendedores?id=eq.${id}`, {
-			method: "DELETE",
-			headers: defaultHeaders,
-		});
-		return res.ok;
+		return await mnocxDatabaseClient.deleteSeller(id);
 	} catch {
 		return false;
 	}
@@ -394,27 +361,20 @@ export async function deleteSupabaseSeller(id: number): Promise<boolean> {
 
 export async function fetchSupabaseReps(): Promise<RepItem[]> {
 	try {
-		const res = await fetch(`${SUPABASE_URL}/rest/v1/representantes?order=id.asc`, {
-			headers: defaultHeaders,
-		});
-		if (res.ok) return await res.json();
+		return await mnocxDatabaseClient.getReps();
 	} catch (e) {
 		console.warn("Erro ao carregar representantes:", e);
+		return [
+			{ id: 1, nome: "Juliana Representante" },
+			{ id: 2, nome: "Marcos Consultor" },
+		];
 	}
-	return [
-		{ id: 1, nome: "Juliana Representante" },
-		{ id: 2, nome: "Marcos Consultor" },
-	];
 }
 
 export async function createSupabaseRep(nome: string): Promise<boolean> {
 	try {
-		const res = await fetch(`${SUPABASE_URL}/rest/v1/representantes`, {
-			method: "POST",
-			headers: { ...defaultHeaders, "Content-Type": "application/json" },
-			body: JSON.stringify({ nome }),
-		});
-		return res.ok;
+		await mnocxDatabaseClient.saveRep({ nome });
+		return true;
 	} catch {
 		return false;
 	}
@@ -422,70 +382,28 @@ export async function createSupabaseRep(nome: string): Promise<boolean> {
 
 export async function deleteSupabaseRep(id: number): Promise<boolean> {
 	try {
-		const res = await fetch(`${SUPABASE_URL}/rest/v1/representantes?id=eq.${id}`, {
-			method: "DELETE",
-			headers: defaultHeaders,
-		});
-		return res.ok;
+		return await mnocxDatabaseClient.deleteRep(id);
 	} catch {
 		return false;
 	}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 6. CONFIG SETTINGS (CHAVE/VALOR NO SUPABASE)
+// 6. CONFIG SETTINGS (CHAVE/VALOR NO BANCO DEDICADO MNOC-X)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function fetchConfigSetting<T = any>(key: string, defaultValue: T): Promise<T> {
 	try {
-		const res = await fetch(
-			`${SUPABASE_URL}/rest/v1/config_settings?key=eq.${encodeURIComponent(key)}`,
-			{ headers: defaultHeaders },
-		);
-		if (res.ok) {
-			const data = await res.json();
-			if (data && data.length > 0) {
-				const raw = data[0].value;
-				try {
-					return JSON.parse(raw);
-				} catch {
-					return raw as unknown as T;
-				}
-			}
-		}
+		return await mnocxDatabaseClient.getConfig<T>(key, defaultValue);
 	} catch (e) {
 		console.warn(`Erro ao carregar config ${key}:`, e);
+		return defaultValue;
 	}
-	return defaultValue;
 }
 
 export async function saveConfigSetting(key: string, value: any): Promise<boolean> {
 	try {
-		const strValue = typeof value === "string" ? value : JSON.stringify(value);
-		const check = await fetch(
-			`${SUPABASE_URL}/rest/v1/config_settings?key=eq.${encodeURIComponent(key)}`,
-			{ headers: defaultHeaders },
-		);
-		const exists = check.ok ? (await check.json()).length > 0 : false;
-
-		if (exists) {
-			const patchRes = await fetch(
-				`${SUPABASE_URL}/rest/v1/config_settings?key=eq.${encodeURIComponent(key)}`,
-				{
-					method: "PATCH",
-					headers: { ...defaultHeaders, "Content-Type": "application/json" },
-					body: JSON.stringify({ value: strValue }),
-				},
-			);
-			return patchRes.ok;
-		}
-
-		const postRes = await fetch(`${SUPABASE_URL}/rest/v1/config_settings`, {
-			method: "POST",
-			headers: { ...defaultHeaders, "Content-Type": "application/json" },
-			body: JSON.stringify({ key, value: strValue }),
-		});
-		return postRes.ok;
+		return await mnocxDatabaseClient.saveConfig(key, value);
 	} catch (e) {
 		console.warn(`Erro ao gravar config ${key}:`, e);
 		return false;
@@ -1076,70 +994,94 @@ export async function authenticateOpticalUser(
 	}
 }
 
+export const DEFAULT_USERS: OpticalUserRecord[] = [
+	{
+		id: 1,
+		usuario: "admin",
+		senha: "12345",
+		nome: "Administrador MNOC-X",
+		status: "ATIVO",
+		loja: "Todos",
+		venda: "ATIVO",
+		conferencia: "ATIVO",
+		log_vendas: "ATIVO",
+		dashboard: "ATIVO",
+		resumo_vendas: "ATIVO",
+		auditoria: "ATIVO",
+		configuracoes: "ATIVO",
+		medicos: "ATIVO",
+	},
+	{
+		id: 2,
+		usuario: "fabio",
+		senha: "12345",
+		nome: "Fabio Del Vecchio",
+		status: "ATIVO",
+		loja: "MN Nova Campinas",
+		venda: "ATIVO",
+		conferencia: "ATIVO",
+		log_vendas: "ATIVO",
+		dashboard: "ATIVO",
+		resumo_vendas: "ATIVO",
+		auditoria: "ATIVO",
+		configuracoes: "ATIVO",
+		medicos: "ATIVO",
+	},
+];
+
 export async function fetchSupabaseUsers(): Promise<OpticalUserRecord[]> {
 	try {
-		const res = await fetch(`${SUPABASE_URL}/rest/v1/usuarios?order=id.asc`, {
-			headers: defaultHeaders,
-		});
-		if (res.ok) {
-			return await res.json();
-		}
-	} catch (e) {
-		console.warn("Erro ao buscar usuários no Supabase:", e);
+		return await mnocxDatabaseClient.getConfig<OpticalUserRecord[]>("users", DEFAULT_USERS);
+	} catch {
+		return DEFAULT_USERS;
 	}
-	return [];
 }
 
 export async function saveSupabaseUser(user: Partial<OpticalUserRecord>): Promise<boolean> {
 	try {
-		const payload = {
-			usuario: user.usuario?.trim(),
-			senha: user.senha,
-			nome: user.nome?.trim(),
+		const users = await fetchSupabaseUsers();
+		const id = user.id || Date.now();
+		const existingIdx = users.findIndex((u) => u.id === id || u.usuario === user.usuario);
+		let updated: OpticalUserRecord[];
+		const fullUser: OpticalUserRecord = {
+			id,
+			usuario: user.usuario || "user",
+			senha: user.senha || "12345",
+			nome: user.nome || "Usuário",
 			status: user.status || "ATIVO",
 			loja: user.loja || "Todos",
+			venda: user.venda || "ATIVO",
 			conferencia: user.conferencia || "INATIVO",
-			registros: user.registros || "INATIVO",
+			log_vendas: user.log_vendas || "ATIVO",
 			dashboard: user.dashboard || "INATIVO",
+			resumo_vendas: user.resumo_vendas || "INATIVO",
 			auditoria: user.auditoria || "INATIVO",
 			configuracoes: user.configuracoes || "INATIVO",
-			logs: user.logs || "INATIVO",
-			venda: user.venda || "INATIVO",
-			log_vendas: user.log_vendas || "INATIVO",
-			resumo_vendas: user.resumo_vendas || "INATIVO",
 			medicos: user.medicos || "",
 		};
 
-		if (user.id) {
-			const res = await fetch(`${SUPABASE_URL}/rest/v1/usuarios?id=eq.${user.id}`, {
-				method: "PATCH",
-				headers: { ...defaultHeaders, "Content-Type": "application/json" },
-				body: JSON.stringify(payload),
-			});
-			return res.ok;
+		if (existingIdx >= 0) {
+			updated = [...users];
+			updated[existingIdx] = { ...updated[existingIdx], ...fullUser };
 		} else {
-			const res = await fetch(`${SUPABASE_URL}/rest/v1/usuarios`, {
-				method: "POST",
-				headers: { ...defaultHeaders, "Content-Type": "application/json" },
-				body: JSON.stringify(payload),
-			});
-			return res.ok;
+			updated = [...users, fullUser];
 		}
+		await mnocxDatabaseClient.saveConfig("users", updated);
+		return true;
 	} catch (e) {
-		console.error("Erro ao salvar usuário no Supabase:", e);
+		console.error("Erro ao salvar usuário:", e);
 		return false;
 	}
 }
 
 export async function deleteSupabaseUser(id: number): Promise<boolean> {
 	try {
-		const res = await fetch(`${SUPABASE_URL}/rest/v1/usuarios?id=eq.${id}`, {
-			method: "DELETE",
-			headers: defaultHeaders,
-		});
-		return res.ok;
+		const users = await fetchSupabaseUsers();
+		const filtered = users.filter((u) => u.id !== id);
+		await mnocxDatabaseClient.saveConfig("users", filtered);
+		return true;
 	} catch (e) {
-		console.error("Erro ao deletar usuário no Supabase:", e);
+		console.error("Erro ao deletar usuário:", e);
 		return false;
 	}
 }

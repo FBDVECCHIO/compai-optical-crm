@@ -295,7 +295,7 @@ export function loadSavedOrders(): OpticalOrder[] {
 		// Se o banco foi expressamente zerado pelo usuário para testes limpos
 		if (isDatabaseZeroed()) {
 			const saved = storage.getItem(CURRENT_STORAGE_KEY);
-			if (saved) {
+			if (saved !== null) {
 				const parsed = JSON.parse(saved);
 				if (Array.isArray(parsed)) {
 					return parsed.map((o, idx) => sanitizeOrder(o, idx));
@@ -305,18 +305,18 @@ export function loadSavedOrders(): OpticalOrder[] {
 		}
 
 		const saved = storage.getItem(CURRENT_STORAGE_KEY);
-		if (saved) {
+		if (saved !== null) {
 			const parsed = JSON.parse(saved);
-			if (Array.isArray(parsed) && parsed.length > 0) {
+			if (Array.isArray(parsed)) {
 				return parsed.map((o, idx) => sanitizeOrder(o, idx));
 			}
 		}
 
 		// Fallback para chave legada e migração automática
 		const legacySaved = storage.getItem(LEGACY_STORAGE_KEY);
-		if (legacySaved) {
+		if (legacySaved !== null) {
 			const parsed = JSON.parse(legacySaved);
-			if (Array.isArray(parsed) && parsed.length > 0) {
+			if (Array.isArray(parsed)) {
 				const sanitized = parsed.map((o, idx) => sanitizeOrder(o, idx));
 				try {
 					storage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(sanitized));
@@ -328,7 +328,11 @@ export function loadSavedOrders(): OpticalOrder[] {
 		console.warn("Could not load optical orders from localStorage", e);
 	}
 
-	return INITIAL_OPTICAL_ORDERS.map((o, idx) => sanitizeOrder(o, idx));
+	const initial = INITIAL_OPTICAL_ORDERS.map((o, idx) => sanitizeOrder(o, idx));
+	try {
+		storage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(initial));
+	} catch {}
+	return initial;
 }
 
 let globalOrders: OpticalOrder[] = loadSavedOrders();
@@ -421,6 +425,16 @@ export function updateOrder(order: OpticalOrder): OpticalOrder {
 	return safeOrder;
 }
 
+export function deleteOrder(idOrNumber: string): boolean {
+	const beforeLen = globalOrders.length;
+	globalOrders = globalOrders.filter(
+		(ord) => ord.id !== idOrNumber && ord.orderNumber !== idOrNumber,
+	);
+	notify();
+	mnocxDatabaseClient.deleteOrder(idOrNumber).catch(() => {});
+	return globalOrders.length < beforeLen;
+}
+
 export function updateOrderStatus(
 	id: string,
 	newStatus: OpticalOrderStatus,
@@ -489,10 +503,10 @@ export function useOpticalOrders() {
 			globalOrders = loaded;
 			setOrders(loaded);
 
-			// Carrega vendas reais do Supabase em background apenas se o banco não estiver zerado
+			// Carrega vendas reais do Supabase em background apenas se não houver ordens locais já carregadas
 			if (!hasLoadedSupabase) {
 				hasLoadedSupabase = true;
-				if (!isDatabaseZeroed()) {
+				if (!isDatabaseZeroed() && loaded.length === 0) {
 					setIsSyncingSupabase(true);
 					fetchRealOrdersFromSupabase()
 						.then((realOrders) => {
@@ -526,6 +540,7 @@ export function useOpticalOrders() {
 		isSyncingSupabase,
 		addOrder,
 		updateOrder,
+		deleteOrder,
 		updateOrderStatus,
 		payResidual,
 		resetToDefaults,

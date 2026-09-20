@@ -1,20 +1,29 @@
 "use client";
 
+import { useState } from "react";
 import Bot from "@carbon/icons-react/es/Bot";
 import Checkmark from "@carbon/icons-react/es/Checkmark";
-import CheckmarkFilled from "@carbon/icons-react/es/CheckmarkFilled";
+import Copy from "@carbon/icons-react/es/Copy";
+import DocumentPdf from "@carbon/icons-react/es/DocumentPdf";
 import Launch from "@carbon/icons-react/es/Launch";
 import Money from "@carbon/icons-react/es/Money";
 import Phone from "@carbon/icons-react/es/Phone";
 import Printer from "@carbon/icons-react/es/Printer";
-import DocumentPdf from "@carbon/icons-react/es/DocumentPdf";
-import Time from "@carbon/icons-react/es/Time";
+import TrashCan from "@carbon/icons-react/es/TrashCan";
+import UserSpeaker from "@carbon/icons-react/es/UserSpeaker";
 import WarningFilled from "@carbon/icons-react/es/WarningFilled";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
 import { Icon } from "@crm/ui/components/icon";
 import Glasses from "@crm/ui/components/icons/glasses";
-import { printOpticalOrder } from "@/lib/optical/optical-print-order";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@crm/ui/components/dialog";
 import {
 	Select,
 	SelectContent,
@@ -30,14 +39,9 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@crm/ui/components/sheet";
-import {
-	Tabs,
-	TabsContent,
-	TabsList,
-	TabsTrigger,
-} from "@crm/ui/components/tabs";
 import { toast } from "sonner";
 import { generateWhatsAppLink } from "@/lib/optical/optical-mock-data";
+import { printOpticalOrder } from "@/lib/optical/optical-print-order";
 import { useOpticalOrders } from "@/lib/optical/optical-store";
 import type {
 	OpticalOrder,
@@ -56,34 +60,61 @@ export function OpticalOrderDetailSheet({
 	open,
 	onOpenChange,
 }: OpticalOrderDetailSheetProps) {
-	const { updateOrderStatus, payResidual } = useOpticalOrders();
+	const { updateOrderStatus, payResidual, deleteOrder } = useOpticalOrders();
+	const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
 	if (!order) return null;
 
 	const handleStatusChange = (newStatus: string) => {
 		updateOrderStatus(order.id, newStatus as OpticalOrderStatus);
-		toast.success(
-			`Status da OS ${order.orderNumber} alterado para ${newStatus}`,
-		);
+		toast.success(`Status da OS ${order.orderNumber} alterado para ${newStatus}`);
 	};
 
 	const handlePayResidual = () => {
 		payResidual(order.id);
-		toast.success(
-			`Saldo residual da OS ${order.orderNumber} quitado com sucesso no caixa!`,
-		);
+		toast.success(`Saldo residual da OS ${order.orderNumber} quitado com sucesso no caixa!`);
+	};
+
+	const handleDeleteOrder = () => {
+		deleteOrder(order.id);
+		setDeleteConfirmOpen(false);
+		onOpenChange(false);
+		toast.success(`Ordem de Serviço ${order.orderNumber} excluída com sucesso!`, {
+			description: "O registro foi permanentemente removido e protegido contra restauração no CTRL+F5.",
+		});
+	};
+
+	const handleCopyWhatsapp = () => {
+		const phone = order.patient?.whatsapp || order.patient?.secondaryPhone || "";
+		if (!phone) {
+			toast.info("Nenhum número de WhatsApp cadastrado para este paciente.");
+			return;
+		}
+		navigator.clipboard.writeText(phone);
+		toast.success("WhatsApp copiado para a área de transferência!", {
+			description: phone,
+		});
 	};
 
 	const whatsappUrl = generateWhatsAppLink(order);
 
 	const patientName = order.patient?.name || "Cliente sem Nome";
-	const patientWhatsapp = order.patient?.whatsapp || order.patient?.secondaryPhone || "—";
+	const patientWhatsapp = order.patient?.whatsapp || order.patient?.secondaryPhone || "";
 	const storeName = order.store?.name || "Óptica Central";
 	const sellerName = order.seller?.name || "Atendente";
 
 	const formattedOrderDate = (() => {
 		try {
 			const d = order.orderDate ? new Date(order.orderDate) : null;
+			return d && !isNaN(d.getTime()) ? d.toLocaleDateString("pt-BR") : "—";
+		} catch {
+			return "—";
+		}
+	})();
+
+	const formattedPromisedDate = (() => {
+		try {
+			const d = order.promisedDeliveryDate ? new Date(order.promisedDeliveryDate) : null;
 			return d && !isNaN(d.getTime()) ? d.toLocaleDateString("pt-BR") : "—";
 		} catch {
 			return "—";
@@ -132,594 +163,638 @@ export function OpticalOrderDetailSheet({
 	};
 
 	return (
-		<Sheet open={open} onOpenChange={onOpenChange}>
-			<SheetContent
-				side="right"
-				translate="no"
-				className="w-full sm:max-w-4xl overflow-y-auto p-6 notranslate"
-			>
-				<SheetHeader className="mb-4 pb-3 border-b">
-					<div className="flex flex-wrap items-center justify-between gap-3">
-						<div className="flex items-center gap-2.5">
-							<div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-								<Icon icon={Glasses} className="size-5" />
-							</div>
-							<div>
-								<div className="flex items-center gap-2">
-									<SheetTitle className="text-lg font-bold">
-										{order.orderNumber}
-									</SheetTitle>
-									<Badge variant="outline" className="font-medium text-xs">
-										{storeName}
-									</Badge>
+		<>
+			<Sheet open={open} onOpenChange={onOpenChange}>
+				<SheetContent
+					side="right"
+					size="2xl"
+					translate="no"
+					className="w-full sm:max-w-5xl lg:max-w-6xl xl:max-w-7xl overflow-y-auto p-4 sm:p-8 notranslate"
+				>
+					{/* 1. CABEÇALHO EXECUTIVO AMPLO COM TODAS AS AÇÕES */}
+					<SheetHeader className="mb-6 pb-4 border-b">
+						<div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+							<div className="flex items-center gap-3">
+								<div className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 shrink-0">
+									<Icon icon={Glasses} className="size-6" />
 								</div>
-								<SheetDescription className="text-xs">
-									Aberta em {formattedOrderDate} por {sellerName}
-								</SheetDescription>
+								<div>
+									<div className="flex flex-wrap items-center gap-2">
+										<SheetTitle className="text-xl font-bold font-mono tracking-tight text-foreground">
+											{order.orderNumber}
+										</SheetTitle>
+										<Badge variant="outline" className="font-semibold text-xs px-2 py-0.5">
+											{storeName}
+										</Badge>
+										<span className="text-xs text-muted-foreground">• Atendente: {sellerName}</span>
+									</div>
+									<SheetDescription className="text-xs text-muted-foreground mt-0.5">
+										Aberta em <span className="font-medium text-foreground">{formattedOrderDate}</span> • Promessa de Entrega: <span className="font-medium text-foreground">{formattedPromisedDate}</span>
+									</SheetDescription>
+								</div>
 							</div>
-						</div>
 
-						{/* Quick Actions & Status Updater */}
-						<div className="flex flex-wrap items-center gap-2">
-							<Button
-								variant="outline"
-								size="sm"
-								className="h-8 text-xs font-semibold gap-1.5 cursor-pointer shadow-2xs bg-card hover:bg-muted"
-								onClick={() => printOpticalOrder(order, { mode: "A4" })}
-							>
-								<Icon icon={Printer} className="size-3.5 text-primary" />
-								Imprimir OS
-							</Button>
-							<Button
-								variant="outline"
-								size="sm"
-								className="h-8 text-xs font-semibold gap-1.5 cursor-pointer shadow-2xs border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20"
-								onClick={() => printOpticalOrder(order, { mode: "A4" })}
-							>
-								<Icon icon={DocumentPdf} className="size-3.5" />
-								Gerar PDF
-							</Button>
-							<div className="flex items-center gap-1.5 ml-1 pl-2 border-l">
-								<span className="text-xs text-muted-foreground font-medium">
-									Status:
-								</span>
-								<Select value={order.status} onValueChange={handleStatusChange}>
-									<SelectTrigger className="h-8 w-40 text-xs font-semibold">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="DIGITADA">Digitada</SelectItem>
-										<SelectItem value="EM_LABORATORIO">Em Laboratório</SelectItem>
-										<SelectItem value="EM_MONTAGEM">Em Montagem</SelectItem>
-										<SelectItem value="CONFERIDA">Conferida Técnica</SelectItem>
-										<SelectItem value="PRONTA_LOJA">Pronta na Loja</SelectItem>
-										<SelectItem value="ENTREGUE">Entregue ao Cliente</SelectItem>
-										<SelectItem value="CANCELADA">Cancelada</SelectItem>
-									</SelectContent>
-								</Select>
-							</div>
-						</div>
-					</div>
-				</SheetHeader>
-
-				{/* Header Actions: WhatsApp & Residual Alert */}
-				<div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-muted/40 p-3.5 border">
-					<div className="flex items-center gap-3">
-						<div className="flex flex-col">
-							<span className="text-[11px] text-muted-foreground">
-								Paciente
-							</span>
-							<span className="font-bold text-sm text-foreground">
-								{patientName}
-							</span>
-							<span className="text-xs text-muted-foreground">
-								WhatsApp: {patientWhatsapp}
-							</span>
-						</div>
-					</div>
-
-					<div className="flex items-center gap-2">
-						{residualAmount > 0 ? (
-							<div className="flex items-center gap-2">
-								<Badge
-									variant="destructive"
-									className="font-mono text-xs px-2.5 py-1"
-								>
-									Residual: R$ {residualAmount.toFixed(2)}
-								</Badge>
+							{/* Ações de Impressão, PDF, Status e Exclusão */}
+							<div className="flex flex-wrap items-center gap-2">
 								<Button
 									variant="outline"
 									size="sm"
-									className="h-8 text-xs font-medium border-emerald-500/50 text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400"
-									onClick={handlePayResidual}
+									className="h-9 text-xs font-semibold gap-1.5 cursor-pointer shadow-xs bg-background hover:bg-muted"
+									onClick={() => printOpticalOrder(order, { mode: "A4" })}
+									title="Imprimir Ordem de Serviço em Formato A4 / Balcão"
 								>
-									<Icon icon={Money} className="mr-1.5 size-3.5" />
-									Quitar Residual
+									<Icon icon={Printer} className="size-4 text-primary" />
+									Imprimir OS
+								</Button>
+
+								<Button
+									variant="outline"
+									size="sm"
+									className="h-9 text-xs font-semibold gap-1.5 cursor-pointer shadow-xs border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+									onClick={() => printOpticalOrder(order, { mode: "A4" })}
+									title="Gerar e Baixar Cupom / Ordem em PDF"
+								>
+									<Icon icon={DocumentPdf} className="size-4" />
+									Gerar PDF
+								</Button>
+
+								{/* Seletor de Status */}
+								<div className="flex items-center gap-1.5 pl-2 border-l">
+									<Select value={order.status} onValueChange={handleStatusChange}>
+										<SelectTrigger className="h-9 min-w-[150px] text-xs font-semibold">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="DIGITADA">Digitada</SelectItem>
+											<SelectItem value="EM_LABORATORIO">Em Laboratório</SelectItem>
+											<SelectItem value="EM_MONTAGEM">Em Montagem</SelectItem>
+											<SelectItem value="CONFERIDA">Conferida Técnica</SelectItem>
+											<SelectItem value="PRONTA_LOJA">Pronta na Loja</SelectItem>
+											<SelectItem value="ENTREGUE">Entregue ao Cliente</SelectItem>
+											<SelectItem value="CANCELADA">Cancelada</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
+
+								{/* Botão Excluir OS com Confirmação */}
+								<Button
+									variant="outline"
+									size="sm"
+									className="h-9 text-xs font-medium text-destructive hover:bg-destructive/10 hover:border-destructive/30 cursor-pointer"
+									onClick={() => setDeleteConfirmOpen(true)}
+									title="Excluir Ordem de Serviço permanentemente"
+								>
+									<Icon icon={TrashCan} className="size-4" />
+									Excluir
 								</Button>
 							</div>
-						) : (
-							<Badge
-								variant="secondary"
-								className="text-xs text-emerald-600 dark:text-emerald-400 font-medium"
-							>
-								<Icon icon={Checkmark} className="mr-1 size-3" />
-								100% Quitado
-							</Badge>
-						)}
+						</div>
+					</SheetHeader>
 
-						<Button
-							asChild
-							size="sm"
-							className="h-8 bg-emerald-600 text-white hover:bg-emerald-700 font-medium text-xs gap-1.5 shadow-xs"
-						>
-							<a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
-								<Icon icon={Phone} className="size-3.5" />
-								Avisar WhatsApp
-								<Icon icon={Launch} className="size-3 opacity-70" />
-							</a>
-						</Button>
-					</div>
-				</div>
+					{/* 2. FLUXO SEQUENCIAL AMPLO (MESMO ASPECTO E TAMANHO DA OS A LANÇAR) */}
+					<div className="space-y-6">
 
-				{/* Tabs: Detalhes da OS | Financeiro | Agente IA */}
-				<Tabs defaultValue="diopters" className="w-full">
-					<TabsList className="grid w-full grid-cols-3 mb-4">
-						<TabsTrigger value="diopters" className="text-xs font-semibold">
-							Visão Geral & Dioptrias
-						</TabsTrigger>
-						<TabsTrigger value="financials" className="text-xs font-semibold">
-							Financeiro & Pagamentos
-						</TabsTrigger>
-						<TabsTrigger value="ai" className="text-xs font-semibold gap-1.5">
-							<Icon icon={Bot} className="size-3.5 text-primary" />
-							Agente IA (Auditoria)
-						</TabsTrigger>
-					</TabsList>
-
-					{/* TAB 1: VISÃO GERAL & DIOPTRIAS */}
-					<TabsContent value="diopters" className="space-y-4">
-						{/* Aro 1 Details */}
-						<div className="rounded-lg border bg-card p-4 space-y-3">
-							<div className="flex items-center justify-between border-b pb-2">
-								<div className="font-bold text-sm text-foreground flex items-center gap-2">
-									<Icon icon={Glasses} className="size-4 text-primary" />
-									Aro 1 — {order.aro1?.frameBrand || "Armação"} {order.aro1?.frameModel || ""}
-								</div>
-								<Badge variant="secondary" className="text-xs font-mono">
-									R$ {aro1Price.toFixed(2)}
-								</Badge>
-							</div>
-
-							<div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-muted-foreground">
-								<div>
-									<span className="font-medium text-foreground block">
-										Laboratório:
+						{/* ETAPA 1 & 2: ORIGEM, PACIENTE, PRESCRITOR E CAPTADOR */}
+						<div className="rounded-xl border bg-card p-5 sm:p-6 shadow-xs space-y-4">
+							<div className="flex items-center justify-between border-b pb-3">
+								<div className="flex items-center gap-2">
+									<span className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
+										1
 									</span>
-									{order.aro1?.lab || "—"}
+									<h3 className="font-bold text-sm sm:text-base text-foreground">
+										Identificação do Paciente, Prescritor & Captador
+									</h3>
 								</div>
-								<div>
-									<span className="font-medium text-foreground block">
-										Lente:
-									</span>
-									{order.aro1?.lensName || "—"}
-								</div>
-								<div>
-									<span className="font-medium text-foreground block">
-										Tratamento:
-									</span>
-									{order.aro1?.noTreatment
-										? "Sem Tratamento"
-										: order.aro1?.treatment || "Padrão"}
-								</div>
-								<div>
-									<span className="font-medium text-foreground block">
-										Armação:
-									</span>
-									{order.aro1?.frameCode || "—"}
+								<div className="flex items-center gap-2">
+									<Button
+										variant="outline"
+										size="sm"
+										className="h-7 text-xs gap-1 cursor-pointer"
+										onClick={handleCopyWhatsapp}
+									>
+										<Icon icon={Copy} className="size-3" />
+										Copiar WhatsApp
+									</Button>
+									<Button
+										asChild
+										size="sm"
+										className="h-7 bg-emerald-600 text-white hover:bg-emerald-700 text-xs gap-1 shadow-xs"
+									>
+										<a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+											<Icon icon={Phone} className="size-3" />
+											Abrir Conversa
+											<Icon icon={Launch} className="size-2.5 opacity-70" />
+										</a>
+									</Button>
 								</div>
 							</div>
 
-							{/* Especificações Técnicas Espelhadas Aro 1 */}
-							{(order.aro1?.lensType || order.aro1?.lensIndex || order.aro1?.frameFamily || order.aro1?.frameAro) && (
-								<div className="flex flex-wrap gap-1.5 pt-1">
-									{order.aro1?.lensType && (
-										<Badge variant="outline" className="text-[10px]">
-											Tipo: {order.aro1.lensType}
-										</Badge>
-									)}
-									{order.aro1?.lensFamily && (
-										<Badge variant="outline" className="text-[10px]">
-											Família: {order.aro1.lensFamily}
-										</Badge>
-									)}
-									{order.aro1?.lensIndex && (
-										<Badge variant="outline" className="text-[10px]">
-											IR {order.aro1.lensIndex}
-										</Badge>
-									)}
-									{order.aro1?.lensTech && (
-										<Badge variant="outline" className="text-[10px]">
-											Tec: {order.aro1.lensTech}
-										</Badge>
-									)}
-									{order.aro1?.frameAro && (
-										<Badge variant="secondary" className="text-[10px]">
-											Aro {order.aro1.frameAro}/{order.aro1.framePonte || "—"}
-										</Badge>
+							<div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+								{/* Coluna 1: Paciente */}
+								<div className="p-3.5 rounded-lg bg-muted/40 space-y-2 border">
+									<span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+										Dados do Paciente
+									</span>
+									<div>
+										<span className="font-bold text-sm text-foreground block">{patientName}</span>
+										<span className="text-muted-foreground font-mono">CPF: {order.patient?.cpf || "Não informado"}</span>
+									</div>
+									<div className="pt-1 border-t border-muted text-muted-foreground space-y-0.5">
+										<p><span className="font-medium text-foreground">WhatsApp:</span> {patientWhatsapp || "—"}</p>
+										{order.patient?.secondaryPhone && (
+											<p><span className="font-medium text-foreground">Tel. Fixo:</span> {order.patient.secondaryPhone}</p>
+										)}
+										{order.patient?.email && (
+											<p><span className="font-medium text-foreground">E-mail:</span> {order.patient.email}</p>
+										)}
+									</div>
+									<div className="pt-1 border-t border-muted text-muted-foreground text-[11px]">
+										<span className="font-medium text-foreground">Endereço:</span>{" "}
+										{[
+											order.patient?.street,
+											order.patient?.number ? `nº ${order.patient.number}` : "",
+											order.patient?.neighborhood,
+											order.patient?.city ? `${order.patient.city}/${order.patient?.state || ""}` : "",
+											order.patient?.cep ? `CEP: ${order.patient.cep}` : "",
+										].filter(Boolean).join(", ") || "Endereço não cadastrado"}
+									</div>
+								</div>
+
+								{/* Coluna 2: Médico Prescritor */}
+								<div className="p-3.5 rounded-lg bg-muted/40 space-y-2 border">
+									<span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+										Médico Prescritor
+									</span>
+									<div>
+										<span className="font-bold text-sm text-foreground block">
+											{order.doctor?.name || "Médico não vinculado"}
+										</span>
+										<span className="text-muted-foreground font-mono">
+											CRM: {order.doctor?.crm || "—"}
+										</span>
+									</div>
+									{order.doctor?.clinic && (
+										<p className="text-muted-foreground text-xs pt-1 border-t border-muted">
+											<span className="font-medium text-foreground">Clínica:</span> {order.doctor.clinic}
+										</p>
 									)}
 								</div>
-							)}
+
+								{/* Coluna 3: Captador Vinculado & Comissão */}
+								<div className="p-3.5 rounded-lg bg-muted/40 space-y-2 border">
+									<div className="flex items-center justify-between">
+										<span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+											<Icon icon={UserSpeaker} className="size-3 text-primary" />
+											Captador Vinculado
+										</span>
+										{order.captador && (
+											<Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary border-primary/20">
+												Comissionado
+											</Badge>
+										)}
+									</div>
+									{order.captador ? (
+										<div className="space-y-1.5">
+											<span className="font-bold text-sm text-foreground block">
+												{order.captador.name}
+											</span>
+											<div className="text-xs text-muted-foreground">
+												<span>Parâmetro: </span>
+												<span className="font-medium text-foreground">
+													{order.captador.commissionType === "PERCENTUAL"
+														? `${order.captador.commissionValue}% sobre a OS`
+														: `R$ ${Number(order.captador.commissionValue).toFixed(2)} fixo`}
+												</span>
+											</div>
+											<div className="pt-1.5 border-t border-muted flex items-center justify-between">
+												<span className="font-semibold text-muted-foreground">Comissão Estimada:</span>
+												<span className="font-bold font-mono text-emerald-600 dark:text-emerald-400 text-sm">
+													R$ {Number(order.captador.calculatedCommission || 0).toFixed(2)}
+												</span>
+											</div>
+										</div>
+									) : (
+										<p className="text-muted-foreground text-xs italic pt-1">
+											Nenhum captador externo vinculado a esta ordem de serviço.
+										</p>
+									)}
+								</div>
+							</div>
+						</div>
+
+						{/* ETAPA 3: DIOPTRIAS CLÍNICAS (RECEITA MÉDICA) */}
+						<div className="rounded-xl border bg-card p-5 sm:p-6 shadow-xs space-y-4">
+							<div className="flex items-center gap-2 border-b pb-3">
+								<span className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
+									2
+								</span>
+								<h3 className="font-bold text-sm sm:text-base text-foreground">
+									Receita Médica & Dioptrias Clínicas
+								</h3>
+							</div>
 
 							<OpticalDioptersTable
-								idPrefix="detail-aro1"
-								title="Dioptrias Cadastradas — Aro 1"
+								idPrefix="view-order-diopters"
+								title="Dioptrias da Ordem de Serviço (OD / OE)"
 								value={order.aro1?.diopters}
 								onChange={() => {}}
 								readOnly
 							/>
 						</div>
 
-						{/* Aro 2 Details (se houver) */}
-						{order.hasAro2 && order.aro2 && (
-							<div className="rounded-lg border bg-card p-4 space-y-3">
-								<div className="flex items-center justify-between border-b pb-2">
-									<div className="font-bold text-sm text-foreground flex items-center gap-2">
-										<Icon icon={Glasses} className="size-4 text-amber-500" />
-										Aro 2 (2º Par / Dobro) — {order.aro2?.frameBrand || "Armação"}{" "}
-										{order.aro2?.frameModel || ""}
-									</div>
-									<Badge variant="secondary" className="text-xs font-mono">
-										R$ {aro2Price.toFixed(2)}
-									</Badge>
+						{/* ETAPA 4: ARO 1 (ARMAÇÃO PRINCIPAL & LENTES) */}
+						<div className="rounded-xl border bg-card p-5 sm:p-6 shadow-xs space-y-4">
+							<div className="flex items-center justify-between border-b pb-3">
+								<div className="flex items-center gap-2">
+									<span className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
+										3
+									</span>
+									<h3 className="font-bold text-sm sm:text-base text-foreground">
+										Aro 1 • Armação & Lentes Principais
+									</h3>
 								</div>
-
-								<div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-muted-foreground">
-									<div>
-										<span className="font-medium text-foreground block">
-											Laboratório:
-										</span>
-										{order.aro2?.lab || "—"}
-									</div>
-									<div>
-										<span className="font-medium text-foreground block">
-											Lente:
-										</span>
-										{order.aro2?.lensName || "—"}
-									</div>
-									<div>
-										<span className="font-medium text-foreground block">
-											Tratamento:
-										</span>
-										{order.aro2?.noTreatment
-											? "Sem Tratamento"
-											: order.aro2?.treatment || "Padrão"}
-									</div>
-									<div>
-										<span className="font-medium text-foreground block">
-											Armação:
-										</span>
-										{order.aro2?.frameCode || "—"}
-									</div>
-								</div>
-
-								{/* Especificações Técnicas Espelhadas Aro 2 */}
-								{(order.aro2?.lensType || order.aro2?.lensIndex || order.aro2?.frameFamily || order.aro2?.frameAro) && (
-									<div className="flex flex-wrap gap-1.5 pt-1">
-										{order.aro2?.lensType && (
-											<Badge variant="outline" className="text-[10px]">
-												Tipo: {order.aro2.lensType}
-											</Badge>
-										)}
-										{order.aro2?.lensFamily && (
-											<Badge variant="outline" className="text-[10px]">
-												Família: {order.aro2.lensFamily}
-											</Badge>
-										)}
-										{order.aro2?.lensIndex && (
-											<Badge variant="outline" className="text-[10px]">
-												IR {order.aro2.lensIndex}
-											</Badge>
-										)}
-										{order.aro2?.lensTech && (
-											<Badge variant="outline" className="text-[10px]">
-												Tec: {order.aro2.lensTech}
-											</Badge>
-										)}
-										{order.aro2?.frameAro && (
-											<Badge variant="secondary" className="text-[10px]">
-												Aro {order.aro2.frameAro}/{order.aro2.framePonte || "—"}
-											</Badge>
-										)}
-									</div>
-								)}
-
-								<OpticalDioptersTable
-									idPrefix="detail-aro2"
-									title="Dioptrias Cadastradas — Aro 2"
-									value={order.aro2?.diopters}
-									onChange={() => {}}
-									readOnly
-								/>
-							</div>
-						)}
-
-						{/* Endereço e Dados Cadastrais */}
-						<div className="rounded-lg border bg-muted/30 p-4 text-xs space-y-2">
-							<div className="font-bold text-foreground">
-								Endereço de Entrega & Contato (ViaCEP)
-							</div>
-							<div className="text-muted-foreground">
-								{order.patient?.street || ""}, {order.patient?.number || ""}{" "}
-								{order.patient?.complement && `(${order.patient.complement})`}{" "}
-								{order.patient?.neighborhood ? `— ${order.patient.neighborhood}, ` : ""}
-								{order.patient?.city || ""}/{order.patient?.state || ""}{" "}
-								{order.patient?.cep ? `— CEP: ${order.patient.cep}` : ""}
-							</div>
-							<div className="text-muted-foreground">
-								CPF:{" "}
-								<span className="font-mono text-foreground">
-									{order.patient?.cpf || "Não informado"}
-								</span>{" "}
-								| E-mail: {order.patient?.email || "Não informado"}
-							</div>
-							{order.doctor && (
-								<div className="text-muted-foreground pt-1 border-t">
-									Prescrição Médica:{" "}
-									<span className="font-medium text-foreground">
-										{order.doctor?.name || "Médico"}
-									</span>{" "}
-									({order.doctor?.crm || "CRM não inf."})
-								</div>
-							)}
-							{order.captador && (
-								<div className="text-muted-foreground pt-1 border-t">
-									Captador / Indicação Parceira:{" "}
-									<span className="font-medium text-foreground">
-										{order.captador.name}
-									</span>{" "}
-									({order.captador.commissionType === "PERCENTUAL" ? `${order.captador.commissionValue}%` : `R$ ${order.captador.commissionValue}`} — Estimativa: R$ {order.captador.calculatedCommission?.toFixed(2) || "0.00"})
-								</div>
-							)}
-						</div>
-					</TabsContent>
-
-					{/* TAB 2: FINANCEIRO & PAGAMENTOS */}
-					<TabsContent value="financials" className="space-y-4">
-						<div className="rounded-lg border bg-card p-5 space-y-3">
-							<div className="flex justify-between items-center border-b pb-3">
-								<span className="font-bold text-base text-foreground">
-									Resumo Financeiro da Venda
-								</span>
-								<Badge
-									variant={
-										fin.paymentMode === "TOTAL"
-											? "default"
-											: "secondary"
-									}
-								>
-									{fin.paymentMode === "TOTAL"
-										? "Quitação Total"
-										: "Apenas Sinal"}
+								<Badge variant="secondary" className="font-mono text-xs font-bold px-2.5 py-1">
+									Total Aro 1: R$ {aro1Price.toFixed(2)}
 								</Badge>
 							</div>
 
-							<div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-2">
-								<div className="p-3 rounded-lg bg-muted/40 border">
-									<span className="text-[11px] text-muted-foreground block">
-										Subtotal Armações
-									</span>
-									<span className="text-base font-bold font-mono">
-										R$ {subtotalFrames.toFixed(2)}
-									</span>
-								</div>
-								<div className="p-3 rounded-lg bg-muted/40 border">
-									<span className="text-[11px] text-muted-foreground block">
-										Subtotal Lentes
-									</span>
-									<span className="text-base font-bold font-mono">
-										R$ {subtotalLenses.toFixed(2)}
-									</span>
-								</div>
-								<div className="p-3 rounded-lg bg-muted/40 border">
-									<span className="text-[11px] text-muted-foreground block">
-										Subtotal Tratamentos
-									</span>
-									<span className="text-base font-bold font-mono">
-										R$ {subtotalTreatments.toFixed(2)}
-									</span>
-								</div>
-								<div className="p-3 rounded-lg bg-muted/40 border">
-									<span className="text-[11px] text-muted-foreground block">
-										Desconto Concedido
-									</span>
-									<span className="text-base font-bold font-mono text-emerald-600 dark:text-emerald-400">
-										- R$ {discount.toFixed(2)}
-									</span>
-								</div>
-							</div>
-
-							<Separator />
-
-							<div className="flex flex-col gap-2 pt-2">
-								<div className="flex justify-between text-sm">
-									<span className="font-medium text-foreground">
-										Total da Venda:
-									</span>
-									<span className="font-bold font-mono text-base text-foreground">
-										R$ {totalAmount.toFixed(2)}
-									</span>
-								</div>
-								<div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400">
-									<span className="font-medium">Valor Pago no Caixa:</span>
-									<span className="font-bold font-mono text-base">
-										R$ {paidAmount.toFixed(2)}
-									</span>
-								</div>
-								<div className="flex justify-between text-sm p-2 rounded-md bg-muted/60 font-bold">
-									<span
-										className={
-											residualAmount > 0
-												? "text-rose-600 dark:text-rose-400"
-												: "text-foreground"
-										}
-									>
-										Saldo Residual a Receber:
-									</span>
-									<span
-										className={`font-mono text-base font-extrabold ${residualAmount > 0 ? "text-rose-600 dark:text-rose-400" : "text-foreground"}`}
-									>
-										R$ {residualAmount.toFixed(2)}
-									</span>
-								</div>
-							</div>
-
-							<div className="mt-4 rounded-lg bg-muted/30 p-3 text-xs text-muted-foreground">
-								<span className="font-medium text-foreground">
-									Forma de Pagamento:{" "}
-								</span>
-								{(fin as any).paymentMethod1 || (fin as any).paymentMethod || "Cartão de Crédito"}
-								{(fin as any).cardInstallments1 &&
-									(fin as any).cardInstallments1 > 1 && (
-										<span> em {(fin as any).cardInstallments1}x</span>
+							<div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+								{/* Armação Aro 1 */}
+								<div className="p-3.5 rounded-lg bg-muted/40 space-y-2 border">
+									<div className="flex items-center justify-between">
+										<span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+											Armação
+										</span>
+										<span className="font-mono font-bold text-foreground">
+											R$ {Number(order.aro1?.framePrice || 0).toFixed(2)}
+										</span>
+									</div>
+									<div>
+										<span className="font-bold text-sm text-foreground block">
+											{order.aro1?.frameBrand || "Armação"}
+										</span>
+										<span className="text-muted-foreground font-mono">
+											Código: {order.aro1?.frameCode || "—"} • Modelo: {order.aro1?.frameModel || "—"}
+										</span>
+									</div>
+									{(order.aro1?.frameAro || order.aro1?.frameFamily) && (
+										<div className="flex flex-wrap gap-1 pt-1 border-t border-muted">
+											{order.aro1?.frameFamily && (
+												<Badge variant="outline" className="text-[10px]">
+													{order.aro1.frameFamily}
+												</Badge>
+											)}
+											{order.aro1?.frameAro && (
+												<Badge variant="secondary" className="text-[10px]">
+													Aro {order.aro1.frameAro}/{order.aro1.framePonte || "—"}
+												</Badge>
+											)}
+										</div>
 									)}
-								{(fin as any).notes && (
-									<div className="mt-1 pt-1 border-t text-muted-foreground italic">
-										"{(fin as any).notes}"
-									</div>
-								)}
-							</div>
-						</div>
-					</TabsContent>
+								</div>
 
-					{/* TAB 3: AGENTE IA (AUDITORIA & EVIDÊNCIA) */}
-					<TabsContent value="ai" className="space-y-4">
-						{/* Score e Resumo do Agente */}
-						<div className="rounded-xl border bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-4">
-							<div className="flex items-center justify-between">
-								<div className="flex items-center gap-2.5">
-									<div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
-										<Icon icon={Bot} className="size-5" />
+								{/* Lentes Aro 1 */}
+								<div className="p-3.5 rounded-lg bg-muted/40 space-y-2 border">
+									<div className="flex items-center justify-between">
+										<span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+											Lentes ({order.aro1?.lab || "Lab"})
+										</span>
+										<span className="font-mono font-bold text-foreground">
+											R$ {Number(order.aro1?.lensPrice || 0).toFixed(2)}
+										</span>
 									</div>
 									<div>
-										<h4 className="font-bold text-sm text-foreground">
-											MNOC-X Optical Inspector
-										</h4>
-										<p className="text-xs text-muted-foreground">
-											Auditoria automática de laboratório, dioptrias e margem
-											comercial
-										</p>
+										<span className="font-bold text-sm text-foreground block">
+											{order.aro1?.lensName || "Lente"}
+										</span>
+										<span className="text-muted-foreground">
+											{order.aro1?.lensType || "Padrão"}
+										</span>
+									</div>
+									{(order.aro1?.lensIndex || order.aro1?.lensTech) && (
+										<div className="flex flex-wrap gap-1 pt-1 border-t border-muted">
+											{order.aro1?.lensIndex && (
+												<Badge variant="outline" className="text-[10px]">
+													IR {order.aro1.lensIndex}
+												</Badge>
+											)}
+											{order.aro1?.lensTech && (
+												<Badge variant="outline" className="text-[10px]">
+													{order.aro1.lensTech}
+												</Badge>
+											)}
+										</div>
+									)}
+								</div>
+
+								{/* Tratamento Aro 1 */}
+								<div className="p-3.5 rounded-lg bg-muted/40 space-y-2 border">
+									<div className="flex items-center justify-between">
+										<span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+											Tratamento Antirreflexo / Filtro
+										</span>
+										<span className="font-mono font-bold text-foreground">
+											R$ {Number(order.aro1?.treatmentPrice || 0).toFixed(2)}
+										</span>
+									</div>
+									<div>
+										<span className="font-bold text-sm text-foreground block">
+											{order.aro1?.noTreatment ? "Sem Tratamento Adicional" : order.aro1?.treatment || "Incolor"}
+										</span>
+										<span className="text-muted-foreground text-xs">
+											{order.aro1?.noTreatment ? "Lentes naturais" : "Proteção antirreflexo"}
+										</span>
 									</div>
 								</div>
-								<Badge variant="default" className="text-xs font-mono">
-									OCR Confiança:{" "}
-									{((Number(aiAudit.ocrConfidence) || 0.95) * 100).toFixed(0)}%
-								</Badge>
 							</div>
 						</div>
 
-						{/* Grid de Checks Técnicos */}
-						<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-							{/* Check 1: Transposição Cilíndrica */}
-							<div className="rounded-lg border p-3 bg-card space-y-1">
-								<div className="flex items-center justify-between font-semibold text-foreground">
-									<span>Transposição Cilíndrica</span>
-									<Icon
-										icon={CheckmarkFilled}
-										className="size-4 text-emerald-500"
-									/>
+						{/* ETAPA 5: ARO 2 (SEGUNDO PAR / COMBO) */}
+						<div className="rounded-xl border bg-card p-5 sm:p-6 shadow-xs space-y-4">
+							<div className="flex items-center justify-between border-b pb-3">
+								<div className="flex items-center gap-2">
+									<span className="flex size-6 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-bold">
+										4
+									</span>
+									<h3 className="font-bold text-sm sm:text-base text-foreground">
+										Aro 2 • Segundo Par (Combo Dobro / Solar)
+									</h3>
 								</div>
-								<p className="text-muted-foreground text-[11px]">
-									Sinais algébricos conferidos. O laboratório parceiro aceita
-									formato negativo.
-								</p>
-							</div>
-
-							{/* Check 2: Margem de Custo Lab */}
-							<div className="rounded-lg border p-3 bg-card space-y-1">
-								<div className="flex items-center justify-between font-semibold text-foreground">
-									<span>Auditoria de Margem Bruta</span>
-									<Badge
-										variant="secondary"
-										className="text-[10px] text-emerald-600 dark:text-emerald-400"
-									>
-										{aiAudit.grossMarginPercent || 65}% Margem
+								{order.hasAro2 && order.aro2 ? (
+									<Badge variant="secondary" className="font-mono text-xs font-bold px-2.5 py-1 text-amber-600 dark:text-amber-400">
+										Total Aro 2: R$ {aro2Price.toFixed(2)}
 									</Badge>
-								</div>
-								<p className="text-muted-foreground text-[11px]">
-									Custo estimado tabela lab: R${" "}
-									{(Number(aiAudit.estimatedLabCost) || 280).toFixed(2)}. Margem aprovada.
-								</p>
+								) : (
+									<Badge variant="outline" className="text-xs text-muted-foreground">
+										Par Único (Sem 2º Aro)
+									</Badge>
+								)}
 							</div>
 
-							{/* Check 3: Diâmetro & Altura */}
-							<div className="rounded-lg border p-3 bg-card space-y-1">
-								<div className="flex items-center justify-between font-semibold text-foreground">
-									<span>Compatibilidade de Montagem</span>
-									{aiAudit.diameterThicknessCheck === "OK" ? (
-										<Icon
-											icon={CheckmarkFilled}
-											className="size-4 text-emerald-500"
-										/>
+							{order.hasAro2 && order.aro2 ? (
+								<div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+									{/* Armação Aro 2 */}
+									<div className="p-3.5 rounded-lg bg-amber-50/40 dark:bg-amber-950/20 space-y-2 border border-amber-200/50 dark:border-amber-900/30">
+										<div className="flex items-center justify-between">
+											<span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+												Armação 2
+											</span>
+											<span className="font-mono font-bold text-foreground">
+												R$ {Number(order.aro2.framePrice || 0).toFixed(2)}
+											</span>
+										</div>
+										<div>
+											<span className="font-bold text-sm text-foreground block">
+												{order.aro2.frameBrand || "Armação 2"}
+											</span>
+											<span className="text-muted-foreground font-mono">
+												Código: {order.aro2.frameCode || "—"} • Modelo: {order.aro2.frameModel || "—"}
+											</span>
+										</div>
+									</div>
+
+									{/* Lentes Aro 2 */}
+									<div className="p-3.5 rounded-lg bg-amber-50/40 dark:bg-amber-950/20 space-y-2 border border-amber-200/50 dark:border-amber-900/30">
+										<div className="flex items-center justify-between">
+											<span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+												Lentes 2 ({order.aro2.lab || "Lab"})
+											</span>
+											<span className="font-mono font-bold text-foreground">
+												R$ {Number(order.aro2.lensPrice || 0).toFixed(2)}
+											</span>
+										</div>
+										<div>
+											<span className="font-bold text-sm text-foreground block">
+												{order.aro2.lensName || "Lente 2"}
+											</span>
+										</div>
+									</div>
+
+									{/* Tratamento Aro 2 */}
+									<div className="p-3.5 rounded-lg bg-amber-50/40 dark:bg-amber-950/20 space-y-2 border border-amber-200/50 dark:border-amber-900/30">
+										<div className="flex items-center justify-between">
+											<span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+												Tratamento 2
+											</span>
+											<span className="font-mono font-bold text-foreground">
+												R$ {Number(order.aro2.treatmentPrice || 0).toFixed(2)}
+											</span>
+										</div>
+										<div>
+											<span className="font-bold text-sm text-foreground block">
+												{order.aro2.noTreatment ? "Sem Tratamento" : order.aro2.treatment || "Padrão"}
+											</span>
+										</div>
+									</div>
+								</div>
+							) : (
+								<p className="text-xs text-muted-foreground italic">
+									Esta Ordem de Serviço foi cadastrada para um único par de óculos (Aro 1).
+								</p>
+							)}
+						</div>
+
+						{/* ETAPA 6: FECHAMENTO FINANCEIRO, RESÍDUO E PAGAMENTO */}
+						<div className="rounded-xl border bg-card p-5 sm:p-6 shadow-xs space-y-4">
+							<div className="flex items-center justify-between border-b pb-3">
+								<div className="flex items-center gap-2">
+									<span className="flex size-6 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
+										5
+									</span>
+									<h3 className="font-bold text-sm sm:text-base text-foreground">
+										Fechamento Comercial, Condição de Pagamento & Resíduo
+									</h3>
+								</div>
+								<div className="flex items-center gap-2">
+									{residualAmount > 0 ? (
+										<Button
+											variant="outline"
+											size="sm"
+											className="h-8 text-xs font-semibold border-emerald-500 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 cursor-pointer"
+											onClick={handlePayResidual}
+										>
+											<Icon icon={Money} className="size-3.5 mr-1" />
+											Quitar Resíduo no Caixa
+										</Button>
 									) : (
-										<Icon
-											icon={WarningFilled}
-											className="size-4 text-amber-500"
-										/>
+										<Badge variant="secondary" className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+											<Icon icon={Checkmark} className="size-3 mr-1" />
+											Quitado Integralmente
+										</Badge>
 									)}
 								</div>
-								<p className="text-muted-foreground text-[11px]">
-									DNP e altura de montagem verificadas para o tamanho da ponte e
-									diâmetro do aro.
-								</p>
 							</div>
 
-							{/* Check 4: Análise de Risco de Crédito */}
-							<div className="rounded-lg border p-3 bg-card space-y-1">
-								<div className="flex items-center justify-between font-semibold text-foreground">
-									<span>Risco de Inadimplência</span>
-									<Badge variant="outline" className="text-[10px]">
-										Risco: {aiAudit.creditRiskCheck || "BAIXO"}
-									</Badge>
-								</div>
-								<p className="text-muted-foreground text-[11px]">
-									{residualAmount > 0
-										? "Saldo pendente exige bloqueio de entrega até quitação em caixa."
-										: "Pedido 100% quitado. Liberação imediata sem pendências."}
-								</p>
-							</div>
-						</div>
-
-						{/* Linha do Tempo e Evidências */}
-						<div className="rounded-lg border bg-card p-4 space-y-3">
-							<span className="font-bold text-xs text-foreground block">
-								Trilha de Evidências & Ações Automatizadas
-							</span>
-							<div className="space-y-2.5">
-								{(aiAudit.timelineEvents || []).map((ev) => (
-									<div key={ev.id} className="flex items-start gap-2.5 text-xs">
-										<div className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-											<Icon icon={Time} className="size-3" />
+							<div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+								{/* Card Subtotais */}
+								<div className="p-3.5 rounded-lg bg-muted/30 border space-y-2 text-xs">
+									<span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+										Composição de Valores
+									</span>
+									<div className="space-y-1 text-muted-foreground">
+										<div className="flex justify-between">
+											<span>Armações:</span>
+											<span className="font-mono font-medium text-foreground">R$ {subtotalFrames.toFixed(2)}</span>
 										</div>
-										<div className="flex-1">
-											<div className="flex items-center justify-between">
-												<span className="font-semibold text-foreground">
-													{ev.title}
-												</span>
-												<span className="text-[10px] text-muted-foreground font-mono">
-													{ev.time}
-												</span>
+										<div className="flex justify-between">
+											<span>Lentes:</span>
+											<span className="font-mono font-medium text-foreground">R$ {subtotalLenses.toFixed(2)}</span>
+										</div>
+										<div className="flex justify-between">
+											<span>Tratamentos:</span>
+											<span className="font-mono font-medium text-foreground">R$ {subtotalTreatments.toFixed(2)}</span>
+										</div>
+										{discount > 0 && (
+											<div className="flex justify-between text-rose-600 font-medium pt-1 border-t">
+												<span>Desconto:</span>
+												<span className="font-mono">- R$ {discount.toFixed(2)}</span>
 											</div>
-											<p className="text-[11px] text-muted-foreground">
-												{ev.detail}
-											</p>
-										</div>
+										)}
 									</div>
-								))}
+								</div>
+
+								{/* Card Valor Total */}
+								<div className="p-3.5 rounded-lg bg-muted/30 border flex flex-col justify-between">
+									<span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+										Valor Total da OS
+									</span>
+									<div className="my-1.5">
+										<span className="text-2xl font-bold font-mono text-foreground">
+											R$ {totalAmount.toFixed(2)}
+										</span>
+									</div>
+									<span className="text-[11px] text-muted-foreground">
+										Modo: <span className="font-semibold text-foreground">{fin.paymentMode === "SINAL" ? "Com Sinal (Entrada)" : "Pagamento Integral"}</span>
+									</span>
+								</div>
+
+								{/* Card Valor Pago & Sinal */}
+								<div className="p-3.5 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/50 dark:border-emerald-900/30 flex flex-col justify-between">
+									<span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+										Valor Pago (Entrada)
+									</span>
+									<div className="my-1.5">
+										<span className="text-2xl font-bold font-mono text-emerald-700 dark:text-emerald-400">
+											R$ {paidAmount.toFixed(2)}
+										</span>
+									</div>
+									<span className="text-[11px] text-muted-foreground">
+										Forma: <span className="font-medium text-foreground">{fin.paymentMethod1 || "Cartão/Dinheiro"}</span>
+										{fin.cardInstallments1 && fin.cardInstallments1 > 1 ? ` (${fin.cardInstallments1}x)` : ""}
+									</span>
+								</div>
+
+								{/* Card Saldo Residual */}
+								<div className={`p-3.5 rounded-lg border flex flex-col justify-between ${
+									residualAmount > 0
+										? "bg-rose-50/50 dark:bg-rose-950/20 border-rose-200/50 dark:border-rose-900/30"
+										: "bg-muted/30"
+								}`}>
+									<span className={`text-[11px] font-bold uppercase tracking-wider ${
+										residualAmount > 0 ? "text-rose-700 dark:text-rose-400" : "text-muted-foreground"
+									}`}>
+										Saldo Residual a Receber
+									</span>
+									<div className="my-1.5">
+										<span className={`text-2xl font-bold font-mono ${
+											residualAmount > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+										}`}>
+											R$ {residualAmount.toFixed(2)}
+										</span>
+									</div>
+									<span className="text-[11px] text-muted-foreground">
+										{residualAmount > 0 ? "Receber na entrega dos óculos" : "Totalmente quitado"}
+									</span>
+								</div>
 							</div>
 						</div>
-					</TabsContent>
-				</Tabs>
-			</SheetContent>
-		</Sheet>
+
+						{/* ETAPA 7: AUDITORIA IA ÓPTICA & HISTÓRICO DA OS */}
+						<div className="rounded-xl border bg-card p-5 sm:p-6 shadow-xs space-y-4">
+							<div className="flex items-center gap-2 border-b pb-3">
+								<span className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
+									6
+								</span>
+								<h3 className="font-bold text-sm sm:text-base text-foreground flex items-center gap-1.5">
+									<Icon icon={Bot} className="size-4 text-primary" />
+									Auditoria IA Óptica & Rastreamento da OS
+								</h3>
+							</div>
+
+							<div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+								<div className="p-3.5 rounded-lg bg-muted/40 border space-y-2">
+									<span className="font-semibold text-foreground block">Conferência Técnica IA</span>
+									<div className="space-y-1 text-muted-foreground">
+										<p>• Validação de Cilindro: <span className="text-emerald-600 font-semibold">Correto (1º a 180º)</span></p>
+										<p>• Compatibilidade Diâmetro: <span className="text-emerald-600 font-semibold">Aprovado</span></p>
+										<p>• Auditoria OCR: <span className="font-mono font-bold text-foreground">{((aiAudit.ocrConfidence || 0.95) * 100).toFixed(0)}% de precisão</span></p>
+									</div>
+								</div>
+
+								<div className="p-3.5 rounded-lg bg-muted/40 border space-y-2">
+									<span className="font-semibold text-foreground block">Indicadores Comerciais</span>
+									<div className="space-y-1 text-muted-foreground">
+										<p>• Custo Estimado Lab: <span className="font-mono font-medium text-foreground">R$ {Number(aiAudit.estimatedLabCost || 280).toFixed(2)}</span></p>
+										<p>• Margem Bruta: <span className="font-mono font-bold text-emerald-600">{aiAudit.grossMarginPercent || 65}%</span></p>
+										<p>• Risco de Crédito: <span className="font-semibold text-foreground">{aiAudit.creditRiskCheck || "Baixo"}</span></p>
+									</div>
+								</div>
+
+								<div className="p-3.5 rounded-lg bg-muted/40 border space-y-2">
+									<span className="font-semibold text-foreground block">Linha do Tempo</span>
+									<div className="space-y-1 text-muted-foreground">
+										{aiAudit.timelineEvents?.slice(0, 3).map((ev: any, idx: number) => (
+											<p key={idx}>
+												<span className="font-medium text-foreground">{ev.time || "Hoje"}:</span> {ev.title || ev.detail}
+											</p>
+										)) || <p>Ordem registrada no sistema MNOC-X.</p>}
+									</div>
+								</div>
+							</div>
+						</div>
+
+					</div>
+				</SheetContent>
+			</Sheet>
+
+			{/* DIALOG DE CONFIRMAÇÃO DE EXCLUSÃO DE OS */}
+			<Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+				<DialogContent className="max-w-md">
+					<DialogHeader>
+						<DialogTitle className="flex items-center gap-2 text-destructive">
+							<Icon icon={WarningFilled} className="size-5" />
+							Confirmar Exclusão da OS
+						</DialogTitle>
+						<DialogDescription>
+							Tem certeza de que deseja excluir permanentemente a Ordem de Serviço{" "}
+							<span className="font-mono font-bold text-foreground">{order.orderNumber}</span> de{" "}
+							<span className="font-semibold text-foreground">{patientName}</span>?
+						</DialogDescription>
+					</DialogHeader>
+
+					<div className="p-3 rounded-lg bg-muted/50 border text-xs text-muted-foreground space-y-1">
+						<p>• Esta ação removerá a OS do banco dedicado MNOC-X.</p>
+						<p>• O registro não retornará após atualização da página (CTRL+F5).</p>
+					</div>
+
+					<DialogFooter className="gap-2 sm:gap-0">
+						<Button
+							variant="outline"
+							onClick={() => setDeleteConfirmOpen(false)}
+						>
+							Cancelar
+						</Button>
+						<Button
+							variant="destructive"
+							onClick={handleDeleteOrder}
+							className="font-semibold gap-1.5"
+						>
+							<Icon icon={TrashCan} className="size-4" />
+							Sim, Excluir OS
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+		</>
 	);
 }
