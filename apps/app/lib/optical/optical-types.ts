@@ -43,6 +43,41 @@ export interface EyePrescription {
 export type LensCategory = "MONOFOCAL" | "MULTIFOCAL" | "BIFOCAL" | "OCUPACIONAL";
 export type FrameCategory = "RECEITUARIO" | "SOLAR" | "CLIP_ON";
 
+export type CaptadorCommissionType = "PERCENTUAL" | "FIXO";
+
+export interface OpticalCaptador {
+	id: string;
+	name: string;
+	phone?: string;
+	pixKey?: string;
+	notes?: string;
+	commissionType: CaptadorCommissionType;
+	commissionValue: number;
+	active: boolean;
+	createdAt?: string;
+}
+
+export interface OpticalFrameShape {
+	id: string;
+	name: string;
+	slug: string;
+	category: string;
+	description?: string;
+	active: boolean;
+}
+
+export interface FrameCustomerData {
+	bridge?: string;
+	aro?: string;
+	verticalB?: string;
+	diagonalEd?: string;
+	brand?: string;
+	type?: string;
+	shapeId?: string;
+	shapeName?: string;
+	photoUrl?: string;
+}
+
 export interface AroItem {
 	frameCode: string;
 	frameBrand: string;
@@ -53,6 +88,7 @@ export interface AroItem {
 	frameManufacturer?: string;
 	frameAro?: string;
 	framePonte?: string;
+	frameCustomerData?: FrameCustomerData;
 
 	lab: string;
 	lensName: string;
@@ -157,6 +193,13 @@ export interface OpticalOrder {
 	doctor?: {
 		name: string;
 		crm?: string;
+	};
+	captador?: {
+		id: string;
+		name: string;
+		commissionType: CaptadorCommissionType;
+		commissionValue: number;
+		calculatedCommission: number;
 	};
 	seller: {
 		id: string;

@@ -12,6 +12,7 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import type { EyePrescription } from "@/lib/optical/optical-types";
 import { processPrescriptionOCR } from "@/lib/optical/prescription-ocr";
+import { cn } from "@crm/ui/lib/utils";
 
 interface OpticalDioptersTableProps {
 	idPrefix: string;
@@ -20,6 +21,8 @@ interface OpticalDioptersTableProps {
 	onChange: (next: EyePrescription) => void;
 	onOcrCompleted?: (doctor?: string, patient?: string) => void;
 	readOnly?: boolean;
+	allowOnlyDnpAndAlt?: boolean;
+	lockAddition?: boolean;
 }
 
 export function OpticalDioptersTable({
@@ -29,6 +32,8 @@ export function OpticalDioptersTable({
 	onChange,
 	onOcrCompleted,
 	readOnly = false,
+	allowOnlyDnpAndAlt = false,
+	lockAddition = false,
 }: OpticalDioptersTableProps) {
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [scanning, setScanning] = useState(false);
@@ -173,8 +178,9 @@ export function OpticalDioptersTable({
 									value={value.od.esf}
 									onChange={(e) => updateEye("od", "esf", e.target.value)}
 									placeholder="-1.75"
-									disabled={readOnly}
-									className="h-8 text-center text-xs font-mono font-medium"
+									disabled={readOnly || allowOnlyDnpAndAlt}
+									title={allowOnlyDnpAndAlt ? "Grau esférico blindado (cópia do Aro 1)" : undefined}
+									className={cn("h-8 text-center text-xs font-mono font-medium", allowOnlyDnpAndAlt && "bg-muted/50 text-muted-foreground cursor-not-allowed")}
 								/>
 							</td>
 							<td className="p-1">
@@ -183,8 +189,9 @@ export function OpticalDioptersTable({
 									value={value.od.cil}
 									onChange={(e) => updateEye("od", "cil", e.target.value)}
 									placeholder="-0.75"
-									disabled={readOnly}
-									className="h-8 text-center text-xs font-mono font-medium"
+									disabled={readOnly || allowOnlyDnpAndAlt}
+									title={allowOnlyDnpAndAlt ? "Grau cilíndrico blindado (cópia do Aro 1)" : undefined}
+									className={cn("h-8 text-center text-xs font-mono font-medium", allowOnlyDnpAndAlt && "bg-muted/50 text-muted-foreground cursor-not-allowed")}
 								/>
 							</td>
 							<td className="p-1">
@@ -193,8 +200,9 @@ export function OpticalDioptersTable({
 									value={value.od.eixo}
 									onChange={(e) => updateEye("od", "eixo", e.target.value)}
 									placeholder="180°"
-									disabled={readOnly}
-									className="h-8 text-center text-xs font-mono"
+									disabled={readOnly || allowOnlyDnpAndAlt}
+									title={allowOnlyDnpAndAlt ? "Grau de eixo blindado (cópia do Aro 1)" : undefined}
+									className={cn("h-8 text-center text-xs font-mono", allowOnlyDnpAndAlt && "bg-muted/50 text-muted-foreground cursor-not-allowed")}
 								/>
 							</td>
 							<td className="p-1">
@@ -233,8 +241,9 @@ export function OpticalDioptersTable({
 									value={value.oe.esf}
 									onChange={(e) => updateEye("oe", "esf", e.target.value)}
 									placeholder="-1.50"
-									disabled={readOnly}
-									className="h-8 text-center text-xs font-mono font-medium"
+									disabled={readOnly || allowOnlyDnpAndAlt}
+									title={allowOnlyDnpAndAlt ? "Grau esférico blindado (cópia do Aro 1)" : undefined}
+									className={cn("h-8 text-center text-xs font-mono font-medium", allowOnlyDnpAndAlt && "bg-muted/50 text-muted-foreground cursor-not-allowed")}
 								/>
 							</td>
 							<td className="p-1">
@@ -243,8 +252,9 @@ export function OpticalDioptersTable({
 									value={value.oe.cil}
 									onChange={(e) => updateEye("oe", "cil", e.target.value)}
 									placeholder="-0.50"
-									disabled={readOnly}
-									className="h-8 text-center text-xs font-mono font-medium"
+									disabled={readOnly || allowOnlyDnpAndAlt}
+									title={allowOnlyDnpAndAlt ? "Grau cilíndrico blindado (cópia do Aro 1)" : undefined}
+									className={cn("h-8 text-center text-xs font-mono font-medium", allowOnlyDnpAndAlt && "bg-muted/50 text-muted-foreground cursor-not-allowed")}
 								/>
 							</td>
 							<td className="p-1">
@@ -253,8 +263,9 @@ export function OpticalDioptersTable({
 									value={value.oe.eixo}
 									onChange={(e) => updateEye("oe", "eixo", e.target.value)}
 									placeholder="10°"
-									disabled={readOnly}
-									className="h-8 text-center text-xs font-mono"
+									disabled={readOnly || allowOnlyDnpAndAlt}
+									title={allowOnlyDnpAndAlt ? "Grau de eixo blindado (cópia do Aro 1)" : undefined}
+									className={cn("h-8 text-center text-xs font-mono", allowOnlyDnpAndAlt && "bg-muted/50 text-muted-foreground cursor-not-allowed")}
 								/>
 							</td>
 							<td className="p-1">
@@ -293,15 +304,27 @@ export function OpticalDioptersTable({
 					</label>
 					<Input
 						id={`${idPrefix}-adicao`}
-						value={value.adicao ?? ""}
+						value={lockAddition ? "" : (value.adicao ?? "")}
 						onChange={(e) => updateAdicao(e.target.value)}
-						placeholder="+2.00"
-						disabled={readOnly}
-						className="h-8 w-24 text-center font-mono text-xs font-semibold"
+						placeholder={lockAddition ? "n/a" : "+2.00"}
+						disabled={readOnly || lockAddition}
+						title={lockAddition ? "Grau Monofocal: Adição não aplicável (grau total em OD/OE)" : undefined}
+						className={cn("h-8 w-24 text-center font-mono text-xs font-semibold", lockAddition && "bg-muted/50 text-muted-foreground cursor-not-allowed")}
 					/>
-					<span className="text-[11px] text-muted-foreground">
-						(Multifocais / Perto)
-					</span>
+					{lockAddition ? (
+						<Badge variant="outline" className="text-[10px] text-muted-foreground border-dashed">
+							🔒 Grau Monofocal: Adição n/a
+						</Badge>
+					) : (
+						<span className="text-[11px] text-muted-foreground">
+							(Multifocais / Perto)
+						</span>
+					)}
+					{allowOnlyDnpAndAlt && (
+						<Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary font-medium">
+							🔒 Esf/Cil/Eixo blindados do Aro 1 (DNP e Altura livres)
+						</Badge>
+					)}
 				</div>
 
 				{(odHasCilNoEixo || oeHasCilNoEixo) && (

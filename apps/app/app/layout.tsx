@@ -24,7 +24,9 @@ export const metadata: Metadata = {
 		default: "Comp AI - CRM",
 		template: "%s · Comp AI CRM",
 	},
-	description: "Customer Relationship Management for Comp AI",
+	other: {
+		google: "notranslate",
+	},
 	icons: {
 		icon: [
 			{ url: "/favicon.svg", type: "image/svg+xml" },
@@ -42,9 +44,10 @@ export default function RootLayout({
 }>) {
 	return (
 		<html
-			lang="en"
+			lang="pt-BR"
+			translate="no"
 			suppressHydrationWarning
-			className={cn(fontSans.variable, fontMono.variable, "h-full antialiased")}
+			className={cn(fontSans.variable, fontMono.variable, "notranslate h-full antialiased")}
 		>
 			<body className="flex min-h-full flex-col font-sans">
 				<NuqsAdapter>

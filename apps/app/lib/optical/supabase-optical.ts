@@ -1978,6 +1978,109 @@ export async function runDatabaseDiagnostic(): Promise<DatabaseDiagnosticResult>
 	};
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CAPTADORES & COMISSÕES DE OS
+// ─────────────────────────────────────────────────────────────────────────────
+import type { OpticalCaptador, OpticalFrameShape } from "./optical-types";
+export type { OpticalCaptador, OpticalFrameShape };
 
+export const CAPTADORES_STORAGE_KEY = "mnocx_vault_v2_captadores";
+export const FRAME_SHAPES_STORAGE_KEY = "mnocx_vault_v2_frame_shapes";
 
+export const DEFAULT_CAPTADORES: OpticalCaptador[] = [
+	{
+		id: "cap_1",
+		name: "Dr. Carlos Eduardo (Parceiro Oftalmo)",
+		phone: "(11) 98765-4321",
+		pixKey: "carlos.oftalmo@gmail.com",
+		commissionType: "PERCENTUAL",
+		commissionValue: 5,
+		active: true,
+		notes: "Indicação médica de pacientes présbitas",
+	},
+	{
+		id: "cap_2",
+		name: "Clínica Olhar Prime (Campinas)",
+		phone: "(19) 3234-5678",
+		pixKey: "financeiro@olharprime.com.br",
+		commissionType: "PERCENTUAL",
+		commissionValue: 7,
+		active: true,
+		notes: "Parceria clínica de convênio",
+	},
+	{
+		id: "cap_3",
+		name: "Promotor Rodrigo (Ação Comercial)",
+		phone: "(11) 99123-4567",
+		pixKey: "11991234567",
+		commissionType: "FIXO",
+		commissionValue: 50,
+		active: true,
+		notes: "Bonificação fixa por OS fechada",
+	},
+];
 
+export const DEFAULT_FRAME_SHAPES: OpticalFrameShape[] = [
+	{ id: "shape_1", name: "Redondo", slug: "redondo", category: "Clássico", description: "Aro circular suave", active: true },
+	{ id: "shape_2", name: "Quadrado", slug: "quadrado", category: "Geométrico", description: "Bordas retas e angulares", active: true },
+	{ id: "shape_3", name: "Retangular", slug: "retangular", category: "Executivo", description: "Design horizontal discreto", active: true },
+	{ id: "shape_4", name: "Aviador", slug: "aviador", category: "Esportivo", description: "Formato em gota clássico", active: true },
+	{ id: "shape_5", name: "Gatinho (Cat-Eye)", slug: "gatinho", category: "Feminino", description: "Extremidades superiores elevadas", active: true },
+	{ id: "shape_6", name: "Geométrico / Hexagonal", slug: "geometrico", category: "Conceito", description: "Facetas poligonais modernas", active: true },
+	{ id: "shape_7", name: "Oval", slug: "oval", category: "Suave", description: "Elíptico harmonioso", active: true },
+	{ id: "shape_8", name: "Panto", slug: "panto", category: "Vintage", description: "Arredondado com topo reto clássico", active: true },
+];
+
+export async function fetchSupabaseCaptadores(): Promise<OpticalCaptador[]> {
+	if (typeof window !== "undefined") {
+		try {
+			const saved = localStorage.getItem(CAPTADORES_STORAGE_KEY);
+			if (saved) {
+				const parsed = JSON.parse(saved);
+				if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+			}
+		} catch (e) {
+			console.warn("Erro ao ler captadores locais:", e);
+		}
+	}
+	return DEFAULT_CAPTADORES;
+}
+
+export async function saveSupabaseCaptadores(items: OpticalCaptador[]): Promise<boolean> {
+	if (typeof window !== "undefined") {
+		try {
+			localStorage.setItem(CAPTADORES_STORAGE_KEY, JSON.stringify(items));
+			return true;
+		} catch (e) {
+			console.warn("Erro ao salvar captadores:", e);
+		}
+	}
+	return false;
+}
+
+export async function fetchSupabaseFrameShapes(): Promise<OpticalFrameShape[]> {
+	if (typeof window !== "undefined") {
+		try {
+			const saved = localStorage.getItem(FRAME_SHAPES_STORAGE_KEY);
+			if (saved) {
+				const parsed = JSON.parse(saved);
+				if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+			}
+		} catch (e) {
+			console.warn("Erro ao ler formatos de aro locais:", e);
+		}
+	}
+	return DEFAULT_FRAME_SHAPES;
+}
+
+export async function saveSupabaseFrameShapes(items: OpticalFrameShape[]): Promise<boolean> {
+	if (typeof window !== "undefined") {
+		try {
+			localStorage.setItem(FRAME_SHAPES_STORAGE_KEY, JSON.stringify(items));
+			return true;
+		} catch (e) {
+			console.warn("Erro ao salvar formatos de aro:", e);
+		}
+	}
+	return false;
+}

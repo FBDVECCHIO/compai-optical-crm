@@ -2,6 +2,7 @@
 
 import Add from "@carbon/icons-react/es/Add";
 import Building from "@carbon/icons-react/es/Building";
+import Camera from "@carbon/icons-react/es/Camera";
 import Checkmark from "@carbon/icons-react/es/Checkmark";
 import Copy from "@carbon/icons-react/es/Copy";
 import Locked from "@carbon/icons-react/es/Locked";
@@ -12,6 +13,7 @@ import Receipt from "@carbon/icons-react/es/Receipt";
 import Search from "@carbon/icons-react/es/Search";
 import ShoppingBag from "@carbon/icons-react/es/ShoppingBag";
 import UserAvatar from "@carbon/icons-react/es/UserAvatar";
+import UserSpeaker from "@carbon/icons-react/es/UserSpeaker";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
 import { Checkbox } from "@crm/ui/components/checkbox";
@@ -49,6 +51,8 @@ import {
 	fetchSupabaseSellers,
 	fetchSupabaseDoctors,
 	saveSupabaseDoctors,
+	fetchSupabaseCaptadores,
+	fetchSupabaseFrameShapes,
 	type StoreItem,
 	type SellerItem,
 	type DoctorItem,
@@ -58,7 +62,10 @@ import type {
 	AroItem,
 	EyePrescription,
 	FrameCatalogItem,
+	FrameCustomerData,
 	LensCatalogItem,
+	OpticalCaptador,
+	OpticalFrameShape,
 	OpticalOrder,
 	OpticalPatient,
 	OpticalPaymentMethod,
@@ -139,6 +146,24 @@ export function OpticalOrderForm({
 	const [newDocCrm, setNewDocCrm] = useState("");
 	const [newDocClinica, setNewDocClinica] = useState("");
 	const [newDocError, setNewDocError] = useState("");
+
+	// Captador de Vendas & Comissão
+	const [captadores, setCaptadores] = useState<OpticalCaptador[]>([]);
+	const [selectedCaptadorId, setSelectedCaptadorId] = useState<string>("");
+
+	// Formatos de Armação 2D & Armação Trazida pelo Cliente
+	const [frameShapes, setFrameShapes] = useState<OpticalFrameShape[]>([]);
+	const [customerFrameData, setCustomerFrameData] = useState<FrameCustomerData>({
+		bridge: "18",
+		aro: "52",
+		verticalB: "38",
+		diagonalEd: "54",
+		brand: "",
+		type: "RECEITUARIO",
+		shapeId: "shape_1",
+		shapeName: "Redondo",
+		photoUrl: "",
+	});
 
 	// Frame Modes (Estoque da Loja vs Trazida pelo Cliente)
 	const [aro1FrameMode, setAro1FrameMode] = useState<"STOCK" | "CUSTOMER">("STOCK");
@@ -229,12 +254,16 @@ export function OpticalOrderForm({
 			fetchSupabaseDoctors(),
 			fetchLensCatalog(),
 			fetchFrameCatalog(),
-		]).then(([loadedStores, loadedSellers, loadedDoctors, loadedLenses, loadedFrames]) => {
+			fetchSupabaseCaptadores(),
+			fetchSupabaseFrameShapes(),
+		]).then(([loadedStores, loadedSellers, loadedDoctors, loadedLenses, loadedFrames, loadedCaptadores, loadedShapes]) => {
 			setStores(loadedStores);
 			setSellers(loadedSellers);
 			setDoctors(loadedDoctors);
 			setLensCatalog(loadedLenses);
 			setFrameCatalog(loadedFrames);
+			setCaptadores(loadedCaptadores);
+			setFrameShapes(loadedShapes);
 
 			if (loadedStores.length > 0) {
 				setStoreName(loadedStores[0]!.nome);
@@ -432,6 +461,19 @@ export function OpticalOrderForm({
 
 	const totalAmount = Math.max(0, grossTotal - effectiveDiscountBrl);
 
+	// Captador Selecionado & Comissão em Tempo Real
+	const selectedCaptador = useMemo(() => {
+		return captadores.find((c) => c.id === selectedCaptadorId);
+	}, [captadores, selectedCaptadorId]);
+
+	const captadorCommissionAmount = useMemo(() => {
+		if (!selectedCaptador) return 0;
+		if (selectedCaptador.commissionType === "PERCENTUAL") {
+			return Number(((totalAmount * selectedCaptador.commissionValue) / 100).toFixed(2));
+		}
+		return selectedCaptador.commissionValue;
+	}, [selectedCaptador, totalAmount]);
+
 	// Auditoria de alçada de desconto de vendedor vs gerente
 	const discountAudit = useMemo(() => {
 		return checkDiscountLimit("VENDEDOR", effectiveDiscountPct, aro1.lab);
@@ -534,6 +576,24 @@ export function OpticalOrderForm({
 			return;
 		}
 
+		// Validação estrita de Código e Estoque no Aro 1
+		if (aro1FrameMode === "STOCK") {
+			if (!aro1.frameCode || !aro1.frameCode.trim()) {
+				toast.error("O código do produto da armação do Aro 1 é obrigatório.");
+				return;
+			}
+			const matchedFrame = frameCatalog.find(
+				(f) =>
+					f.produto === aro1.frameModel ||
+					(f.marca === aro1.frameBrand && f.produto.includes(aro1.frameCode)) ||
+					f.produto.toLowerCase().includes(aro1.frameCode.toLowerCase())
+			);
+			if (matchedFrame && matchedFrame.estoque <= 0) {
+				toast.error("A armação selecionada está sem estoque no momento. Escolha outro produto com estoque disponível.");
+				return;
+			}
+		}
+
 		setIsSubmitting(true);
 		try {
 			const currentStore = stores.find((s) => s.nome === storeName);
@@ -545,6 +605,15 @@ export function OpticalOrderForm({
 				store: { id: currentStore?.id ? String(currentStore.id) : "store_matriz", name: storeName },
 				seller: { id: currentSeller?.id ? String(currentSeller.id) : "user_seller", name: sellerName },
 				doctor: doctorName ? { name: doctorName, crm: doctorCrm } : undefined,
+				captador: selectedCaptador
+					? {
+							id: selectedCaptador.id,
+							name: selectedCaptador.name,
+							commissionType: selectedCaptador.commissionType,
+							commissionValue: selectedCaptador.commissionValue,
+							calculatedCommission: captadorCommissionAmount,
+					  }
+					: undefined,
 				status: "DIGITADA",
 				invoiceIssued,
 				invoiceNumber: invoiceIssued ? invoiceNumber || `NF-${Math.floor(100000 + Math.random() * 900000)}` : undefined,
@@ -557,6 +626,7 @@ export function OpticalOrderForm({
 				aro1: {
 					...aro1,
 					framePrice: aro1FrameMode === "CUSTOMER" ? 0 : aro1.framePrice,
+					frameCustomerData: aro1FrameMode === "CUSTOMER" ? customerFrameData : undefined,
 				},
 				hasAro2,
 				isAro2CopyOfAro1: isAro2Copy,
@@ -935,11 +1005,12 @@ export function OpticalOrderForm({
 									<button
 										type="button"
 										onClick={handleCloneWhatsApp}
-										title="Clonar WhatsApp"
-										className="flex items-center gap-1 text-[10px] text-primary hover:underline cursor-pointer"
+										title="Copiar WhatsApp"
+										translate="no"
+										className="flex items-center gap-1 text-[10px] text-primary hover:underline cursor-pointer notranslate"
 									>
 										<Icon icon={Copy} className="size-3" />
-										Clonar Whats
+										Copiar WhatsApp
 									</button>
 								</div>
 								<Input
@@ -1098,10 +1169,11 @@ export function OpticalOrderForm({
 										setNewDocError("");
 										setIsNewDocModalOpen(true);
 									}}
-									className="h-7 px-2 text-[11px] font-bold text-primary hover:bg-primary/10 cursor-pointer gap-1"
+									className="h-7 px-2 text-[11px] font-bold text-primary hover:bg-primary/10 cursor-pointer gap-1 notranslate"
+									translate="no"
 								>
 									<Icon icon={Add} className="size-3" />
-									+ Cadastrar Novo Médico
+									Cadastrar Novo Médico
 								</Button>
 							</div>
 
@@ -1123,7 +1195,8 @@ export function OpticalOrderForm({
 											setDoctorCrm("");
 										}
 									}}
-									className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
+									className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer notranslate"
+									translate="no"
 								>
 									<option value="">Selecione um médico cadastrado...</option>
 									{doctors.map((d) => (
@@ -1155,6 +1228,72 @@ export function OpticalOrderForm({
 								</div>
 							</div>
 						</div>
+
+						{/* Sub-bloco Captador / Indicador de Vendas & Comissão */}
+						<Separator className="my-2" />
+						<div className="p-3.5 rounded-xl bg-muted/30 border space-y-2.5">
+							<div className="flex items-center justify-between">
+								<div className="flex items-center gap-1.5 font-semibold text-xs text-foreground">
+									<Icon icon={UserSpeaker} className="size-3.5 text-primary" />
+									<span translate="no" className="notranslate">Captador / Indicador de Vendas</span>
+								</div>
+								{selectedCaptador && (
+									<Badge
+										variant="outline"
+										className="text-[10px] font-bold text-primary border-primary/30 notranslate"
+										translate="no"
+									>
+										Comissão: {selectedCaptador.commissionType === "PERCENTUAL" ? `${selectedCaptador.commissionValue}%` : `R$ ${selectedCaptador.commissionValue.toFixed(2)}`} (R$ {captadorCommissionAmount.toFixed(2)})
+									</Badge>
+								)}
+							</div>
+
+							<div>
+								<FieldLabel className="text-[10px] font-semibold text-muted-foreground mb-1 block">
+									Vincular Captador à Ordem de Serviço
+								</FieldLabel>
+								<select
+									value={selectedCaptadorId}
+									onChange={(e) => setSelectedCaptadorId(e.target.value)}
+									className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer notranslate"
+									translate="no"
+								>
+									<option value="">Nenhum captador vinculado (Venda direta da loja)</option>
+									{captadores
+										.filter((c) => c.active)
+										.map((c) => (
+											<option key={c.id} value={c.id}>
+												{c.name} — {c.commissionType === "PERCENTUAL" ? `${c.commissionValue}% do valor total` : `R$ ${c.commissionValue.toFixed(2)} fixo`} {c.phone ? `(${c.phone})` : ""}
+											</option>
+										))}
+								</select>
+							</div>
+
+							{selectedCaptador && (
+								<div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px] p-2 rounded-lg bg-background border">
+									<div>
+										<span className="text-[10px] text-muted-foreground block">Modalidade de Comissão:</span>
+										<span className="font-semibold text-foreground">
+											{selectedCaptador.commissionType === "PERCENTUAL"
+												? `${selectedCaptador.commissionValue}% sobre o total da OS`
+												: `R$ ${selectedCaptador.commissionValue.toFixed(2)} Fixo por OS`}
+										</span>
+									</div>
+									<div>
+										<span className="text-[10px] text-muted-foreground block">Comissão Calculada:</span>
+										<span className="font-bold text-emerald-600 dark:text-emerald-400">
+											R$ {captadorCommissionAmount.toFixed(2)}
+										</span>
+									</div>
+									<div>
+										<span className="text-[10px] text-muted-foreground block">Chave PIX / Contato:</span>
+										<span className="font-mono text-foreground truncate block">
+											{selectedCaptador.pixKey || selectedCaptador.phone || "Não cadastrado"}
+										</span>
+									</div>
+								</div>
+							)}
+						</div>
 					</FieldGroup>
 				</div>
 
@@ -1178,7 +1317,21 @@ export function OpticalOrderForm({
 						idPrefix="receita"
 						title="Dioptrias e Medidas da Prescrição Médica"
 						value={aro1.diopters}
-						onChange={(diopters) => setAro1((a) => ({ ...a, diopters }))}
+						onChange={(diopters) => {
+							setAro1((a) => ({ ...a, diopters }));
+							if (isAro2Copy) {
+								setAro2((a2) => ({
+									...a2,
+									diopters: {
+										...a2.diopters,
+										od: { ...a2.diopters.od, esf: diopters.od.esf, cil: diopters.od.cil, eixo: diopters.od.eixo },
+										oe: { ...a2.diopters.oe, esf: diopters.oe.esf, cil: diopters.oe.cil, eixo: diopters.oe.eixo },
+										adicao: diopters.adicao,
+									},
+								}));
+							}
+						}}
+						lockAddition={aro1.lensType === "MONOFOCAL"}
 						onOcrCompleted={(doc, pat) => {
 							if (doc) setDoctorName(doc);
 							if (pat && !patient.name)
@@ -1259,209 +1412,466 @@ export function OpticalOrderForm({
 							</div>
 						</div>
 
-						{/* Seletor Dropdown do Catálogo de Armações (se estoque) */}
+						{/* MODO ESTOQUE: Código mandatório, dados travados, e bloqueio de estoque */}
 						{aro1FrameMode === "STOCK" ? (
-							<div className="p-3.5 rounded-xl bg-muted/30 border space-y-2">
-								<div className="flex items-center justify-between">
-									<FieldLabel className="text-xs font-semibold">
-										Selecionar Armação / Peça do Estoque
-									</FieldLabel>
+							<div className="space-y-3">
+								<div className="p-3.5 rounded-xl bg-muted/30 border space-y-3">
+									<div className="flex items-center justify-between">
+										<FieldLabel className="text-xs font-bold text-foreground flex items-center gap-1.5">
+											<span>Código do Produto * (Campo Mandatório)</span>
+										</FieldLabel>
+										{(() => {
+											const currentFrame = frameCatalog.find(
+												(f) =>
+													f.produto === aro1.frameModel ||
+													(f.marca === aro1.frameBrand && f.produto.includes(aro1.frameCode)) ||
+													f.produto.toLowerCase().includes(aro1.frameCode.toLowerCase())
+											);
+											if (!currentFrame) return null;
+											return (
+												<Badge
+													variant={currentFrame.estoque > 0 ? "secondary" : "destructive"}
+													className={`text-[10px] font-bold ${
+														currentFrame.estoque > 0
+															? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
+															: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20"
+													}`}
+												>
+													{currentFrame.estoque > 0
+														? `Estoque: ${currentFrame.estoque} un. disponíveis`
+														: "⚠️ SEM ESTOQUE FÍSICO (ESGOTADO)"}
+												</Badge>
+											);
+										})()}
+									</div>
+
+									{/* Seletor Rápido do Estoque */}
+									<div>
+										<FieldLabel className="text-[10px] font-semibold text-muted-foreground mb-1 block">
+											Localizar Peça no Catálogo de Estoque
+										</FieldLabel>
+										<select
+											value={
+												frameCatalog.find(
+													(f) =>
+														f.produto === aro1.frameModel ||
+														(f.marca === aro1.frameBrand &&
+															f.produto.includes(aro1.frameCode)),
+												)?.id || ""
+											}
+											onChange={(e) => {
+												const selected = frameCatalog.find(
+													(f) => f.id === e.target.value,
+												);
+												if (selected) {
+													const code = selected.produto.split(" ")[1] || selected.produto.slice(0, 8);
+													setAro1((a) => ({
+														...a,
+														frameCode: code,
+														frameBrand: selected.marca,
+														frameModel: selected.produto,
+														framePrice: selected.preco,
+														frameType: selected.tipo,
+														frameFamily: selected.familia,
+														frameManufacturer: selected.fabricante,
+														frameAro: selected.tamanhoAro,
+														framePonte: selected.tamanhoPonte,
+													}));
+												}
+											}}
+											className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer notranslate"
+											translate="no"
+										>
+											<option value="">Selecione pelo código ou modelo...</option>
+											{frameCatalog.map((f) => (
+												<option key={f.id} value={f.id}>
+													[{f.marca}] {f.produto} ({f.tipo}) — R$ {f.preco} (Estoque: {f.estoque} un.)
+												</option>
+											))}
+										</select>
+									</div>
+
+									{/* Campo Mandatório: Código do Produto com Busca Automática */}
+									<div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+										<div className="sm:col-span-2">
+											<FieldLabel className="text-xs font-bold text-primary flex items-center gap-1">
+												<span>Código do Produto *</span>
+												<Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-primary text-primary">
+													Obrigatório
+												</Badge>
+											</FieldLabel>
+											<Input
+												value={aro1.frameCode}
+												required
+												onChange={(e) => {
+													const val = e.target.value;
+													setAro1((a) => ({ ...a, frameCode: val }));
+													const matched = frameCatalog.find(
+														(f) =>
+															f.produto.toLowerCase().includes(val.toLowerCase()) ||
+															(f.marca.toLowerCase().includes(val.toLowerCase()))
+													);
+													if (matched && val.length >= 3) {
+														setAro1((a) => ({
+															...a,
+															frameCode: val,
+															frameBrand: matched.marca,
+															frameModel: matched.produto,
+															framePrice: matched.preco,
+															frameType: matched.tipo,
+															frameFamily: matched.familia,
+															frameManufacturer: matched.fabricante,
+															frameAro: matched.tamanhoAro,
+															framePonte: matched.tamanhoPonte,
+														}));
+													}
+												}}
+												placeholder="Digite o código da peça (ex: RB5228)"
+												className="h-8 text-xs font-mono font-bold border-primary focus:ring-primary"
+											/>
+										</div>
+
+										<div className="sm:col-span-2">
+											<div className="flex items-center justify-between mb-1">
+												<FieldLabel className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+													<Icon icon={Locked} className="size-3" />
+													<span>Descrição do Produto</span>
+												</FieldLabel>
+												<span className="text-[9px] text-muted-foreground">Travado</span>
+											</div>
+											<Input
+												value={aro1.frameModel}
+												readOnly
+												disabled
+												placeholder="Descrição trazida do catálogo"
+												className="h-8 text-xs bg-muted/40 cursor-not-allowed font-medium text-foreground"
+											/>
+										</div>
+									</div>
+
+									{/* Alerta de Estoque Zero */}
 									{(() => {
 										const currentFrame = frameCatalog.find(
 											(f) =>
 												f.produto === aro1.frameModel ||
-												(f.marca === aro1.frameBrand && f.produto.includes(aro1.frameCode))
+												(f.marca === aro1.frameBrand && f.produto.includes(aro1.frameCode)) ||
+												f.produto.toLowerCase().includes(aro1.frameCode.toLowerCase())
 										);
-										if (!currentFrame) return null;
-										return (
-											<Badge
-												variant={currentFrame.estoque > 0 ? "secondary" : "destructive"}
-												className={`text-[10px] font-bold ${
-													currentFrame.estoque > 0
-														? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
-														: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20"
-												}`}
-											>
-												{currentFrame.estoque > 0
-													? `Estoque: ${currentFrame.estoque} un. disponíveis (baixa aut.)`
-													: "⚠️ Sem Estoque no Momento"}
-											</Badge>
-										);
-									})()}
-								</div>
-								<select
-									value={
-										frameCatalog.find(
-											(f) =>
-												f.produto === aro1.frameModel ||
-												(f.marca === aro1.frameBrand &&
-													f.produto.includes(aro1.frameCode)),
-										)?.id || ""
-									}
-									onChange={(e) => {
-										const selected = frameCatalog.find(
-											(f) => f.id === e.target.value,
-										);
-										if (selected) {
-											setAro1((a) => ({
-												...a,
-												frameCode:
-													selected.produto.split(" ")[1] ||
-													selected.produto.slice(0, 8),
-												frameBrand: selected.marca,
-												frameModel: selected.produto,
-												framePrice: selected.preco,
-												frameType: selected.tipo,
-												frameFamily: selected.familia,
-												frameManufacturer: selected.fabricante,
-												frameAro: selected.tamanhoAro,
-												framePonte: selected.tamanhoPonte,
-											}));
+										if (currentFrame && currentFrame.estoque <= 0) {
+											return (
+												<div className="p-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300 text-xs font-semibold flex items-center gap-2">
+													<span className="text-base">🚫</span>
+													<div>
+														<span className="block font-bold">LANÇAMENTO BLOQUEADO: Peça sem estoque físico (0 un.)</span>
+														<span className="text-[11px] font-normal text-rose-600 dark:text-rose-400">
+															O sistema proíbe o lançamento de ordens de serviço com produtos esgotados. Selecione outro modelo com saldo em estoque.
+														</span>
+													</div>
+												</div>
+											);
 										}
-									}}
-									className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
-								>
-									<option value="">Selecione uma armação do estoque...</option>
-									{frameCatalog.map((f) => (
-										<option key={f.id} value={f.id}>
-											[{f.marca}] {f.produto} ({f.tipo}) — Aro {f.tamanhoAro}/{f.tamanhoPonte} — R$ {f.preco} (Estoque: {f.estoque} un.)
-										</option>
-									))}
-								</select>
+										return null;
+									})()}
+
+									{/* Demais Dados Demonstrados porém Travados / Não Editáveis */}
+									<div className="pt-2 border-t space-y-1.5">
+										<div className="flex items-center justify-between">
+											<span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+												<Icon icon={Locked} className="size-3" />
+												Dados Técnicos da Armação (Espelhados do Catálogo — Não Editáveis)
+											</span>
+											<Badge variant="outline" className="text-[9px] text-muted-foreground">
+												Somente Leitura
+											</Badge>
+										</div>
+
+										<div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-xs">
+											<div>
+												<FieldLabel className="text-[10px] text-muted-foreground">Marca</FieldLabel>
+												<Input
+													value={aro1.frameBrand}
+													readOnly
+													disabled
+													className="h-7 text-xs bg-muted/40 cursor-not-allowed"
+												/>
+											</div>
+											<div>
+												<FieldLabel className="text-[10px] text-muted-foreground">Preço (R$)</FieldLabel>
+												<Input
+													value={`R$ ${aro1.framePrice.toFixed(2)}`}
+													readOnly
+													disabled
+													className="h-7 text-xs font-bold text-primary bg-muted/40 cursor-not-allowed"
+												/>
+											</div>
+											<div>
+												<FieldLabel className="text-[10px] text-muted-foreground">Tipo</FieldLabel>
+												<Input
+													value={aro1.frameType || "RECEITUARIO"}
+													readOnly
+													disabled
+													className="h-7 text-xs bg-muted/40 cursor-not-allowed"
+												/>
+											</div>
+											<div>
+												<FieldLabel className="text-[10px] text-muted-foreground">Família</FieldLabel>
+												<Input
+													value={aro1.frameFamily || "-"}
+													readOnly
+													disabled
+													className="h-7 text-xs bg-muted/40 cursor-not-allowed"
+												/>
+											</div>
+											<div>
+												<FieldLabel className="text-[10px] text-muted-foreground">Aro (mm)</FieldLabel>
+												<Input
+													value={aro1.frameAro || "-"}
+													readOnly
+													disabled
+													className="h-7 text-xs font-mono bg-muted/40 cursor-not-allowed"
+												/>
+											</div>
+											<div>
+												<FieldLabel className="text-[10px] text-muted-foreground">Ponte (mm)</FieldLabel>
+												<Input
+													value={aro1.framePonte || "-"}
+													readOnly
+													disabled
+													className="h-7 text-xs font-mono bg-muted/40 cursor-not-allowed"
+												/>
+											</div>
+										</div>
+									</div>
+								</div>
 							</div>
 						) : (
-							<div className="p-3 rounded-lg border border-blue-500/20 bg-blue-500/10 text-xs text-blue-700 dark:text-blue-300 flex items-center gap-2">
-								<Icon icon={Glasses} className="size-4 shrink-0" />
-								<span>Armação de propriedade do cliente cadastrada com valor R$ 0,00. Não haverá baixa de estoque físico na ótica.</span>
+							/* MODO ARMAÇÃO TRAZIDA PELO CLIENTE: Medidas técnicas completas, Formato 2D e Foto */
+							<div className="p-3.5 rounded-xl bg-blue-500/5 border border-blue-500/20 space-y-3.5">
+								<div className="flex items-center justify-between border-b pb-2">
+									<div className="flex items-center gap-2 text-xs font-bold text-blue-700 dark:text-blue-300">
+										<Icon icon={Glasses} className="size-4" />
+										<span>Armação Trazida pelo Cliente (R$ 0,00 — Sem baixa de estoque físico)</span>
+									</div>
+									<Badge variant="outline" className="text-[10px] font-bold border-blue-500/30 text-blue-600 dark:text-blue-400">
+										Medição Técnica Mandatória
+									</Badge>
+								</div>
+
+								{/* Marca e Tipo */}
+								<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+									<Field>
+										<FieldLabel className="text-xs font-semibold">Marca da Armação *</FieldLabel>
+										<Input
+											value={customerFrameData.brand || ""}
+											onChange={(e) => {
+												const brand = e.target.value;
+												setCustomerFrameData((prev) => ({ ...prev, brand }));
+												setAro1((a) => ({ ...a, frameBrand: brand }));
+											}}
+											placeholder="Ex: Prada, Ray-Ban, Sem Marca"
+											className="h-8 text-xs"
+										/>
+									</Field>
+									<Field>
+										<FieldLabel className="text-xs font-semibold">Tipo da Armação *</FieldLabel>
+										<select
+											value={customerFrameData.type || "RECEITUARIO"}
+											onChange={(e) => {
+												const type = e.target.value;
+												setCustomerFrameData((prev) => ({ ...prev, type }));
+												setAro1((a) => ({ ...a, frameType: type }));
+											}}
+											className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs"
+										>
+											<option value="RECEITUARIO">Receituário (Acetato / Metal / Fio de Nylon)</option>
+											<option value="SOLAR">Solar (Com ou sem curvatura)</option>
+											<option value="CLIP_ON">Clip-on Magnético</option>
+											<option value="TRES_PECAS">Três Peças / Balgriff (Parafuso)</option>
+										</select>
+									</Field>
+								</div>
+
+								{/* Medidas Técnicas: Ponte, Aro, Vertical B, Diagonal Maior ED */}
+								<div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-2.5 rounded-lg bg-background border">
+									<Field>
+										<FieldLabel className="text-[11px] font-semibold">Ponte (mm) *</FieldLabel>
+										<Input
+											value={customerFrameData.bridge || ""}
+											onChange={(e) => {
+												const bridge = e.target.value;
+												setCustomerFrameData((prev) => ({ ...prev, bridge }));
+												setAro1((a) => ({ ...a, framePonte: bridge }));
+											}}
+											placeholder="Ex: 18"
+											className="h-7 text-xs font-mono"
+										/>
+									</Field>
+									<Field>
+										<FieldLabel className="text-[11px] font-semibold">Tamanho Aro (mm) *</FieldLabel>
+										<Input
+											value={customerFrameData.aro || ""}
+											onChange={(e) => {
+												const aro = e.target.value;
+												setCustomerFrameData((prev) => ({ ...prev, aro }));
+												setAro1((a) => ({ ...a, frameAro: aro }));
+											}}
+											placeholder="Ex: 52"
+											className="h-7 text-xs font-mono"
+										/>
+									</Field>
+									<Field>
+										<FieldLabel className="text-[11px] font-semibold">Vertical B (mm) *</FieldLabel>
+										<Input
+											value={customerFrameData.verticalB || ""}
+											onChange={(e) => {
+												const verticalB = e.target.value;
+												setCustomerFrameData((prev) => ({ ...prev, verticalB }));
+											}}
+											placeholder="Ex: 38"
+											className="h-7 text-xs font-mono"
+										/>
+									</Field>
+									<Field>
+										<FieldLabel className="text-[11px] font-semibold">Diagonal Maior ED (mm) *</FieldLabel>
+										<Input
+											value={customerFrameData.diagonalEd || ""}
+											onChange={(e) => {
+												const diagonalEd = e.target.value;
+												setCustomerFrameData((prev) => ({ ...prev, diagonalEd }));
+											}}
+											placeholder="Ex: 54"
+											className="h-7 text-xs font-mono"
+										/>
+									</Field>
+								</div>
+
+								{/* Seletor Visual de Formato 2D da Armação */}
+								<div className="space-y-1.5">
+									<div className="flex items-center justify-between">
+										<FieldLabel className="text-xs font-semibold">
+											Formato 2D da Armação Trazida (Seletor Visual)
+										</FieldLabel>
+										<span className="text-[10px] text-muted-foreground">
+											Selecionado: <strong className="text-foreground">{customerFrameData.shapeName || "Redondo"}</strong>
+										</span>
+									</div>
+									<div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-1.5">
+										{(frameShapes.length > 0 ? frameShapes : [
+											{ id: "shape_1", name: "Redondo", slug: "redondo", category: "Clássico", active: true },
+											{ id: "shape_2", name: "Quadrado", slug: "quadrado", category: "Geométrico", active: true },
+											{ id: "shape_3", name: "Retangular", slug: "retangular", category: "Executivo", active: true },
+											{ id: "shape_4", name: "Aviador", slug: "aviador", category: "Esportivo", active: true },
+											{ id: "shape_5", name: "Gatinho", slug: "gatinho", category: "Feminino", active: true },
+											{ id: "shape_6", name: "Geométrico", slug: "geometrico", category: "Conceito", active: true },
+											{ id: "shape_7", name: "Oval", slug: "oval", category: "Suave", active: true },
+											{ id: "shape_8", name: "Panto", slug: "panto", category: "Vintage", active: true },
+										]).filter((s) => s.active).map((shape) => {
+											const isSelected = (customerFrameData.shapeId || "shape_1") === shape.id;
+											return (
+												<button
+													type="button"
+													key={shape.id}
+													onClick={() =>
+														setCustomerFrameData((prev) => ({
+															...prev,
+															shapeId: shape.id,
+															shapeName: shape.name,
+														}))
+													}
+													className={`p-2 rounded-lg border text-center transition-all cursor-pointer flex flex-col items-center gap-1 ${
+														isSelected
+															? "bg-primary text-primary-foreground border-primary shadow-xs font-bold"
+															: "bg-background hover:bg-muted/50 border-input text-foreground"
+													}`}
+												>
+													<span className="text-base leading-none">
+														{shape.slug === "redondo" && "⭕"}
+														{shape.slug === "quadrado" && "⬛"}
+														{shape.slug === "retangular" && "▭"}
+														{shape.slug === "aviador" && "🕶️"}
+														{shape.slug === "gatinho" && "🐱"}
+														{shape.slug === "geometrico" && "⬡"}
+														{shape.slug === "oval" && "⬭"}
+														{shape.slug === "panto" && "👓"}
+														{!["redondo", "quadrado", "retangular", "aviador", "gatinho", "geometrico", "oval", "panto"].includes(shape.slug) && "👓"}
+													</span>
+													<span className="text-[10px] truncate w-full">{shape.name}</span>
+												</button>
+											);
+										})}
+									</div>
+								</div>
+
+								{/* Upload de Foto da Armação */}
+								<div className="p-3 rounded-lg bg-background border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+									<div className="flex items-center gap-3">
+										<div className="size-12 rounded-lg border bg-muted/30 flex items-center justify-center overflow-hidden shrink-0">
+											{customerFrameData.photoUrl ? (
+												<img
+													src={customerFrameData.photoUrl}
+													alt="Foto da armação trazida"
+													className="size-full object-cover"
+												/>
+											) : (
+												<Icon icon={Camera} className="size-5 text-muted-foreground" />
+											)}
+										</div>
+										<div>
+											<span className="text-xs font-semibold text-foreground block">
+												{customerFrameData.photoUrl ? "Foto da Armação Registrada" : "Fotografia da Armação Trazida"}
+											</span>
+											<span className="text-[10px] text-muted-foreground">
+												{customerFrameData.photoUrl
+													? "Imagem anexada ao prontuário técnico de laboratório."
+													: "Suba uma foto nítida frontal para conferência do bisel e montagem."}
+											</span>
+										</div>
+									</div>
+
+									<div className="flex items-center gap-2 w-full sm:w-auto">
+										<label className="flex items-center gap-1.5 px-3 h-8 rounded-lg bg-secondary hover:bg-secondary/80 text-secondary-foreground text-xs font-medium cursor-pointer transition-colors shadow-2xs">
+											<Icon icon={Camera} className="size-3.5" />
+											<span>{customerFrameData.photoUrl ? "Alterar Foto" : "Subir Foto"}</span>
+											<input
+												type="file"
+												accept="image/*"
+												capture="environment"
+												className="hidden"
+												onChange={(e) => {
+													const file = e.target.files?.[0];
+													if (file) {
+														const reader = new FileReader();
+														reader.onload = () => {
+															if (typeof reader.result === "string") {
+																setCustomerFrameData((prev) => ({
+																	...prev,
+																	photoUrl: reader.result as string,
+																}));
+																toast.success("Foto da armação carregada com sucesso!");
+															}
+														};
+														reader.readAsDataURL(file);
+													}
+												}}
+											/>
+										</label>
+										{customerFrameData.photoUrl && (
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												onClick={() =>
+													setCustomerFrameData((prev) => ({ ...prev, photoUrl: "" }))
+												}
+												className="h-8 text-xs text-rose-600 hover:bg-rose-500/10 cursor-pointer"
+											>
+												Remover
+											</Button>
+										)}
+									</div>
+								</div>
 							</div>
 						)}
-
-						<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-							<Field>
-								<FieldLabel>Cód. Armação</FieldLabel>
-								<Input
-									value={aro1.frameCode}
-									onChange={(e) =>
-										setAro1((a) => ({ ...a, frameCode: e.target.value }))
-									}
-									placeholder="RB5228"
-									className="h-8 text-xs font-mono"
-								/>
-							</Field>
-							<Field>
-								<FieldLabel>Marca</FieldLabel>
-								<Input
-									value={aro1.frameBrand}
-									onChange={(e) =>
-										setAro1((a) => ({ ...a, frameBrand: e.target.value }))
-									}
-									placeholder="Ray-Ban"
-									className="h-8 text-xs"
-								/>
-							</Field>
-							<Field>
-								<FieldLabel>Modelo</FieldLabel>
-								<Input
-									value={aro1.frameModel}
-									onChange={(e) =>
-										setAro1((a) => ({ ...a, frameModel: e.target.value }))
-									}
-									placeholder="Acetato Preto"
-									className="h-8 text-xs"
-								/>
-							</Field>
-							<Field>
-								<FieldLabel>R$ Armação</FieldLabel>
-								<Input
-									type="number"
-									step="0.01"
-									disabled={aro1FrameMode === "CUSTOMER"}
-									value={aro1FrameMode === "CUSTOMER" ? 0 : aro1.framePrice}
-									onChange={(e) =>
-										setAro1((a) => ({
-											...a,
-											framePrice: Number(e.target.value) || 0,
-										}))
-									}
-									className="h-8 text-xs font-semibold"
-								/>
-							</Field>
-						</div>
-
-						{/* Especificações Técnicas da Armação Espelhadas do Catálogo */}
-						<div className="p-2.5 rounded-lg bg-muted/20 border grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
-							<div>
-								<FieldLabel className="text-[10px] text-muted-foreground">
-									Tipo da Peça
-								</FieldLabel>
-								<select
-									value={aro1.frameType || "RECEITUARIO"}
-									onChange={(e) =>
-										setAro1((a) => ({ ...a, frameType: e.target.value as any }))
-									}
-									className="w-full h-7 px-2 rounded border bg-background text-xs"
-								>
-									<option value="RECEITUARIO">Receituário</option>
-									<option value="SOLAR">Solar</option>
-									<option value="CLIP_ON">Clip-on</option>
-								</select>
-							</div>
-							<div>
-								<FieldLabel className="text-[10px] text-muted-foreground">
-									Família / Coleção
-								</FieldLabel>
-								<Input
-									value={aro1.frameFamily || ""}
-									onChange={(e) =>
-										setAro1((a) => ({ ...a, frameFamily: e.target.value }))
-									}
-									placeholder="Ex: Wayfarer"
-									className="h-7 text-xs"
-								/>
-							</div>
-							<div>
-								<FieldLabel className="text-[10px] text-muted-foreground">
-									Fabricante
-								</FieldLabel>
-								<Input
-									value={aro1.frameManufacturer || ""}
-									onChange={(e) =>
-										setAro1((a) => ({
-											...a,
-											frameManufacturer: e.target.value,
-										}))
-									}
-									placeholder="Ex: Luxottica"
-									className="h-7 text-xs"
-								/>
-							</div>
-							<div>
-								<FieldLabel className="text-[10px] text-muted-foreground">
-									Tamanho Aro (mm)
-								</FieldLabel>
-								<Input
-									value={aro1.frameAro || ""}
-									onChange={(e) =>
-										setAro1((a) => ({ ...a, frameAro: e.target.value }))
-									}
-									placeholder="Ex: 52"
-									className="h-7 text-xs font-mono"
-								/>
-							</div>
-							<div>
-								<FieldLabel className="text-[10px] text-muted-foreground">
-									Tamanho Ponte (mm)
-								</FieldLabel>
-								<Input
-									value={aro1.framePonte || ""}
-									onChange={(e) =>
-										setAro1((a) => ({ ...a, framePonte: e.target.value }))
-									}
-									placeholder="Ex: 18"
-									className="h-7 text-xs font-mono"
-								/>
-							</div>
-						</div>
 					</div>
 
 					{/* Toggle Variação de Lente por Olho */}
@@ -2031,45 +2441,48 @@ export function OpticalOrderForm({
 								</div>
 
 								<div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-									<div className="sm:col-span-8 space-y-1.5">
-										<select
-											disabled={aro1.noTreatment}
-											value={
-												TREATMENT_OPTIONS.find((t) => t.name === aro1.treatment)?.name ||
-												(aro1.treatment ? "CUSTOM" : "")
-											}
-											onChange={(e) => {
-												const val = e.target.value;
-												if (val !== "CUSTOM") {
-													const selected = TREATMENT_OPTIONS.find((t) => t.name === val);
-													if (selected) {
-														setAro1((a) => ({
-															...a,
-															treatment: selected.name,
-															treatmentPrice: selected.price,
-														}));
-													}
+									<div className="sm:col-span-8">
+										<FieldLabel className="mb-1 text-xs">Opção / Descrição do Tratamento</FieldLabel>
+										<div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+											<select
+												disabled={aro1.noTreatment}
+												value={
+													TREATMENT_OPTIONS.find((t) => t.name === aro1.treatment)?.name ||
+													(aro1.treatment ? "CUSTOM" : "")
 												}
-											}}
-											className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs disabled:opacity-50"
-										>
-											<option value="">Selecione o Tratamento...</option>
-											{TREATMENT_OPTIONS.map((t) => (
-												<option key={t.name} value={t.name}>
-													[{t.lab}] {t.name} — R$ {t.price}
-												</option>
-											))}
-											<option value="CUSTOM">Outro (Digitar nome abaixo)...</option>
-										</select>
-										<Input
-											value={aro1.treatment}
-											disabled={aro1.noTreatment}
-											onChange={(e) =>
-												setAro1((a) => ({ ...a, treatment: e.target.value }))
-											}
-											placeholder="Ex: Crizal Rock / Antirreflexo"
-											className="h-8 text-xs"
-										/>
+												onChange={(e) => {
+													const val = e.target.value;
+													if (val !== "CUSTOM") {
+														const selected = TREATMENT_OPTIONS.find((t) => t.name === val);
+														if (selected) {
+															setAro1((a) => ({
+																...a,
+																treatment: selected.name,
+																treatmentPrice: selected.price,
+															}));
+														}
+													}
+												}}
+												className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs disabled:opacity-50 cursor-pointer"
+											>
+												<option value="">Selecione o Tratamento...</option>
+												{TREATMENT_OPTIONS.map((t) => (
+													<option key={t.name} value={t.name}>
+														[{t.lab}] {t.name} — R$ {t.price}
+													</option>
+												))}
+												<option value="CUSTOM">Outro (Digitar ao lado)...</option>
+											</select>
+											<Input
+												value={aro1.treatment}
+												disabled={aro1.noTreatment}
+												onChange={(e) =>
+													setAro1((a) => ({ ...a, treatment: e.target.value }))
+												}
+												placeholder="Nome do tratamento"
+												className="h-8 text-xs"
+											/>
+										</div>
 									</div>
 									<div className="sm:col-span-4">
 										<FieldLabel className="mb-1 text-xs">R$ Tratamento</FieldLabel>
@@ -2093,7 +2506,7 @@ export function OpticalOrderForm({
 					)}
 				</div>
 
-				{/* ETAPA 5: ARO 2 (DOBRO / 2º PAR - OPCIONAL) */}
+				{/* ETAPA 5: ARO 2 */}
 				<div className="rounded-xl border bg-card p-4 shadow-xs">
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-3">
@@ -2105,12 +2518,13 @@ export function OpticalOrderForm({
 							<div>
 								<label
 									htmlFor="aro2-toggle"
-									className="cursor-pointer font-bold text-sm text-foreground block"
+									translate="no"
+									className="cursor-pointer font-bold text-sm text-foreground block notranslate"
 								>
-									Etapa 5 • Ativar Aro 2 / Dobro (2º Par com Desconto)
+									Etapa 5 • Aro 2
 								</label>
-								<span className="text-[10px] text-muted-foreground">
-									Gera OS filha vinculada no laboratório para montagem independente com 30% desc. no par
+								<span translate="no" className="text-[10px] text-muted-foreground notranslate">
+									2º par de lentes e armação com 30% desc. automático
 								</span>
 							</div>
 						</div>
@@ -2121,10 +2535,11 @@ export function OpticalOrderForm({
 								variant="outline"
 								size="sm"
 								onClick={handleCopyAro1}
-								className="h-8 gap-1.5 text-xs font-medium text-primary hover:bg-primary/10 cursor-pointer"
+								translate="no"
+								className="h-8 gap-1.5 text-xs font-semibold text-primary hover:bg-primary/10 cursor-pointer notranslate"
 							>
 								<Icon icon={Copy} className="size-3.5" />
-								Copiar Aro 1 (c/ 30% Desc.)
+								Copiar Dados Aro 1
 							</Button>
 						)}
 					</div>
@@ -2134,10 +2549,10 @@ export function OpticalOrderForm({
 							<div className="flex items-center justify-between pb-2 border-b">
 								<div className="flex items-center gap-2 font-bold text-sm text-foreground">
 									<Icon icon={Glasses} className="size-4 text-amber-600" />
-									Aro 2 / Dobro — Desdobramento Técnico de Laboratório
+									<span translate="no" className="notranslate">Aro 2</span>
 								</div>
-								<Badge variant="outline" className="text-xs font-semibold border-amber-500/30 text-amber-600">
-									Gera OS Vinculada {orderNumber}-B
+								<Badge variant="outline" className="text-xs font-semibold border-amber-500/30 text-amber-600 notranslate" translate="no">
+									OS Vinculada {orderNumber}-B
 								</Badge>
 							</div>
 
@@ -2527,45 +2942,48 @@ export function OpticalOrderForm({
 									</div>
 
 									<div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-										<div className="sm:col-span-8 space-y-1.5">
-											<select
-												disabled={aro2.noTreatment}
-												value={
-													TREATMENT_OPTIONS.find((t) => t.name === aro2.treatment)?.name ||
-													(aro2.treatment ? "CUSTOM" : "")
-												}
-												onChange={(e) => {
-													const val = e.target.value;
-													if (val !== "CUSTOM") {
-														const selected = TREATMENT_OPTIONS.find((t) => t.name === val);
-														if (selected) {
-															setAro2((a) => ({
-																...a,
-																treatment: selected.name,
-																treatmentPrice: Math.round(selected.price * 0.7),
-															}));
-														}
+										<div className="sm:col-span-8">
+											<FieldLabel className="mb-1 text-xs">Opção / Descrição do Tratamento (2º Par)</FieldLabel>
+											<div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+												<select
+													disabled={aro2.noTreatment}
+													value={
+														TREATMENT_OPTIONS.find((t) => t.name === aro2.treatment)?.name ||
+														(aro2.treatment ? "CUSTOM" : "")
 													}
-												}}
-												className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs disabled:opacity-50"
-											>
-												<option value="">Selecione o Tratamento...</option>
-												{TREATMENT_OPTIONS.map((t) => (
-													<option key={t.name} value={t.name}>
-														[{t.lab}] {t.name} — R$ {Math.round(t.price * 0.7)} (Desc. 2º par)
-													</option>
-												))}
-												<option value="CUSTOM">Outro (Digitar nome abaixo)...</option>
-											</select>
-											<Input
-												value={aro2.treatment}
-												disabled={aro2.noTreatment}
-												onChange={(e) =>
-													setAro2((a) => ({ ...a, treatment: e.target.value }))
-												}
-												placeholder="Ex: Crizal Sun UV"
-												className="h-8 text-xs"
-											/>
+													onChange={(e) => {
+														const val = e.target.value;
+														if (val !== "CUSTOM") {
+															const selected = TREATMENT_OPTIONS.find((t) => t.name === val);
+															if (selected) {
+																setAro2((a) => ({
+																	...a,
+																	treatment: selected.name,
+																	treatmentPrice: Math.round(selected.price * 0.7),
+																}));
+															}
+														}
+													}}
+													className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs disabled:opacity-50 cursor-pointer"
+												>
+													<option value="">Selecione o Tratamento...</option>
+													{TREATMENT_OPTIONS.map((t) => (
+														<option key={t.name} value={t.name}>
+															[{t.lab}] {t.name} — R$ {Math.round(t.price * 0.7)} (Desc. 2º par)
+														</option>
+													))}
+													<option value="CUSTOM">Outro (Digitar ao lado)...</option>
+												</select>
+												<Input
+													value={aro2.treatment}
+													disabled={aro2.noTreatment}
+													onChange={(e) =>
+														setAro2((a) => ({ ...a, treatment: e.target.value }))
+													}
+													placeholder="Nome do tratamento (2º par)"
+													className="h-8 text-xs"
+												/>
+											</div>
 										</div>
 										<div className="sm:col-span-4">
 											<FieldLabel className="mb-1 text-xs">
@@ -2589,15 +3007,17 @@ export function OpticalOrderForm({
 								</div>
 							</div>
 
-							{/* Dioptrias Aro 2 */}
+							{/* Dioptrias Aro 2: Apenas DNP e Altura editáveis, demais blindadas */}
 							<div className="mt-4">
 								<OpticalDioptersTable
 									idPrefix="aro2"
-									title="Dioptrias e Medidas — Aro 2 (2º Par)"
+									title="Aro 2"
 									value={aro2.diopters}
 									onChange={(diopters) =>
 										setAro2((a) => ({ ...a, diopters }))
 									}
+									allowOnlyDnpAndAlt={true}
+									lockAddition={aro1.lensType === "MONOFOCAL" || aro2.lensType === "MONOFOCAL"}
 								/>
 							</div>
 						</div>
@@ -2614,9 +3034,10 @@ export function OpticalOrderForm({
 						<div className="flex items-center gap-2">
 							<Badge
 								variant={paymentMode === "TOTAL" ? "default" : "secondary"}
-								className="text-xs font-medium"
+								className="text-xs font-medium notranslate"
+								translate="no"
 							>
-								{paymentMode === "TOTAL" ? "Quitação Total (100%)" : "Apenas Sinal (Entrada)"}
+								{paymentMode === "TOTAL" ? "Pagamento Total" : "Sinal"}
 							</Badge>
 							<Badge variant="outline" className="text-[10px] font-bold text-emerald-600 border-emerald-500/30">
 								Passo 6 de 6
@@ -2627,33 +3048,35 @@ export function OpticalOrderForm({
 					{/* Seletor de Modo e Forma de Pagamento */}
 					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 						<div>
-							<FieldLabel className="mb-1 text-xs font-semibold">
-								Modo de Recebimento
+							<FieldLabel className="mb-1 text-xs font-semibold notranslate" translate="no">
+								Modo de Pagamento
 							</FieldLabel>
 							<div className="grid grid-cols-2 gap-2">
 								<Button
 									type="button"
 									variant={paymentMode === "TOTAL" ? "default" : "outline"}
 									size="sm"
-									className="h-9 text-xs font-semibold cursor-pointer"
+									className="h-9 text-xs font-semibold cursor-pointer notranslate"
+									translate="no"
 									onClick={() => setPaymentMode("TOTAL")}
 								>
-									Quitação Total (100%)
+									Pagamento Total
 								</Button>
 								<Button
 									type="button"
 									variant={paymentMode === "SINAL" ? "default" : "outline"}
 									size="sm"
-									className="h-9 text-xs font-semibold cursor-pointer"
+									className="h-9 text-xs font-semibold cursor-pointer notranslate"
+									translate="no"
 									onClick={() => setPaymentMode("SINAL")}
 								>
-									Apenas Sinal (Entrada)
+									Sinal
 								</Button>
 							</div>
 						</div>
 
 						<div>
-							<FieldLabel className="mb-1 text-xs font-semibold">
+							<FieldLabel className="mb-1 text-xs font-semibold notranslate" translate="no">
 								Forma de Pagamento
 							</FieldLabel>
 							<Select
@@ -2662,20 +3085,20 @@ export function OpticalOrderForm({
 									setPaymentMethod1(val as OpticalPaymentMethod)
 								}
 							>
-								<SelectTrigger className="h-9 text-xs font-medium">
+								<SelectTrigger className="h-9 text-xs font-medium notranslate" translate="no">
 									<SelectValue />
 								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="DINHEIRO">Dinheiro (Espécie)</SelectItem>
-									<SelectItem value="PIX">Pix Instantâneo</SelectItem>
-									<SelectItem value="CARTAO_CREDITO">
+								<SelectContent className="notranslate" translate="no">
+									<SelectItem value="DINHEIRO" className="notranslate" translate="no">Dinheiro (Espécie)</SelectItem>
+									<SelectItem value="PIX" className="notranslate" translate="no">Pix Instantâneo</SelectItem>
+									<SelectItem value="CARTAO_CREDITO" className="notranslate" translate="no">
 										Cartão de Crédito
 									</SelectItem>
-									<SelectItem value="CARTAO_DEBITO">
+									<SelectItem value="CARTAO_DEBITO" className="notranslate" translate="no">
 										Cartão de Débito
 									</SelectItem>
-									<SelectItem value="CREDIARIO">Crediário da Loja</SelectItem>
-									<SelectItem value="BOLETO">Boleto Bancário</SelectItem>
+									<SelectItem value="CREDIARIO" className="notranslate" translate="no">Crediário da Loja</SelectItem>
+									<SelectItem value="BOLETO" className="notranslate" translate="no">Boleto Bancário</SelectItem>
 								</SelectContent>
 							</Select>
 						</div>
@@ -2685,19 +3108,19 @@ export function OpticalOrderForm({
 					<div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
 						{paymentMethod1 === "CARTAO_CREDITO" && (
 							<div>
-								<FieldLabel className="mb-1 text-xs">
+								<FieldLabel className="mb-1 text-xs notranslate" translate="no">
 									Parcelas no Cartão
 								</FieldLabel>
 								<Select
 									value={String(cardInstallments1)}
 									onValueChange={(val) => setCardInstallments1(Number(val))}
 								>
-									<SelectTrigger className="h-8 text-xs font-medium">
+									<SelectTrigger className="h-8 text-xs font-medium notranslate" translate="no">
 										<SelectValue />
 									</SelectTrigger>
-									<SelectContent>
+									<SelectContent className="notranslate" translate="no">
 										{[1, 2, 3, 4, 5, 6, 10, 12].map((num) => (
-											<SelectItem key={num} value={String(num)}>
+											<SelectItem key={num} value={String(num)} className="notranslate" translate="no">
 												{num}x{" "}
 												{num === 1
 													? "(À vista)"

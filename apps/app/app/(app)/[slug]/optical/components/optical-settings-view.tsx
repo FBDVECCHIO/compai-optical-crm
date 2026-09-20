@@ -23,6 +23,7 @@ import Locked from "@carbon/icons-react/es/Locked";
 import Password from "@carbon/icons-react/es/Password";
 import Security from "@carbon/icons-react/es/Security";
 import Purchase from "@carbon/icons-react/es/Purchase";
+import Glasses from "@crm/ui/components/icons/glasses";
 import { OpticalSalesLogView } from "./optical-sales-log-view";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
@@ -93,6 +94,12 @@ import {
 	saveSupabaseClinics,
 	saveSupabaseDoctors,
 	saveSupabaseTechnicians,
+	fetchSupabaseCaptadores,
+	saveSupabaseCaptadores,
+	fetchSupabaseFrameShapes,
+	saveSupabaseFrameShapes,
+	type OpticalCaptador,
+	type OpticalFrameShape,
 	type SellerItem,
 	type StoreItem,
 	type TechnicianItem,
@@ -105,7 +112,9 @@ type SettingsSubTab =
 	| "labs"
 	| "vendedores"
 	| "medicos"
+	| "captadores"
 	| "comissoes"
+	| "formatos_aro"
 	| "tecnicos"
 	| "apoio"
 	| "tolerancias"
@@ -167,6 +176,21 @@ export function OpticalSettingsView() {
 	const [newIncidentReason, setNewIncidentReason] = useState("");
 	const [newVisitTopic, setNewVisitTopic] = useState("");
 	const [newCaptador, setNewCaptador] = useState("");
+
+	// Captadores & Comissões
+	const [captadores, setCaptadores] = useState<OpticalCaptador[]>([]);
+	const [newCapName, setNewCapName] = useState("");
+	const [newCapPhone, setNewCapPhone] = useState("");
+	const [newCapPix, setNewCapPix] = useState("");
+	const [newCapCommissionType, setNewCapCommissionType] = useState<"PERCENTUAL" | "FIXO">("PERCENTUAL");
+	const [newCapCommissionValue, setNewCapCommissionValue] = useState<number>(5);
+	const [newCapNotes, setNewCapNotes] = useState("");
+
+	// Formatos de Armação (2D)
+	const [frameShapes, setFrameShapes] = useState<OpticalFrameShape[]>([]);
+	const [newShapeName, setNewShapeName] = useState("");
+	const [newShapeCategory, setNewShapeCategory] = useState("Clássico");
+	const [newShapeDesc, setNewShapeDesc] = useState("");
 
 	// Vinculação em Massa de Médicos
 	const [bulkRepSelected, setBulkRepSelected] = useState("");
@@ -294,6 +318,8 @@ export function OpticalSettingsView() {
 					tTec,
 					tConf,
 					uList,
+					capList,
+					shapeList,
 				] = await Promise.all([
 					fetchSupabaseStores(),
 					fetchSupabaseLabs(),
@@ -337,6 +363,8 @@ export function OpticalSettingsView() {
 						"Olá {cliente}! Seu atendimento de assistência técnica foi CONFIRMADO por nosso técnico para o dia {data} às {hora}. Esperamos você!",
 					),
 					fetchSupabaseUsers(),
+					fetchSupabaseCaptadores(),
+					fetchSupabaseFrameShapes(),
 				]);
 
 				setStores(s);
@@ -356,6 +384,8 @@ export function OpticalSettingsView() {
 				setTemplateTecnico(tTec);
 				setTemplateClienteConf(tConf);
 				setUsersList(uList);
+				setCaptadores(capList);
+				setFrameShapes(shapeList);
 				setDiscountPolicies(getDiscountPolicies());
 				refreshDataCounts();
 				if (s.length > 0) setNewSellerStore(s[0]?.nome || "");
@@ -751,6 +781,83 @@ export function OpticalSettingsView() {
 		toast.info("Política de desconto removida.");
 	};
 
+	// Handlers de Captadores
+	const handleAddFullCaptador = async () => {
+		if (!newCapName.trim()) {
+			toast.error("Informe o nome do captador.");
+			return;
+		}
+		const newCap: OpticalCaptador = {
+			id: `cap-${Date.now()}`,
+			name: newCapName.trim(),
+			phone: newCapPhone.trim(),
+			pixKey: newCapPix.trim(),
+			commissionType: newCapCommissionType,
+			commissionValue: Number(newCapCommissionValue) || 0,
+			notes: newCapNotes.trim(),
+			active: true,
+		};
+		const updated = [newCap, ...captadores];
+		setCaptadores(updated);
+		setNewCapName("");
+		setNewCapPhone("");
+		setNewCapPix("");
+		setNewCapCommissionValue(5);
+		setNewCapNotes("");
+		toast.success(`Captador "${newCap.name}" cadastrado com sucesso!`);
+		await saveSupabaseCaptadores(updated);
+	};
+
+	const handleToggleCaptador = async (id: string) => {
+		const updated = captadores.map((c) => (c.id === id ? { ...c, active: !c.active } : c));
+		setCaptadores(updated);
+		toast.info("Status do captador alterado.");
+		await saveSupabaseCaptadores(updated);
+	};
+
+	const handleDeleteFullCaptador = async (id: string, name: string) => {
+		const updated = captadores.filter((c) => c.id !== id);
+		setCaptadores(updated);
+		toast.info(`Captador "${name}" removido.`);
+		await saveSupabaseCaptadores(updated);
+	};
+
+	// Handlers de Formatos de Aro (2D)
+	const handleAddFullFrameShape = async () => {
+		if (!newShapeName.trim()) {
+			toast.error("Informe o nome do formato (ex: Redondo, Retangular, Aviador).");
+			return;
+		}
+		const newShape: OpticalFrameShape = {
+			id: `shape-${Date.now()}`,
+			name: newShapeName.trim(),
+			slug: newShapeName.trim().toLowerCase().replace(/\s+/g, "_"),
+			category: newShapeCategory.trim() || "Clássico",
+			description: newShapeDesc.trim(),
+			active: true,
+		};
+		const updated = [...frameShapes, newShape];
+		setFrameShapes(updated);
+		setNewShapeName("");
+		setNewShapeDesc("");
+		toast.success(`Formato de aro "${newShape.name}" cadastrado!`);
+		await saveSupabaseFrameShapes(updated);
+	};
+
+	const handleToggleFrameShape = async (id: string) => {
+		const updated = frameShapes.map((s) => (s.id === id ? { ...s, active: !s.active } : s));
+		setFrameShapes(updated);
+		toast.info("Status do formato de aro alterado.");
+		await saveSupabaseFrameShapes(updated);
+	};
+
+	const handleDeleteFullFrameShape = async (id: string, name: string) => {
+		const updated = frameShapes.filter((s) => s.id !== id);
+		setFrameShapes(updated);
+		toast.info(`Formato "${name}" removido.`);
+		await saveSupabaseFrameShapes(updated);
+	};
+
 	const renderSubTabButton = (item: { id: SettingsSubTab; label: string; icon: any }) => {
 		const isActive = activeTab === item.id;
 		return (
@@ -835,25 +942,27 @@ export function OpticalSettingsView() {
 				</div>
 			</div>
 
-			{/* Sub Tabs Navigation: 5 em cima, 5 embaixo e Banco & Integridade à direita ocupando as duas linhas */}
+			{/* Sub Tabs Navigation: 6 em cima, 6 embaixo e Banco & Integridade à direita ocupando as duas linhas */}
 			<div className="w-full rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 p-3 shadow-xs">
 				<div className="flex flex-col md:flex-row items-stretch gap-2 w-full">
-					{/* Bloco Esquerda/Central: 2 fileiras perfeitamente simétricas com 5 botões de largura rigorosamente idêntica */}
+					{/* Bloco Esquerda/Central: 2 fileiras perfeitamente simétricas com 6 botões de largura rigorosamente idêntica */}
 					<div className="flex-1 flex flex-col gap-2 min-w-0">
-						{/* Linha 1: 5 botões */}
-						<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 w-full">
+						{/* Linha 1: 6 botões */}
+						<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 w-full">
 							{[
 								{ id: "lojas" as SettingsSubTab, label: `Lojas (${stores.length})`, icon: Building },
 								{ id: "labs" as SettingsSubTab, label: `Labs (${labs.length})`, icon: Chemistry },
 								{ id: "vendedores" as SettingsSubTab, label: `Vendedores (${sellers.length})`, icon: UserMultiple },
 								{ id: "medicos" as SettingsSubTab, label: "Médicos & Clínicas", icon: UserFollow },
+								{ id: "captadores" as SettingsSubTab, label: `Captadores (${captadores.length})`, icon: UserSpeaker },
 								{ id: "comissoes" as SettingsSubTab, label: "Comissões", icon: Money },
 							].map(renderSubTabButton)}
 						</div>
 
-						{/* Linha 2: 5 botões */}
-						<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 w-full">
+						{/* Linha 2: 6 botões */}
+						<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 w-full">
 							{[
+								{ id: "formatos_aro" as SettingsSubTab, label: `Formatos Aro (${frameShapes.length})`, icon: Glasses },
 								{ id: "tecnicos" as SettingsSubTab, label: "Técnicos & Zap", icon: Phone },
 								{ id: "apoio" as SettingsSubTab, label: "Tabelas Apoio", icon: Events },
 								{ id: "tolerancias" as SettingsSubTab, label: "Tolerâncias ISO", icon: RulerAlt },
@@ -1325,6 +1434,164 @@ export function OpticalSettingsView() {
 				</div>
 			)}
 
+			{/* CONTEÚDO DA ABA: CAPTADORES & COMISSÕES */}
+			{activeTab === "captadores" && (
+				<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+					<div className="rounded-xl border bg-card p-5 shadow-xs flex flex-col gap-4">
+						<h3 className="text-sm font-bold tracking-tight flex items-center gap-2">
+							<Icon icon={UserSpeaker} className="size-4 text-primary" />
+							Cadastrar Novo Captador
+						</h3>
+						<p className="text-xs text-muted-foreground">
+							Cadastre captadores e promotores parceiros. Eles podem ser vinculados diretamente à OS na etapa de atendimento para cálculo automático de comissões.
+						</p>
+						<div className="flex flex-col gap-3">
+							<div>
+								<label className="text-[11px] font-medium text-muted-foreground">Nome Completo / Parceiro *</label>
+								<Input
+									placeholder="Ex: Roberto Silva"
+									value={newCapName}
+									onChange={(e) => setNewCapName(e.target.value)}
+									className="text-xs h-9 mt-1"
+								/>
+							</div>
+							<div className="grid grid-cols-2 gap-2">
+								<div>
+									<label className="text-[11px] font-medium text-muted-foreground">WhatsApp / Fone</label>
+									<Input
+										placeholder="(19) 99999-9999"
+										value={newCapPhone}
+										onChange={(e) => setNewCapPhone(e.target.value)}
+										className="text-xs h-9 mt-1"
+									/>
+								</div>
+								<div>
+									<label className="text-[11px] font-medium text-muted-foreground">Chave PIX</label>
+									<Input
+										placeholder="CPF, Telefone ou E-mail"
+										value={newCapPix}
+										onChange={(e) => setNewCapPix(e.target.value)}
+										className="text-xs h-9 mt-1"
+									/>
+								</div>
+							</div>
+							<div className="grid grid-cols-2 gap-2">
+								<div>
+									<label className="text-[11px] font-medium text-muted-foreground">Tipo de Comissão</label>
+									<select
+										value={newCapCommissionType}
+										onChange={(e) => setNewCapCommissionType(e.target.value as "PERCENTUAL" | "FIXO")}
+										className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring mt-1"
+									>
+										<option value="PERCENTUAL">Percentual (%)</option>
+										<option value="FIXO">Valor Fixo (R$)</option>
+									</select>
+								</div>
+								<div>
+									<label className="text-[11px] font-medium text-muted-foreground">
+										Valor ({newCapCommissionType === "PERCENTUAL" ? "%" : "R$"})
+									</label>
+									<Input
+										type="number"
+										step={newCapCommissionType === "PERCENTUAL" ? "0.5" : "5"}
+										value={newCapCommissionValue}
+										onChange={(e) => setNewCapCommissionValue(Number(e.target.value))}
+										className="text-xs h-9 mt-1 font-mono font-bold"
+									/>
+								</div>
+							</div>
+							<div>
+								<label className="text-[11px] font-medium text-muted-foreground">Observações / Acordo</label>
+								<Input
+									placeholder="Ex: Parceria via clínica conveniada"
+									value={newCapNotes}
+									onChange={(e) => setNewCapNotes(e.target.value)}
+									className="text-xs h-9 mt-1"
+								/>
+							</div>
+							<Button size="sm" onClick={handleAddFullCaptador} className="gap-1.5 font-semibold mt-1">
+								<Icon icon={Add} className="size-4" />
+								Cadastrar Captador
+							</Button>
+						</div>
+					</div>
+
+					<div className="lg:col-span-2 rounded-xl border bg-card shadow-xs overflow-hidden flex flex-col">
+						<div className="border-b px-4 py-3 bg-muted/30 flex items-center justify-between">
+							<div>
+								<span className="text-xs font-bold text-foreground">
+									Captadores Cadastrados ({captadores.length})
+								</span>
+								<p className="text-[11px] text-muted-foreground">
+									Disponíveis para seleção imediata no lançamento de Novas OSs
+								</p>
+							</div>
+							<Badge variant="outline" className="text-[10px]">
+								Sincronizado Supabase
+							</Badge>
+						</div>
+						<div className="divide-y flex-1 overflow-y-auto max-h-[500px]">
+							{captadores.length === 0 ? (
+								<div className="p-8 text-center text-xs text-muted-foreground">
+									Nenhum captador cadastrado ainda. Cadastre o primeiro captador no formulário ao lado.
+								</div>
+							) : (
+								captadores.map((cap) => (
+									<div
+										key={cap.id}
+										className={cn(
+											"flex items-center justify-between p-4 text-xs transition-colors hover:bg-muted/40",
+											!cap.active && "opacity-60 bg-muted/20"
+										)}
+									>
+										<div className="flex flex-col gap-1">
+											<div className="flex items-center gap-2">
+												<span className="font-bold text-sm text-foreground">{cap.name}</span>
+												<Badge
+													variant={cap.active ? "default" : "secondary"}
+													className="text-[10px] cursor-pointer"
+													onClick={() => handleToggleCaptador(cap.id)}
+												>
+													{cap.active ? "Ativo" : "Inativo"}
+												</Badge>
+												<Badge variant="outline" className="text-[10px] font-mono font-bold bg-primary/10 text-primary border-primary/20">
+													{cap.commissionType === "PERCENTUAL"
+														? `${cap.commissionValue}% do Total`
+														: `R$ ${cap.commissionValue.toFixed(2)} fixo`}
+												</Badge>
+											</div>
+											<div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+												{cap.phone && <span>📱 {cap.phone}</span>}
+												{cap.pixKey && <span>🔑 PIX: <code className="font-mono text-[10px]">{cap.pixKey}</code></span>}
+												{cap.notes && <span>📝 {cap.notes}</span>}
+											</div>
+										</div>
+										<div className="flex items-center gap-1">
+											<Button
+												variant="ghost"
+												size="sm"
+												onClick={() => handleToggleCaptador(cap.id)}
+												className="text-xs h-8"
+											>
+												{cap.active ? "Desativar" : "Ativar"}
+											</Button>
+											<Button
+												variant="ghost"
+												size="icon-sm"
+												className="text-muted-foreground hover:text-destructive"
+												onClick={() => handleDeleteFullCaptador(cap.id, cap.name)}
+											>
+												<Icon icon={TrashCan} className="size-4" />
+											</Button>
+										</div>
+									</div>
+								))
+							)}
+						</div>
+					</div>
+				</div>
+			)}
+
 			{/* CONTEÚDO DA ABA: COMISSÕES & FINANCEIRO */}
 			{activeTab === "comissoes" && (
 				<div className="flex flex-col gap-6">
@@ -1516,6 +1783,131 @@ export function OpticalSettingsView() {
 							>
 								Adicionar
 							</Button>
+						</div>
+					</div>
+				</div>
+			)}
+
+			{/* CONTEÚDO DA ABA: FORMATOS DE ARO (2D) */}
+			{activeTab === "formatos_aro" && (
+				<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+					<div className="rounded-xl border bg-card p-5 shadow-xs flex flex-col gap-4">
+						<h3 className="text-sm font-bold tracking-tight flex items-center gap-2">
+							<Icon icon={Glasses} className="size-4 text-primary" />
+							Cadastrar Formato de Aro
+						</h3>
+						<p className="text-xs text-muted-foreground">
+							Defina os perfis de aro geométricos 2D que aparecem como opção rápida de seleção quando o cliente traz a própria armação no balcão da ótica.
+						</p>
+						<div className="flex flex-col gap-3">
+							<div>
+								<label className="text-[11px] font-medium text-muted-foreground">Nome do Formato *</label>
+								<Input
+									placeholder="Ex: Borboleta, Clubmaster, Retangular Esportivo"
+									value={newShapeName}
+									onChange={(e) => setNewShapeName(e.target.value)}
+									className="text-xs h-9 mt-1"
+								/>
+							</div>
+							<div>
+								<label className="text-[11px] font-medium text-muted-foreground">Categoria do Estilo</label>
+								<select
+									value={newShapeCategory}
+									onChange={(e) => setNewShapeCategory(e.target.value)}
+									className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring mt-1"
+								>
+									<option value="Clássico">Clássico</option>
+									<option value="Moderno">Moderno</option>
+									<option value="Vintage / Retrô">Vintage / Retrô</option>
+									<option value="Esportivo">Esportivo</option>
+									<option value="Geométrico">Geométrico</option>
+									<option value="Outro">Outro</option>
+								</select>
+							</div>
+							<div>
+								<label className="text-[11px] font-medium text-muted-foreground">Descrição / Dica Visual</label>
+								<Input
+									placeholder="Ex: Aro fino, cantos arredondados, indicado p/ míopes"
+									value={newShapeDesc}
+									onChange={(e) => setNewShapeDesc(e.target.value)}
+									className="text-xs h-9 mt-1"
+								/>
+							</div>
+							<Button size="sm" onClick={handleAddFullFrameShape} className="gap-1.5 font-semibold mt-1">
+								<Icon icon={Add} className="size-4" />
+								Adicionar Formato 2D
+							</Button>
+						</div>
+					</div>
+
+					<div className="lg:col-span-2 rounded-xl border bg-card shadow-xs overflow-hidden flex flex-col">
+						<div className="border-b px-4 py-3 bg-muted/30 flex items-center justify-between">
+							<div>
+								<span className="text-xs font-bold text-foreground">
+									Formatos de Aro Homologados ({frameShapes.length})
+								</span>
+								<p className="text-[11px] text-muted-foreground">
+									Exibidos no catálogo interativo do Aro 1 (Armação Trazida pelo Cliente)
+								</p>
+							</div>
+							<Badge variant="outline" className="text-[10px]">
+								Sincronizado Supabase
+							</Badge>
+						</div>
+						<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 overflow-y-auto max-h-[500px]">
+							{frameShapes.length === 0 ? (
+								<div className="col-span-2 p-8 text-center text-xs text-muted-foreground">
+									Nenhum formato cadastrado. Cadastre o primeiro formato geométrico ao lado.
+								</div>
+							) : (
+								frameShapes.map((shape) => (
+									<div
+										key={shape.id}
+										className={cn(
+											"flex items-center justify-between p-3.5 rounded-xl border bg-background shadow-2xs hover:border-primary/50 transition-all",
+											!shape.active && "opacity-60 bg-muted/20"
+										)}
+									>
+										<div className="flex items-center gap-3">
+											<div className="size-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+												<Icon icon={Glasses} className="size-5 text-primary" />
+											</div>
+											<div>
+												<div className="flex items-center gap-2">
+													<span className="font-bold text-xs text-foreground">{shape.name}</span>
+													<Badge variant="secondary" className="text-[9px] py-0 px-1.5">
+														{shape.category || "Clássico"}
+													</Badge>
+												</div>
+												{shape.description && (
+													<p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">
+														{shape.description}
+													</p>
+												)}
+											</div>
+										</div>
+										<div className="flex items-center gap-1">
+											<Button
+												variant="ghost"
+												size="icon-sm"
+												onClick={() => handleToggleFrameShape(shape.id)}
+												title={shape.active ? "Desativar" : "Ativar"}
+												className={shape.active ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}
+											>
+												<Icon icon={Checkmark} className="size-3.5" />
+											</Button>
+											<Button
+												variant="ghost"
+												size="icon-sm"
+												className="text-muted-foreground hover:text-destructive"
+												onClick={() => handleDeleteFullFrameShape(shape.id, shape.name)}
+											>
+												<Icon icon={TrashCan} className="size-3.5" />
+											</Button>
+										</div>
+									</div>
+								))
+							)}
 						</div>
 					</div>
 				</div>

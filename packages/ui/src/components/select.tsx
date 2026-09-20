@@ -62,9 +62,17 @@ function SelectGroup({
 }
 
 function SelectValue({
+	className,
 	...props
 }: React.ComponentProps<typeof SelectPrimitive.Value>) {
-	return <SelectPrimitive.Value data-slot="select-value" {...props} />;
+	return (
+		<SelectPrimitive.Value
+			data-slot="select-value"
+			translate="no"
+			className={cn("notranslate", className)}
+			{...props}
+		/>
+	);
 }
 
 const selectTriggerVariants = cva(
@@ -98,7 +106,8 @@ function SelectTrigger({
 		<SelectPrimitive.Trigger
 			data-slot="select-trigger"
 			data-size={size}
-			className={cn(selectTriggerVariants({ variant }), className)}
+			translate="no"
+			className={cn(selectTriggerVariants({ variant }), "notranslate", className)}
 			{...props}
 		>
 			{children}

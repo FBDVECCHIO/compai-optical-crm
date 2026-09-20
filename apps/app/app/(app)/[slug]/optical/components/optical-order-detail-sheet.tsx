@@ -6,12 +6,15 @@ import CheckmarkFilled from "@carbon/icons-react/es/CheckmarkFilled";
 import Launch from "@carbon/icons-react/es/Launch";
 import Money from "@carbon/icons-react/es/Money";
 import Phone from "@carbon/icons-react/es/Phone";
+import Printer from "@carbon/icons-react/es/Printer";
+import DocumentPdf from "@carbon/icons-react/es/DocumentPdf";
 import Time from "@carbon/icons-react/es/Time";
 import WarningFilled from "@carbon/icons-react/es/WarningFilled";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
 import { Icon } from "@crm/ui/components/icon";
 import Glasses from "@crm/ui/components/icons/glasses";
+import { printOpticalOrder } from "@/lib/optical/optical-print-order";
 import {
 	Select,
 	SelectContent,
@@ -132,7 +135,8 @@ export function OpticalOrderDetailSheet({
 		<Sheet open={open} onOpenChange={onOpenChange}>
 			<SheetContent
 				side="right"
-				className="w-full sm:max-w-3xl overflow-y-auto p-6"
+				translate="no"
+				className="w-full sm:max-w-4xl overflow-y-auto p-6 notranslate"
 			>
 				<SheetHeader className="mb-4 pb-3 border-b">
 					<div className="flex flex-wrap items-center justify-between gap-3">
@@ -155,25 +159,45 @@ export function OpticalOrderDetailSheet({
 							</div>
 						</div>
 
-						{/* Quick Status Updater */}
-						<div className="flex items-center gap-2">
-							<span className="text-xs text-muted-foreground font-medium">
-								Status:
-							</span>
-							<Select value={order.status} onValueChange={handleStatusChange}>
-								<SelectTrigger className="h-8 w-44 text-xs font-semibold">
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="DIGITADA">Digitada</SelectItem>
-									<SelectItem value="EM_LABORATORIO">Em Laboratório</SelectItem>
-									<SelectItem value="EM_MONTAGEM">Em Montagem</SelectItem>
-									<SelectItem value="CONFERIDA">Conferida Técnica</SelectItem>
-									<SelectItem value="PRONTA_LOJA">Pronta na Loja</SelectItem>
-									<SelectItem value="ENTREGUE">Entregue ao Cliente</SelectItem>
-									<SelectItem value="CANCELADA">Cancelada</SelectItem>
-								</SelectContent>
-							</Select>
+						{/* Quick Actions & Status Updater */}
+						<div className="flex flex-wrap items-center gap-2">
+							<Button
+								variant="outline"
+								size="sm"
+								className="h-8 text-xs font-semibold gap-1.5 cursor-pointer shadow-2xs bg-card hover:bg-muted"
+								onClick={() => printOpticalOrder(order, { mode: "A4" })}
+							>
+								<Icon icon={Printer} className="size-3.5 text-primary" />
+								Imprimir OS
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								className="h-8 text-xs font-semibold gap-1.5 cursor-pointer shadow-2xs border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+								onClick={() => printOpticalOrder(order, { mode: "A4" })}
+							>
+								<Icon icon={DocumentPdf} className="size-3.5" />
+								Gerar PDF
+							</Button>
+							<div className="flex items-center gap-1.5 ml-1 pl-2 border-l">
+								<span className="text-xs text-muted-foreground font-medium">
+									Status:
+								</span>
+								<Select value={order.status} onValueChange={handleStatusChange}>
+									<SelectTrigger className="h-8 w-40 text-xs font-semibold">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="DIGITADA">Digitada</SelectItem>
+										<SelectItem value="EM_LABORATORIO">Em Laboratório</SelectItem>
+										<SelectItem value="EM_MONTAGEM">Em Montagem</SelectItem>
+										<SelectItem value="CONFERIDA">Conferida Técnica</SelectItem>
+										<SelectItem value="PRONTA_LOJA">Pronta na Loja</SelectItem>
+										<SelectItem value="ENTREGUE">Entregue ao Cliente</SelectItem>
+										<SelectItem value="CANCELADA">Cancelada</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
 						</div>
 					</div>
 				</SheetHeader>
@@ -445,6 +469,15 @@ export function OpticalOrderDetailSheet({
 										{order.doctor?.name || "Médico"}
 									</span>{" "}
 									({order.doctor?.crm || "CRM não inf."})
+								</div>
+							)}
+							{order.captador && (
+								<div className="text-muted-foreground pt-1 border-t">
+									Captador / Indicação Parceira:{" "}
+									<span className="font-medium text-foreground">
+										{order.captador.name}
+									</span>{" "}
+									({order.captador.commissionType === "PERCENTUAL" ? `${order.captador.commissionValue}%` : `R$ ${order.captador.commissionValue}`} — Estimativa: R$ {order.captador.calculatedCommission?.toFixed(2) || "0.00"})
 								</div>
 							)}
 						</div>

@@ -28,7 +28,10 @@ export function OpticalStandaloneContainer() {
 	}
 
 	return (
-		<main className="h-screen bg-zinc-200 dark:bg-zinc-950 text-foreground flex flex-col overflow-hidden">
+		<main
+			translate="no"
+			className="notranslate h-screen bg-zinc-200 dark:bg-zinc-950 text-foreground flex flex-col overflow-hidden"
+		>
 			{/* Main Optical Client View com Top Nav Engessado */}
 			<div className="flex-1 flex min-h-0 overflow-hidden">
 				<Suspense fallback={<div className="p-8 text-center text-sm text-zinc-500">Carregando MNOC-X...</div>}>
