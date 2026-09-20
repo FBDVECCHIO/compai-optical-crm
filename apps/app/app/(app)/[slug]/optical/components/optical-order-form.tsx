@@ -53,6 +53,8 @@ import {
 	saveSupabaseDoctors,
 	fetchSupabaseCaptadores,
 	fetchSupabaseFrameShapes,
+	fetchSupabaseFrameTypes,
+	type OpticalFrameType,
 	type StoreItem,
 	type SellerItem,
 	type DoctorItem,
@@ -246,6 +248,7 @@ export function OpticalOrderForm({
 	const [lensTypeFilter2, setLensTypeFilter2] = useState<string>("ALL");
 	const [lensIndexFilter2, setLensIndexFilter2] = useState<string>("ALL");
 	const [lensSearchQuery2, setLensSearchQuery2] = useState<string>("");
+	const [availableFrameTypes, setAvailableFrameTypes] = useState<OpticalFrameType[]>([]);
 
 	useEffect(() => {
 		Promise.all([
@@ -256,7 +259,8 @@ export function OpticalOrderForm({
 			fetchFrameCatalog(),
 			fetchSupabaseCaptadores(),
 			fetchSupabaseFrameShapes(),
-		]).then(([loadedStores, loadedSellers, loadedDoctors, loadedLenses, loadedFrames, loadedCaptadores, loadedShapes]) => {
+			fetchSupabaseFrameTypes(),
+		]).then(([loadedStores, loadedSellers, loadedDoctors, loadedLenses, loadedFrames, loadedCaptadores, loadedShapes, loadedFrameTypes]) => {
 			setStores(loadedStores);
 			setSellers(loadedSellers);
 			setDoctors(loadedDoctors);
@@ -264,6 +268,7 @@ export function OpticalOrderForm({
 			setFrameCatalog(loadedFrames);
 			setCaptadores(loadedCaptadores);
 			setFrameShapes(loadedShapes);
+			setAvailableFrameTypes(loadedFrameTypes);
 
 			if (loadedStores.length > 0) {
 				setStoreName(loadedStores[0]!.nome);
@@ -1675,18 +1680,32 @@ export function OpticalOrderForm({
 									<Field>
 										<FieldLabel className="text-xs font-semibold">Tipo da Armação *</FieldLabel>
 										<select
-											value={customerFrameData.type || "RECEITUARIO"}
+											value={customerFrameData.type || "Acetato"}
 											onChange={(e) => {
 												const type = e.target.value;
 												setCustomerFrameData((prev) => ({ ...prev, type }));
 												setAro1((a) => ({ ...a, frameType: type }));
 											}}
-											className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs"
+											className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer notranslate"
+											translate="no"
 										>
-											<option value="RECEITUARIO">Receituário (Acetato / Metal / Fio de Nylon)</option>
-											<option value="SOLAR">Solar (Com ou sem curvatura)</option>
-											<option value="CLIP_ON">Clip-on Magnético</option>
-											<option value="TRES_PECAS">Três Peças / Balgriff (Parafuso)</option>
+											{availableFrameTypes.length > 0 ? (
+												availableFrameTypes
+													.filter((t) => t.ativo)
+													.map((ft) => (
+														<option key={ft.id} value={ft.nome}>
+															{ft.nome} {ft.descricao ? `(${ft.descricao})` : ""}
+														</option>
+													))
+											) : (
+												<>
+													<option value="Nylon">Nylon (Fio de Nylon / Meio Aro)</option>
+													<option value="Metal">Metal (Aro Completo em Metal)</option>
+													<option value="Acetato">Acetato (Aro Fechado em Acetato)</option>
+													<option value="Parafusado">Parafusado (Três Peças / Balgriff)</option>
+													<option value="Fio de Aço">Fio de Aço (Armação Fio de Aço / Flex)</option>
+												</>
+											)}
 										</select>
 									</Field>
 								</div>

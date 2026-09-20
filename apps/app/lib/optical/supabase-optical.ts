@@ -1,11 +1,13 @@
 import type {
 	FrameCatalogItem,
+	FrameTypeItem,
 	LensCatalogItem,
 	MessageTemplateItem,
 	OpticalOrder,
 	OpticalOrderStatus,
 	PostSalesRecord,
 	PostSalesStage,
+	RoleDiscountTier,
 } from "./optical-types";
 import {
 	INITIAL_FRAME_CATALOG,
@@ -53,6 +55,9 @@ export interface SellerItem {
 	id: number;
 	nome: string;
 	loja?: string;
+	cargo?: string;
+	maxDiscountPct?: number;
+	usuarioId?: number;
 }
 
 export interface RepItem {
@@ -325,7 +330,33 @@ export async function deleteSupabaseLab(id: number): Promise<boolean> {
 
 export async function fetchSupabaseSellers(): Promise<SellerItem[]> {
 	try {
-		return await mnocxDatabaseClient.getSellers();
+		const baseSellers = await mnocxDatabaseClient.getSellers();
+		const users = await fetchSupabaseUsers();
+		const sellerUsers = users.filter(
+			(u) =>
+				u.status === "ATIVO" &&
+				(u.isVendedor === true ||
+					(u.cargo && u.cargo.toLowerCase().includes("vendedor")) ||
+					(u.isVendedor !== false && u.venda === "ATIVO" && u.usuario !== "admin"))
+		);
+
+		const merged: SellerItem[] = [...baseSellers];
+		for (const u of sellerUsers) {
+			const exists = merged.some(
+				(s) => s.nome.trim().toLowerCase() === u.nome.trim().toLowerCase()
+			);
+			if (!exists) {
+				merged.push({
+					id: u.id || Date.now(),
+					nome: u.nome,
+					loja: u.loja,
+					cargo: u.cargo,
+					maxDiscountPct: u.perfilDescontoMaxPct,
+					usuarioId: u.id,
+				});
+			}
+		}
+		return merged;
 	} catch (e) {
 		console.warn("Erro ao carregar vendedores:", e);
 		return [
@@ -872,6 +903,9 @@ export interface OpticalUserRecord {
 	nome: string;
 	status: "ATIVO" | "INATIVO";
 	loja: string;
+	cargo?: string;
+	perfilDescontoMaxPct?: number;
+	isVendedor?: boolean;
 	conferencia: "ATIVO" | "INATIVO";
 	registros?: "ATIVO" | "INATIVO";
 	dashboard: "ATIVO" | "INATIVO";
@@ -1050,6 +1084,17 @@ export async function saveSupabaseUser(user: Partial<OpticalUserRecord>): Promis
 			nome: user.nome || "Usuário",
 			status: user.status || "ATIVO",
 			loja: user.loja || "Todos",
+			cargo: user.cargo || (user.usuario === "admin" ? "Diretoria / Admin" : "Vendedor Pleno"),
+			perfilDescontoMaxPct:
+				user.perfilDescontoMaxPct !== undefined
+					? user.perfilDescontoMaxPct
+					: user.usuario === "admin"
+						? 100
+						: 10,
+			isVendedor:
+				user.isVendedor !== undefined
+					? user.isVendedor
+					: user.venda === "ATIVO" && user.usuario !== "admin",
 			venda: user.venda || "ATIVO",
 			conferencia: user.conferencia || "INATIVO",
 			log_vendas: user.log_vendas || "ATIVO",
@@ -1067,6 +1112,17 @@ export async function saveSupabaseUser(user: Partial<OpticalUserRecord>): Promis
 			updated = [...users, fullUser];
 		}
 		await mnocxDatabaseClient.saveConfig("users", updated);
+
+		// Se for marcado como vendedor ativo, sincroniza no cadastro de vendedores
+		if (fullUser.isVendedor && fullUser.status === "ATIVO") {
+			try {
+				await mnocxDatabaseClient.saveSeller({
+					nome: fullUser.nome,
+					loja: fullUser.loja,
+				});
+			} catch {}
+		}
+
 		return true;
 	} catch (e) {
 		console.error("Erro ao salvar usuário:", e);
@@ -2026,3 +2082,96 @@ export async function saveSupabaseFrameShapes(items: OpticalFrameShape[]): Promi
 	}
 	return false;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 17. TIPOS DE ARMAÇÃO (PARAMETRIZÁVEIS)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type OpticalFrameType = FrameTypeItem;
+
+export const DEFAULT_FRAME_TYPES: OpticalFrameType[] = [
+	{ id: "tipo_nylon", nome: "Nylon", descricao: "Fio de Nylon / Meio Aro", ativo: true, ordem: 1 },
+	{ id: "tipo_metal", nome: "Metal", descricao: "Aro Completo em Metal", ativo: true, ordem: 2 },
+	{ id: "tipo_acetato", nome: "Acetato", descricao: "Aro Fechado em Acetato", ativo: true, ordem: 3 },
+	{ id: "tipo_parafusado", nome: "Parafusado", descricao: "Três Peças / Balgriff / Sem Aro", ativo: true, ordem: 4 },
+	{ id: "tipo_fio_aco", nome: "Fio de Aço", descricao: "Armação Fio de Aço / Flexível", ativo: true, ordem: 5 },
+];
+
+const FRAME_TYPES_STORAGE_KEY = "mnocx_frame_types_v1";
+
+export async function fetchSupabaseFrameTypes(): Promise<OpticalFrameType[]> {
+	try {
+		return await mnocxDatabaseClient.getConfig<OpticalFrameType[]>("frame_types", DEFAULT_FRAME_TYPES);
+	} catch (e) {
+		if (typeof window !== "undefined") {
+			try {
+				const saved = localStorage.getItem(FRAME_TYPES_STORAGE_KEY);
+				if (saved) {
+					const parsed = JSON.parse(saved);
+					if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+				}
+			} catch {}
+		}
+		return DEFAULT_FRAME_TYPES;
+	}
+}
+
+export async function saveSupabaseFrameTypes(items: OpticalFrameType[]): Promise<boolean> {
+	try {
+		await mnocxDatabaseClient.saveConfig("frame_types", items);
+		if (typeof window !== "undefined") {
+			localStorage.setItem(FRAME_TYPES_STORAGE_KEY, JSON.stringify(items));
+		}
+		return true;
+	} catch (e) {
+		console.warn("Erro ao salvar tipos de armacao:", e);
+		return false;
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 18. NÍVEIS DE ACESSO A DESCONTO POR PERFIL / CARGO
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type { RoleDiscountTier };
+
+export const DEFAULT_ROLE_DISCOUNT_TIERS: RoleDiscountTier[] = [
+	{ id: "tier_junior", cargo: "Vendedor Júnior", maxDiscountPct: 5, descricao: "Desconto inicial autônomo de balcão até 5%", ativo: true },
+	{ id: "tier_pleno", cargo: "Vendedor Pleno", maxDiscountPct: 10, descricao: "Desconto padrão de balcão até 10%", ativo: true },
+	{ id: "tier_senior", cargo: "Vendedor Sênior", maxDiscountPct: 15, descricao: "Desconto estendido sênior até 15%", ativo: true },
+	{ id: "tier_gerente", cargo: "Gerente de Loja", maxDiscountPct: 20, descricao: "Alçada gerencial com senha até 20%", ativo: true },
+	{ id: "tier_diretor", cargo: "Diretoria / Admin", maxDiscountPct: 100, descricao: "Alçada irrestrita para cortesias e garantias", ativo: true },
+];
+
+const ROLE_DISCOUNT_TIERS_STORAGE_KEY = "mnocx_role_discount_tiers_v1";
+
+export async function fetchRoleDiscountTiers(): Promise<RoleDiscountTier[]> {
+	try {
+		return await mnocxDatabaseClient.getConfig<RoleDiscountTier[]>("role_discount_tiers", DEFAULT_ROLE_DISCOUNT_TIERS);
+	} catch {
+		if (typeof window !== "undefined") {
+			try {
+				const saved = localStorage.getItem(ROLE_DISCOUNT_TIERS_STORAGE_KEY);
+				if (saved) {
+					const parsed = JSON.parse(saved);
+					if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+				}
+			} catch {}
+		}
+		return DEFAULT_ROLE_DISCOUNT_TIERS;
+	}
+}
+
+export async function saveRoleDiscountTiers(items: RoleDiscountTier[]): Promise<boolean> {
+	try {
+		await mnocxDatabaseClient.saveConfig("role_discount_tiers", items);
+		if (typeof window !== "undefined") {
+			localStorage.setItem(ROLE_DISCOUNT_TIERS_STORAGE_KEY, JSON.stringify(items));
+		}
+		return true;
+	} catch (e) {
+		console.warn("Erro ao salvar níveis de desconto por cargo:", e);
+		return false;
+	}
+}
+

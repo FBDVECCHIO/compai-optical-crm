@@ -29,6 +29,8 @@ import { OpticalSalesLogView } from "./components/optical-sales-log-view";
 import { OpticalSettingsView } from "./components/optical-settings-view";
 import { OpticalSummaryCards } from "./components/optical-summary-cards";
 import { OpticalTopNav, type OpticalModuleTab } from "./components/optical-top-nav";
+import { OpticalSidebar } from "./components/optical-sidebar";
+import { OpticalCompactHeader } from "./components/optical-compact-header";
 import { OpticalWarrantiesView } from "./components/optical-warranties-view";
 import { OpticalOsJourneyView } from "./components/optical-os-journey-view";
 import { OpticalPostSalesView } from "./components/optical-post-sales-view";
@@ -50,6 +52,43 @@ export function OpticalClientView() {
 	const [activeModule, setActiveModule] = useState<OpticalModuleTab>("balcao");
 	const [localSearch, setLocalSearch] = useState(q);
 	const [selectedOrder, setSelectedOrder] = useState<OpticalOrder | null>(null);
+	const [isNewOrderSheetOpen, setIsNewOrderSheetOpen] = useState(false);
+
+	// Estado da barra lateral retrátil (com persistência no localStorage)
+	const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+		if (typeof window !== "undefined") {
+			try {
+				return localStorage.getItem("mnocx_sidebar_collapsed") === "true";
+			} catch {
+				return false;
+			}
+		}
+		return false;
+	});
+
+	const toggleSidebar = () => {
+		setIsSidebarCollapsed((prev) => {
+			const next = !prev;
+			if (typeof window !== "undefined") {
+				try {
+					localStorage.setItem("mnocx_sidebar_collapsed", String(next));
+				} catch {}
+			}
+			return next;
+		});
+	};
+
+	// Atalho F2 para abrir Nova OS rapidamente
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === "F2") {
+				e.preventDefault();
+				setIsNewOrderSheetOpen(true);
+			}
+		};
+		window.addEventListener("keydown", handleKeyDown);
+		return () => window.removeEventListener("keydown", handleKeyDown);
+	}, []);
 
 	// Redireciona caso o módulo atual não seja permitido para o usuário
 	useEffect(() => {
@@ -106,21 +145,29 @@ export function OpticalClientView() {
 			className="flex flex-1 min-h-0 w-full h-full overflow-hidden bg-zinc-200 dark:bg-zinc-950 notranslate"
 			translate="no"
 		>
-			{/* Main Workspace (Left) */}
-			<div className="flex flex-col min-h-0 flex-1 h-full overflow-hidden">
-				{/* Top Navigation Hub: ENGESSADO / FIXO NO TOPO */}
-				<div className="p-4 sm:p-5 pb-2 shrink-0 z-30">
-					<OpticalTopNav
-						activeModule={activeModule}
-						onSelectModule={setActiveModule}
-						isSyncingSupabase={isSyncingSupabase}
-						userSession={session}
-						onLogout={logout}
-					/>
-				</div>
+			{/* 1. Menu Lateral Retrátil à Esquerda (Expandir/Contrair apenas ícones) */}
+			<OpticalSidebar
+				activeModule={activeModule}
+				onSelectModule={setActiveModule}
+				isCollapsed={isSidebarCollapsed}
+				onToggleCollapsed={toggleSidebar}
+				userSession={session}
+				onLogout={logout}
+			/>
 
-				{/* Área Rolável Independente (Todos os demais itens da tela rolam aqui) */}
-				<div className="flex flex-col gap-6 px-4 sm:px-5 pb-8 min-h-0 flex-1 overflow-y-auto">
+			{/* 2. Área Central de Trabalho com Barra de Topo Compacta (48px) subindo todo o conteúdo */}
+			<div className="flex flex-col min-h-0 flex-1 h-full overflow-hidden">
+				{/* Barra Superior Compacta (48px) */}
+				<OpticalCompactHeader
+					activeModule={activeModule}
+					isSyncingSupabase={isSyncingSupabase}
+					userSession={session}
+					onLogout={logout}
+					onNewOrder={() => setIsNewOrderSheetOpen(true)}
+				/>
+
+				{/* Área Rolável Independente que sobe até o topo */}
+				<div className="flex flex-col gap-5 p-3.5 sm:p-5 min-h-0 flex-1 overflow-y-auto">
 					{/* Balcão & Vendas: Dashboard de Performance, Metas por Dias Úteis (Salesforce) e Lista de OSs */}
 					{activeModule === "balcao" && <OpticalSalesPerformanceView />}
 
@@ -168,10 +215,19 @@ export function OpticalClientView() {
 				</div>
 			</div>
 
-			{/* Vertical Optical AI Copilot Sidecar (Right - Occupying full vertical height) */}
+			{/* 3. Copiloto Vertical IA (Sidecar à Direita) */}
 			<OpticalAgentSidecar onSelectOrder={(ord) => setSelectedOrder(ord)} />
 
-			{/* Order Detail Sheet (Modal if selected) */}
+			{/* Modal de Nova OS Rápida */}
+			{isNewOrderSheetOpen && (
+				<CreateOpticalOrderSheet
+					open={isNewOrderSheetOpen}
+					onOpenChange={setIsNewOrderSheetOpen}
+					hideTrigger={true}
+				/>
+			)}
+
+			{/* Order Detail Sheet (Modal se selecionada) */}
 			{selectedOrder && (
 				<OpticalOrderDetailSheet
 					order={selectedOrder}

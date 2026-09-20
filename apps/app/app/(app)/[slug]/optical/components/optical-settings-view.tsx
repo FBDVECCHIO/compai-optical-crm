@@ -98,8 +98,16 @@ import {
 	saveSupabaseCaptadores,
 	fetchSupabaseFrameShapes,
 	saveSupabaseFrameShapes,
+	fetchSupabaseFrameTypes,
+	saveSupabaseFrameTypes,
 	type OpticalCaptador,
 	type OpticalFrameShape,
+	type OpticalFrameType,
+	DEFAULT_FRAME_TYPES,
+	fetchRoleDiscountTiers,
+	saveRoleDiscountTiers,
+	type RoleDiscountTier,
+	DEFAULT_ROLE_DISCOUNT_TIERS,
 	type SellerItem,
 	type StoreItem,
 	type TechnicianItem,
@@ -114,6 +122,7 @@ type SettingsSubTab =
 	| "medicos"
 	| "captadores"
 	| "comissoes"
+	| "tipos_armacao"
 	| "formatos_aro"
 	| "tecnicos"
 	| "apoio"
@@ -216,6 +225,19 @@ export function OpticalSettingsView() {
 	const [uPermGarantias, setUPermGarantias] = useState(false);
 	const [uPermAuditoria, setUPermAuditoria] = useState(false);
 	const [uPermConfig, setUPermConfig] = useState(false);
+	const [uCargo, setUCargo] = useState("Vendedor Pleno");
+	const [uDescontoMax, setUDescontoMax] = useState(10);
+	const [uIsVendedor, setUIsVendedor] = useState(true);
+
+	// Tipos de Armação Parametrizáveis
+	const [frameTypes, setFrameTypes] = useState<OpticalFrameType[]>(DEFAULT_FRAME_TYPES);
+	const [newFrameTypeName, setNewFrameTypeName] = useState("");
+	const [newFrameTypeDesc, setNewFrameTypeDesc] = useState("");
+
+	// Níveis de Desconto por Perfil / Cargo
+	const [roleDiscountTiers, setRoleDiscountTiers] = useState<RoleDiscountTier[]>(DEFAULT_ROLE_DISCOUNT_TIERS);
+	const [editingTierId, setEditingTierId] = useState<string | null>(null);
+	const [editingTierPct, setEditingTierPct] = useState<number>(10);
 
 	// Diagnóstico de Banco & Integridade
 	const [diagnosticResult, setDiagnosticResult] = useState<DatabaseDiagnosticResult | null>(null);
@@ -320,6 +342,8 @@ export function OpticalSettingsView() {
 					uList,
 					capList,
 					shapeList,
+					fTypeList,
+					tierList,
 				] = await Promise.all([
 					fetchSupabaseStores(),
 					fetchSupabaseLabs(),
@@ -365,6 +389,8 @@ export function OpticalSettingsView() {
 					fetchSupabaseUsers(),
 					fetchSupabaseCaptadores(),
 					fetchSupabaseFrameShapes(),
+					fetchSupabaseFrameTypes(),
+					fetchRoleDiscountTiers(),
 				]);
 
 				setStores(s);
@@ -386,6 +412,8 @@ export function OpticalSettingsView() {
 				setUsersList(uList);
 				setCaptadores(capList);
 				setFrameShapes(shapeList);
+				setFrameTypes(fTypeList);
+				setRoleDiscountTiers(tierList);
 				setDiscountPolicies(getDiscountPolicies());
 				refreshDataCounts();
 				if (s.length > 0) setNewSellerStore(s[0]?.nome || "");
@@ -405,6 +433,20 @@ export function OpticalSettingsView() {
 	}, [activeTab]);
 
 	// Handlers de Usuários
+	const handleSelectCargo = (cargo: string) => {
+		setUCargo(cargo);
+		const tier = roleDiscountTiers.find((t) => t.cargo.toLowerCase() === cargo.toLowerCase());
+		if (tier) {
+			setUDescontoMax(tier.maxDiscountPct);
+		}
+		if (cargo.toLowerCase().includes("vendedor")) {
+			setUIsVendedor(true);
+			setUPermBalcao(true);
+		} else if (cargo.toLowerCase().includes("admin") || cargo.toLowerCase().includes("gerente")) {
+			setUIsVendedor(true);
+		}
+	};
+
 	const handleOpenCreateUser = () => {
 		setEditingUser(null);
 		setUUsuario("");
@@ -412,6 +454,9 @@ export function OpticalSettingsView() {
 		setUNome("");
 		setUStatus("ATIVO");
 		setULoja(stores[0]?.nome || "Todos");
+		setUCargo("Vendedor Pleno");
+		setUDescontoMax(10);
+		setUIsVendedor(true);
 		setUPermBalcao(true);
 		setUPermConferencia(false);
 		setUPermLogVendas(true);
@@ -430,6 +475,9 @@ export function OpticalSettingsView() {
 		setUNome(user.nome);
 		setUStatus(user.status);
 		setULoja(user.loja || "Todos");
+		setUCargo(user.cargo || (user.usuario === "admin" ? "Diretoria / Admin" : "Vendedor Pleno"));
+		setUDescontoMax(user.perfilDescontoMaxPct !== undefined ? user.perfilDescontoMaxPct : (user.usuario === "admin" ? 100 : 10));
+		setUIsVendedor(user.isVendedor !== undefined ? user.isVendedor : (user.venda === "ATIVO" && user.usuario !== "admin"));
 		const perms = decodeUserPermissions(user);
 		setUPermBalcao(perms.balcao);
 		setUPermConferencia(perms.conferencia);
@@ -461,6 +509,9 @@ export function OpticalSettingsView() {
 			nome: uNome.trim(),
 			status: uStatus,
 			loja: uLoja,
+			cargo: uCargo,
+			perfilDescontoMaxPct: uDescontoMax,
+			isVendedor: uIsVendedor,
 			venda: uPermBalcao ? "ATIVO" : "INATIVO",
 			conferencia: uPermConferencia ? "ATIVO" : "INATIVO",
 			log_vendas: uPermLogVendas ? "ATIVO" : "INATIVO",
@@ -479,11 +530,62 @@ export function OpticalSettingsView() {
 					: `Usuário "${record.usuario}" criado com sucesso!`,
 			);
 			setIsUserModalOpen(false);
-			const refreshed = await fetchSupabaseUsers();
-			setUsersList(refreshed);
+			const [refreshedUsers, refreshedSellers] = await Promise.all([
+				fetchSupabaseUsers(),
+				fetchSupabaseSellers(),
+			]);
+			setUsersList(refreshedUsers);
+			setSellers(refreshedSellers);
 		} else {
 			toast.error("Erro ao salvar usuário no Supabase.");
 		}
+	};
+
+	// Handlers de Tipos de Armação
+	const handleAddFrameType = async () => {
+		if (!newFrameTypeName.trim()) return;
+		const name = newFrameTypeName.trim();
+		const id = `tipo_${Date.now()}`;
+		const newType: OpticalFrameType = {
+			id,
+			nome: name,
+			descricao: newFrameTypeDesc.trim() || undefined,
+			ativo: true,
+			ordem: frameTypes.length + 1,
+		};
+		const updated = [...frameTypes, newType];
+		setFrameTypes(updated);
+		setNewFrameTypeName("");
+		setNewFrameTypeDesc("");
+		toast.success(`Tipo de armação "${name}" cadastrado com sucesso!`);
+		await saveSupabaseFrameTypes(updated);
+	};
+
+	const handleToggleFrameType = async (id: string) => {
+		const updated = frameTypes.map((t) =>
+			t.id === id ? { ...t, ativo: !t.ativo } : t
+		);
+		setFrameTypes(updated);
+		toast.info("Status do tipo de armação alterado.");
+		await saveSupabaseFrameTypes(updated);
+	};
+
+	const handleDeleteFrameType = async (id: string, name: string) => {
+		const updated = frameTypes.filter((t) => t.id !== id);
+		setFrameTypes(updated);
+		toast.info(`Tipo de armação "${name}" removido.`);
+		await saveSupabaseFrameTypes(updated);
+	};
+
+	// Handlers de Níveis de Desconto por Cargo
+	const handleSaveRoleDiscountTier = async (tierId: string, maxPct: number) => {
+		const updated = roleDiscountTiers.map((t) =>
+			t.id === tierId ? { ...t, maxDiscountPct: maxPct } : t
+		);
+		setRoleDiscountTiers(updated);
+		setEditingTierId(null);
+		toast.success("Nível de desconto por cargo atualizado!");
+		await saveRoleDiscountTiers(updated);
 	};
 
 	const handleToggleUserStatus = async (user: OpticalUserRecord) => {
@@ -952,7 +1054,7 @@ export function OpticalSettingsView() {
 							{[
 								{ id: "lojas" as SettingsSubTab, label: `Lojas (${stores.length})`, icon: Building },
 								{ id: "labs" as SettingsSubTab, label: `Labs (${labs.length})`, icon: Chemistry },
-								{ id: "vendedores" as SettingsSubTab, label: `Vendedores (${sellers.length})`, icon: UserMultiple },
+								{ id: "usuarios" as SettingsSubTab, label: `Usuários & Vendedores (${usersList.length})`, icon: UserMultiple },
 								{ id: "medicos" as SettingsSubTab, label: "Médicos & Clínicas", icon: UserFollow },
 								{ id: "captadores" as SettingsSubTab, label: `Captadores (${captadores.length})`, icon: UserSpeaker },
 								{ id: "comissoes" as SettingsSubTab, label: "Comissões", icon: Money },
@@ -962,11 +1064,11 @@ export function OpticalSettingsView() {
 						{/* Linha 2: 6 botões */}
 						<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 w-full">
 							{[
-								{ id: "formatos_aro" as SettingsSubTab, label: `Formatos Aro (${frameShapes.length})`, icon: Glasses },
+								{ id: "tipos_armacao" as SettingsSubTab, label: `Tipos Armação (${frameTypes.length})`, icon: Glasses },
+								{ id: "formatos_aro" as SettingsSubTab, label: `Formatos Aro (${frameShapes.length})`, icon: RulerAlt },
 								{ id: "tecnicos" as SettingsSubTab, label: "Técnicos & Zap", icon: Phone },
 								{ id: "apoio" as SettingsSubTab, label: "Tabelas Apoio", icon: Events },
-								{ id: "tolerancias" as SettingsSubTab, label: "Tolerâncias ISO", icon: RulerAlt },
-								{ id: "usuarios" as SettingsSubTab, label: `Usuários (${usersList.length})`, icon: User },
+								{ id: "tolerancias" as SettingsSubTab, label: "Tolerâncias ISO", icon: Checkmark },
 								{ id: "descontos" as SettingsSubTab, label: "Políticas Desconto", icon: Purchase },
 							].map(renderSubTabButton)}
 						</div>
@@ -1788,6 +1890,127 @@ export function OpticalSettingsView() {
 				</div>
 			)}
 
+			{/* CONTEÚDO DA ABA: TIPOS DE ARMAÇÃO (PARAMETRIZÁVEIS) */}
+			{activeTab === "tipos_armacao" && (
+				<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+					<div className="rounded-xl border bg-card p-5 shadow-xs flex flex-col gap-4">
+						<h3 className="text-sm font-bold tracking-tight flex items-center gap-2">
+							<Icon icon={Glasses} className="size-4 text-primary" />
+							Cadastrar Tipo de Armação
+						</h3>
+						<p className="text-xs text-muted-foreground">
+							Defina os tipos e materiais de armação que alimentam dinamicamente os formulários de OS (Aro 1 e Aro 2), Catálogo de Peças e filtros de balcão.
+						</p>
+						<div className="flex flex-col gap-3">
+							<div>
+								<label className="text-[11px] font-medium text-muted-foreground">Nome do Tipo *</label>
+								<Input
+									placeholder="Ex: Titânio, Madeira, Grilamid..."
+									value={newFrameTypeName}
+									onChange={(e) => setNewFrameTypeName(e.target.value)}
+									className="text-xs h-9 mt-1"
+								/>
+							</div>
+							<div>
+								<label className="text-[11px] font-medium text-muted-foreground">Descrição / Aplicação</label>
+								<Input
+									placeholder="Ex: Armação ultraleve e hipoalergênica"
+									value={newFrameTypeDesc}
+									onChange={(e) => setNewFrameTypeDesc(e.target.value)}
+									className="text-xs h-9 mt-1"
+								/>
+							</div>
+							<Button size="sm" onClick={handleAddFrameType} className="gap-1.5 font-semibold mt-2 cursor-pointer">
+								<Icon icon={Add} className="size-4" />
+								Cadastrar Tipo
+							</Button>
+						</div>
+					</div>
+
+					<div className="lg:col-span-2 rounded-xl border bg-card shadow-xs overflow-hidden flex flex-col">
+						<div className="border-b px-4 py-3 bg-muted/30 flex items-center justify-between">
+							<div>
+								<span className="text-xs font-bold text-foreground">
+									Tipos de Armação Parametrizados ({frameTypes.length})
+								</span>
+								<p className="text-[11px] text-muted-foreground">
+									Opções ativas refletem imediatamente em todas as áreas do sistema (Nova OS, Aro 1, Aro 2 e Peças).
+								</p>
+							</div>
+							<Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+								Sincronizado Cofre MNOC-X
+							</Badge>
+						</div>
+
+						<div className="divide-y max-h-[600px] overflow-y-auto">
+							{frameTypes.map((ft) => {
+								const isDefault = ["Nylon", "Metal", "Acetato", "Parafusado", "Fio de Aço"].includes(ft.nome);
+								return (
+									<div
+										key={ft.id}
+										className="flex items-center justify-between p-4 text-xs hover:bg-muted/40 transition-colors"
+									>
+										<div className="flex items-center gap-3">
+											<div className={`flex size-9 items-center justify-center rounded-lg border font-bold text-xs ${
+												ft.ativo ? "bg-primary/10 text-primary border-primary/20" : "bg-muted text-muted-foreground"
+											}`}>
+												<Icon icon={Glasses} className="size-4" />
+											</div>
+											<div>
+												<div className="flex items-center gap-2">
+													<span className="font-bold text-sm text-foreground">{ft.nome}</span>
+													{isDefault && (
+														<Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+															Padrão MNOC-X
+														</Badge>
+													)}
+													<Badge
+														variant={ft.ativo ? "default" : "secondary"}
+														className={`text-[9px] px-1.5 py-0 h-4 font-bold ${
+															ft.ativo
+																? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+																: "bg-muted text-muted-foreground"
+														}`}
+													>
+														{ft.ativo ? "ATIVO" : "INATIVO"}
+													</Badge>
+												</div>
+												<span className="text-[11px] text-muted-foreground block mt-0.5">
+													{ft.descricao || "Tipo padrão de armação oftálmica"}
+												</span>
+											</div>
+										</div>
+
+										<div className="flex items-center gap-2">
+											<Button
+												variant="ghost"
+												size="sm"
+												className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+												onClick={() => handleToggleFrameType(ft.id)}
+												title={ft.ativo ? "Desativar opção nos formulários" : "Ativar opção nos formulários"}
+											>
+												{ft.ativo ? "Desativar" : "Ativar"}
+											</Button>
+											{!isDefault && (
+												<Button
+													variant="ghost"
+													size="sm"
+													className="h-8 px-2 text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 cursor-pointer"
+													onClick={() => handleDeleteFrameType(ft.id, ft.nome)}
+													title="Excluir tipo de armação"
+												>
+													<Icon icon={TrashCan} className="size-3.5" />
+												</Button>
+											)}
+										</div>
+									</div>
+								);
+							})}
+						</div>
+					</div>
+				</div>
+			)}
+
 			{/* CONTEÚDO DA ABA: FORMATOS DE ARO (2D) */}
 			{activeTab === "formatos_aro" && (
 				<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -2346,16 +2569,16 @@ export function OpticalSettingsView() {
 				</div>
 			)}
 
-			{activeTab === "usuarios" && (
+			{(activeTab === "usuarios" || activeTab === "vendedores") && (
 				<div className="flex flex-col gap-5">
 					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 						<div>
 							<h3 className="text-sm font-bold tracking-tight flex items-center gap-2">
 								<Icon icon={User} className="size-4 text-primary" />
-								Gestão de Usuários, Senhas & Acessos
+								Gestão Unificada de Usuários, Vendedores & Alçadas de Desconto
 							</h3>
 							<p className="text-xs text-muted-foreground">
-								Base oficial de operadores do Supabase ({usersList.length} cadastrados). Defina senhas, filiais e permissões por tela.
+								Base unificada de operadores e vendedores do Supabase ({usersList.length} cadastrados). Atribua cargos, tetos de desconto comercial e permissões de tela.
 							</p>
 						</div>
 						<Button
@@ -2364,7 +2587,7 @@ export function OpticalSettingsView() {
 							className="h-8 text-xs font-bold gap-1.5 bg-primary text-primary-foreground shadow-xs self-start sm:self-auto"
 						>
 							<Icon icon={Add} className="size-3.5" />
-							Novo Usuário
+							Novo Usuário / Vendedor
 						</Button>
 					</div>
 
@@ -2375,8 +2598,11 @@ export function OpticalSettingsView() {
 									<tr className="border-b bg-muted/40 text-muted-foreground font-semibold">
 										<th className="p-3">Usuário</th>
 										<th className="p-3">Nome</th>
+										<th className="p-3">Perfil / Cargo</th>
 										<th className="p-3">Loja Vinculada</th>
 										<th className="p-3 text-center">Status</th>
+										<th className="p-3 text-center">Alçada Desconto</th>
+										<th className="p-3 text-center">Vendedor Balcão</th>
 										<th className="p-3">Módulos Autorizados</th>
 										<th className="p-3 text-center">Ações</th>
 									</tr>
@@ -2384,8 +2610,8 @@ export function OpticalSettingsView() {
 								<tbody className="divide-y">
 									{usersList.length === 0 ? (
 										<tr>
-											<td colSpan={6} className="p-8 text-center text-muted-foreground">
-												Nenhum usuário encontrado na tabela do Supabase.
+											<td colSpan={9} className="p-8 text-center text-muted-foreground">
+												Nenhum usuário ou vendedor encontrado na base do Supabase.
 											</td>
 										</tr>
 									) : (
@@ -2408,6 +2634,11 @@ export function OpticalSettingsView() {
 													<td className="p-3 font-medium text-foreground">
 														{usr.nome || "—"}
 													</td>
+													<td className="p-3 font-semibold text-zinc-800 dark:text-zinc-200">
+														<Badge variant="outline" className="text-[10px] font-semibold border-zinc-300 dark:border-zinc-700">
+															{usr.cargo || (isAdm ? "Diretoria / Admin" : "Vendedor Pleno")}
+														</Badge>
+													</td>
 													<td className="p-3 text-muted-foreground font-medium whitespace-nowrap">
 														{usr.loja || "Todos"}
 													</td>
@@ -2422,6 +2653,20 @@ export function OpticalSettingsView() {
 														>
 															{usr.status}
 														</Badge>
+													</td>
+													<td className="p-3 text-center whitespace-nowrap">
+														<Badge variant="secondary" className="font-mono text-[10px] font-bold text-blue-700 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20">
+															Até {usr.perfilDescontoMaxPct ?? (isAdm ? 100 : 10)}%
+														</Badge>
+													</td>
+													<td className="p-3 text-center whitespace-nowrap">
+														{usr.isVendedor !== false ? (
+															<Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+																Sim (Balcão)
+															</Badge>
+														) : (
+															<span className="text-zinc-400 text-[11px]">Não</span>
+														)}
 													</td>
 													<td className="p-3">
 														<div className="flex flex-wrap items-center gap-1">
@@ -2554,6 +2799,88 @@ export function OpticalSettingsView() {
 							<p className="text-xs text-muted-foreground">
 								Alçada irrestrita para cortesias, vouchers, garantias da rede e parcerias institucionais sem bloqueio de margem.
 							</p>
+						</div>
+					</div>
+
+					{/* NÍVEIS DE ACESSO A DESCONTOS POR PERFIL / CARGO (PARAMETRIZÁVEIS) */}
+					<div className="rounded-xl border bg-card shadow-xs overflow-hidden">
+						<div className="border-b px-4 py-3 bg-muted/30 flex items-center justify-between">
+							<div>
+								<span className="text-xs font-bold text-foreground">
+									Níveis de Acesso a Descontos por Perfil / Cargo ({roleDiscountTiers.length})
+								</span>
+								<p className="text-[11px] text-muted-foreground">
+									Parâmetros oficiais que definem automaticamente a alçada de desconto no cadastro de usuários e vendedores.
+								</p>
+							</div>
+							<Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30">
+								Governança de Alçadas
+							</Badge>
+						</div>
+
+						<div className="divide-y text-xs">
+							{roleDiscountTiers.map((tier) => (
+								<div key={tier.id} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/30 transition-colors">
+									<div className="flex items-center gap-3">
+										<div className="flex size-8 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-bold">
+											<Icon icon={Purchase} className="size-4" />
+										</div>
+										<div>
+											<span className="font-bold text-sm text-foreground block">{tier.cargo}</span>
+											<span className="text-[11px] text-muted-foreground">{tier.descricao || "Alçada padrão de desconto"}</span>
+										</div>
+									</div>
+
+									<div className="flex items-center gap-3">
+										{editingTierId === tier.id ? (
+											<div className="flex items-center gap-2">
+												<Input
+													type="number"
+													min={1}
+													max={100}
+													value={editingTierPct}
+													onChange={(e) => setEditingTierPct(Number(e.target.value) || 0)}
+													className="h-8 w-20 text-xs font-mono"
+												/>
+												<span className="text-xs font-bold font-mono">%</span>
+												<Button
+													size="sm"
+													onClick={() => handleSaveRoleDiscountTier(tier.id, editingTierPct)}
+													className="h-8 text-xs font-bold cursor-pointer"
+												>
+													Salvar
+												</Button>
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={() => setEditingTierId(null)}
+													className="h-8 text-xs cursor-pointer"
+												>
+													Cancelar
+												</Button>
+											</div>
+										) : (
+											<div className="flex items-center gap-2">
+												<Badge variant="secondary" className="font-mono text-xs font-bold px-2.5 py-0.5 text-blue-700 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20">
+													Teto: {tier.maxDiscountPct}%
+												</Badge>
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => {
+														setEditingTierId(tier.id);
+														setEditingTierPct(tier.maxDiscountPct);
+													}}
+													className="h-7 px-2 text-xs font-medium cursor-pointer"
+												>
+													<Icon icon={Edit} className="size-3 mr-1" />
+													Ajustar Teto
+												</Button>
+											</div>
+										)}
+									</div>
+								</div>
+							))}
 						</div>
 					</div>
 
@@ -3001,6 +3328,35 @@ export function OpticalSettingsView() {
 
 						<div className="grid grid-cols-2 gap-3">
 							<div>
+								<label className="text-[11px] font-semibold text-foreground">Perfil / Cargo</label>
+								<select
+									value={uCargo}
+									onChange={(e) => handleSelectCargo(e.target.value)}
+									className="h-8 w-full rounded-lg border bg-background px-2.5 text-xs font-semibold mt-1"
+								>
+									{roleDiscountTiers.map((t) => (
+										<option key={t.id} value={t.cargo}>
+											{t.cargo} (Teto: {t.maxDiscountPct}%)
+										</option>
+									))}
+								</select>
+							</div>
+
+							<div>
+								<label className="text-[11px] font-semibold text-foreground">Alçada Máx. Desconto (%)</label>
+								<Input
+									type="number"
+									min={1}
+									max={100}
+									value={uDescontoMax}
+									onChange={(e) => setUDescontoMax(Number(e.target.value) || 0)}
+									className="h-8 text-xs font-mono mt-1"
+								/>
+							</div>
+						</div>
+
+						<div className="grid grid-cols-2 gap-3">
+							<div>
 								<label className="text-[11px] font-semibold text-foreground">Loja de Atendimento</label>
 								<select
 									value={uLoja}
@@ -3027,6 +3383,24 @@ export function OpticalSettingsView() {
 									<option value="INATIVO">INATIVO</option>
 								</select>
 							</div>
+						</div>
+
+						{/* Atuação como Vendedor de Balcão */}
+						<div className="rounded-lg border bg-muted/20 p-2.5 flex items-center justify-between">
+							<div>
+								<span className="text-xs font-bold text-foreground block">
+									Atua como Vendedor(a) de Balcão
+								</span>
+								<span className="text-[10px] text-muted-foreground">
+									Exibe o profissional na lista de vendedores da emissão de OS, Metas e Balcão.
+								</span>
+							</div>
+							<input
+								type="checkbox"
+								checked={uIsVendedor}
+								onChange={(e) => setUIsVendedor(e.target.checked)}
+								className="size-4 rounded text-primary"
+							/>
 						</div>
 
 						{/* Permissões de Módulos */}

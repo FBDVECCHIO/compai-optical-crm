@@ -17,42 +17,74 @@ import { Suspense, useState } from "react";
 import { SEARCH_PARAM } from "@/lib/search-param-keys";
 import { OpticalOrderForm } from "./optical-order-form";
 
-export function CreateOpticalOrderSheet() {
+export interface CreateOpticalOrderSheetProps {
+	open?: boolean;
+	onOpenChange?: (open: boolean) => void;
+	hideTrigger?: boolean;
+}
+
+export function CreateOpticalOrderSheet({
+	open,
+	onOpenChange,
+	hideTrigger = false,
+}: CreateOpticalOrderSheetProps = {}) {
 	return (
 		<Suspense
 			fallback={
-				<Button disabled size="sm" data-action="nova-venda">
-					<Icon icon={Add} data-icon="inline-start" />
-					Lançar OS (Nova Venda)
-				</Button>
+				!hideTrigger ? (
+					<Button disabled size="sm" data-action="nova-venda">
+						<Icon icon={Add} data-icon="inline-start" />
+						Lançar OS (Nova Venda)
+					</Button>
+				) : null
 			}
 		>
-			<CreateOpticalOrderSheetContent />
+			<CreateOpticalOrderSheetContent
+				externalOpen={open}
+				externalOnOpenChange={onOpenChange}
+				hideTrigger={hideTrigger}
+			/>
 		</Suspense>
 	);
 }
 
-function CreateOpticalOrderSheetContent() {
+function CreateOpticalOrderSheetContent({
+	externalOpen,
+	externalOnOpenChange,
+	hideTrigger,
+}: {
+	externalOpen?: boolean;
+	externalOnOpenChange?: (open: boolean) => void;
+	hideTrigger?: boolean;
+}) {
 	const [isOpenParam, setIsOpenParam] = useQueryState(
 		SEARCH_PARAM.dialog.create,
 		parseAsBoolean.withDefault(false),
 	);
 	const [localOpen, setLocalOpen] = useState(false);
 
-	const isOpen = isOpenParam || localOpen;
+	const isControlled = typeof externalOpen === "boolean";
+	const isOpen = isControlled ? externalOpen : isOpenParam || localOpen;
+
 	const setOpen = (open: boolean) => {
-		setLocalOpen(open);
-		setIsOpenParam(open ? true : null);
+		if (isControlled && externalOnOpenChange) {
+			externalOnOpenChange(open);
+		} else {
+			setLocalOpen(open);
+			setIsOpenParam(open ? true : null);
+		}
 	};
 
 	return (
 		<Sheet open={isOpen} onOpenChange={setOpen}>
-			<SheetTrigger asChild>
-				<Button size="sm" className="font-semibold shadow-xs" data-action="nova-venda">
-					<Icon icon={Add} data-icon="inline-start" />
-					Lançar OS (Nova Venda)
-				</Button>
-			</SheetTrigger>
+			{!hideTrigger && (
+				<SheetTrigger asChild>
+					<Button size="sm" className="font-semibold shadow-xs" data-action="nova-venda">
+						<Icon icon={Add} data-icon="inline-start" />
+						Lançar OS (Nova Venda)
+					</Button>
+				</SheetTrigger>
+			)}
 			<SheetContent
 				side="right"
 				size="2xl"

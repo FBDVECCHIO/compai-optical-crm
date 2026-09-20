@@ -334,3 +334,26 @@ export interface DiscountPolicy {
 	brandOrLab?: string; // ex: "TODOS", "Hoya", "Zeiss", "Ray-Ban"
 	description?: string;
 }
+
+// -------------------------------------------------------------
+// NÍVEIS DE DESCONTO POR PERFIL / CARGO
+// -------------------------------------------------------------
+export interface RoleDiscountTier {
+	id: string;
+	cargo: string; // ex: "Vendedor Júnior", "Vendedor Pleno", "Vendedor Sênior", "Gerente de Loja", "Diretoria / Admin"
+	maxDiscountPct: number; // ex: 5, 10, 15, 20, 100
+	descricao?: string;
+	ativo: boolean;
+}
+
+// -------------------------------------------------------------
+// TIPOS DE ARMAÇÃO (PARAMETRIZÁVEIS)
+// -------------------------------------------------------------
+export interface FrameTypeItem {
+	id: string;
+	nome: string; // "Nylon", "Metal", "Acetato", "Parafusado", "Fio de Aço"
+	descricao?: string;
+	ativo: boolean;
+	ordem?: number;
+}
+
