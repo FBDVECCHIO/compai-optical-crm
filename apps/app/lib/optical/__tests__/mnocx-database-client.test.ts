@@ -41,8 +41,8 @@ describe("MnocxDatabaseClient (Banco Dedicado)", () => {
 
 		const orders = await mnocxDatabaseClient.getOrders();
 		expect(orders.length).toBe(1);
-		expect(orders[0].orderNumber).toBe("OS-MNOCX-TEST-001");
-		expect(orders[0].patient.name).toBe("CLIENTE TESTE BANCO DEDICADO");
+		expect(orders[0]?.orderNumber).toBe("OS-MNOCX-TEST-001");
+		expect(orders[0]?.patient?.name).toBe("CLIENTE TESTE BANCO DEDICADO");
 	});
 
 	it("fornece lojas e vendedores exclusivos da rede MNOC-X", async () => {
