@@ -4,15 +4,16 @@ import { useEffect, useState } from "react";
 import { INITIAL_OPTICAL_ORDERS } from "./optical-mock-data";
 import { fetchRealOrdersFromSupabase, saveOrderToSupabase } from "./supabase-optical";
 import type { OpticalOrder, OpticalOrderStatus, DiscountPolicy } from "./optical-types";
+import { mnocxDatabaseClient, MNOCX_VAULT_KEYS } from "./mnocx-database-client";
 
-export const CURRENT_STORAGE_KEY = "mnocx_optical_orders_v2";
+export const CURRENT_STORAGE_KEY = MNOCX_VAULT_KEYS.orders;
 export const LEGACY_STORAGE_KEY = "compai_optical_orders_v1";
-export const ZEROED_STORAGE_KEY = "mnocx_db_zeroed";
+export const ZEROED_STORAGE_KEY = MNOCX_VAULT_KEYS.zeroedFlag;
 
 export function isDatabaseZeroed(): boolean {
 	const storage = getStorage();
-	if (!storage) return false;
-	return storage.getItem(ZEROED_STORAGE_KEY) === "true";
+	if (!storage) return mnocxDatabaseClient.isZeroed();
+	return storage.getItem(ZEROED_STORAGE_KEY) === "true" || mnocxDatabaseClient.isZeroed();
 }
 
 export function setDatabaseZeroed(zeroed: boolean): void {
@@ -292,7 +293,7 @@ export function loadSavedOrders(): OpticalOrder[] {
 
 	try {
 		// Se o banco foi expressamente zerado pelo usuário para testes limpos
-		if (storage.getItem(ZEROED_STORAGE_KEY) === "true") {
+		if (isDatabaseZeroed()) {
 			const saved = storage.getItem(CURRENT_STORAGE_KEY);
 			if (saved) {
 				const parsed = JSON.parse(saved);
@@ -349,6 +350,7 @@ function notify() {
 }
 
 export function clearOpticalStorage(mode: "ORDERS_ONLY" | "FULL" | "DEMO" = "ORDERS_ONLY") {
+	mnocxDatabaseClient.clearOrders(mode);
 	const storage = getStorage();
 	if (mode === "DEMO") {
 		if (storage) {
@@ -487,24 +489,26 @@ export function useOpticalOrders() {
 			globalOrders = loaded;
 			setOrders(loaded);
 
-			// Carrega vendas reais do Supabase em background
+			// Carrega vendas reais do Supabase em background apenas se o banco não estiver zerado
 			if (!hasLoadedSupabase) {
 				hasLoadedSupabase = true;
-				setIsSyncingSupabase(true);
-				fetchRealOrdersFromSupabase()
-					.then((realOrders) => {
-						if (realOrders.length > 0) {
-							const sanitizedReal = realOrders.map((ro, idx) => sanitizeOrder(ro, idx));
-							const existingNumbers = new Set(globalOrders.map((o) => o.orderNumber));
-							const newOrders = sanitizedReal.filter((ro) => !existingNumbers.has(ro.orderNumber));
-							if (newOrders.length > 0) {
-								globalOrders = [...newOrders, ...globalOrders];
-								notify();
+				if (!isDatabaseZeroed()) {
+					setIsSyncingSupabase(true);
+					fetchRealOrdersFromSupabase()
+						.then((realOrders) => {
+							if (realOrders.length > 0) {
+								const sanitizedReal = realOrders.map((ro, idx) => sanitizeOrder(ro, idx));
+								const existingNumbers = new Set(globalOrders.map((o) => o.orderNumber));
+								const newOrders = sanitizedReal.filter((ro) => !existingNumbers.has(ro.orderNumber));
+								if (newOrders.length > 0) {
+									globalOrders = [...newOrders, ...globalOrders];
+									notify();
+								}
 							}
-						}
-					})
-					.catch((e) => console.warn("Supabase sync notice:", e))
-					.finally(() => setIsSyncingSupabase(false));
+						})
+						.catch((e) => console.warn("Supabase sync notice:", e))
+						.finally(() => setIsSyncingSupabase(false));
+				}
 			}
 		}
 

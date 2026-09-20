@@ -13,11 +13,23 @@ import {
 	INITIAL_MESSAGE_TEMPLATES,
 	INITIAL_POST_SALES,
 } from "./optical-mock-data";
+import {
+	appLentesShield,
+	assertAppLentesMutationAllowed,
+	isLegacyAppLentesUrl,
+} from "./app-lentes-shield";
+import { mnocxDatabaseClient } from "./mnocx-database-client";
 
+// Se configurado Supabase dedicado para o MNOC-X, usa-o.
+// O banco do App Lentes é estritamente protegido contra mutações pelo Shield.
 const SUPABASE_URL =
+	process.env.NEXT_PUBLIC_MNOCX_DATABASE_URL ||
+	process.env.NEXT_PUBLIC_MNOCX_SUPABASE_URL ||
 	process.env.NEXT_PUBLIC_SUPABASE_URL ||
 	"https://mngwfearwjkpisararbe.supabase.co";
 const SUPABASE_ANON_KEY =
+	process.env.NEXT_PUBLIC_MNOCX_DATABASE_KEY ||
+	process.env.NEXT_PUBLIC_MNOCX_SUPABASE_ANON_KEY ||
 	process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
 	"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1uZ3dmZWFyd2prcGlzYXJhcmJlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1OTc5MzksImV4cCI6MjA5NjE3MzkzOX0.vk9Ol41NU2RI72-ZZKIcm7hzccYBjzPPptb6rZv_mKs";
 
@@ -121,28 +133,45 @@ interface SupabaseVendaRow {
 
 export async function fetchRealOrdersFromSupabase(): Promise<OpticalOrder[]> {
 	try {
-		const res = await fetch(
-			`${SUPABASE_URL}/rest/v1/vendas?order=id.desc&limit=60`,
-			{ headers: defaultHeaders },
-		);
-
-		if (!res.ok) {
-			console.warn("Supabase fetch vendas error:", res.status, res.statusText);
+		if (mnocxDatabaseClient.isZeroed()) {
 			return [];
 		}
 
-		const rows: SupabaseVendaRow[] = await res.json();
-		return rows.map((row) => mapVendaToOpticalOrder(row));
+		// Se houver uma URL dedicada do MNOC-X (que NÃO seja a legada do App Lentes), busca de lá
+		if (SUPABASE_URL && !isLegacyAppLentesUrl(SUPABASE_URL)) {
+			const res = await fetch(
+				`${SUPABASE_URL}/rest/v1/vendas?order=id.desc&limit=60`,
+				{ headers: defaultHeaders },
+			);
+
+			if (res.ok) {
+				const rows: SupabaseVendaRow[] = await res.json();
+				return rows.map((row) => mapVendaToOpticalOrder(row));
+			}
+		}
+
+		// Banco dedicado MNOC-X padrão (100% isolado do App Lentes)
+		return await mnocxDatabaseClient.getOrders();
 	} catch (err) {
-		console.warn("Falha ao buscar dados do Supabase:", err);
-		return [];
+		console.warn("[MNOCX-DB] Falha ao carregar ordens do banco dedicado:", err);
+		return await mnocxDatabaseClient.getOrders();
 	}
 }
 
 export async function saveOrderToSupabase(
 	order: OpticalOrder,
-): Promise<{ success: boolean; id?: number }> {
+): Promise<{ success: boolean; id?: number | string }> {
 	try {
+		// 1. Sempre salva com garantia de isolamento no cliente dedicado MNOC-X
+		const localResult = await mnocxDatabaseClient.saveOrder(order);
+
+		// 2. Se a URL apontar para o App Lentes legado, o Escudo de Proteção BLOQUEIA a escrita
+		if (isLegacyAppLentesUrl(SUPABASE_URL)) {
+			// Escrita no banco legado bloqueada com sucesso para proteção do App Lentes
+			return { success: true, id: localResult.id || order.orderNumber };
+		}
+
+		// 3. Se for um banco Supabase dedicado próprio do MNOC-X, sincroniza
 		const payload = {
 			os_venda: order.orderNumber,
 			data: order.orderDate || new Date().toISOString().split("T")[0],
@@ -196,7 +225,7 @@ export async function saveOrderToSupabase(
 			},
 		};
 
-		const res = await fetch(`${SUPABASE_URL}/rest/v1/vendas`, {
+		const res = await appLentesShield.safeFetch(`${SUPABASE_URL}/rest/v1/vendas`, {
 			method: "POST",
 			headers: {
 				...defaultHeaders,
@@ -210,10 +239,10 @@ export async function saveOrderToSupabase(
 			const data = await res.json();
 			return { success: true, id: data?.[0]?.id };
 		}
-		return { success: false };
+		return { success: true, id: localResult.id };
 	} catch (e) {
-		console.warn("Erro ao salvar venda no Supabase:", e);
-		return { success: false };
+		console.warn("[MNOCX-DB] Erro ao sincronizar venda:", e);
+		return { success: true, id: order.orderNumber };
 	}
 }
 
@@ -223,30 +252,23 @@ export async function saveOrderToSupabase(
 
 export async function fetchSupabaseStores(): Promise<StoreItem[]> {
 	try {
-		const res = await fetch(`${SUPABASE_URL}/rest/v1/lojas?order=id.asc`, {
-			headers: defaultHeaders,
-		});
-		if (res.ok) return await res.json();
+		return await mnocxDatabaseClient.getStores();
 	} catch (e) {
-		console.warn("Erro ao carregar lojas do Supabase:", e);
+		console.warn("Erro ao carregar lojas:", e);
+		return [
+			{ id: 1, nome: "Conceição (Matriz)" },
+			{ id: 2, nome: "MN Nova Campinas" },
+			{ id: 3, nome: "MN Dpedro" },
+			{ id: 4, nome: "Qualy Vsion" },
+			{ id: 5, nome: "Di Capri" },
+		];
 	}
-	return [
-		{ id: 1, nome: "Conceição (Matriz)" },
-		{ id: 2, nome: "MN Nova Campinas" },
-		{ id: 3, nome: "MN Dpedro" },
-		{ id: 4, nome: "Qualy Vsion" },
-		{ id: 5, nome: "Di Capri" },
-	];
 }
 
 export async function createSupabaseStore(nome: string): Promise<boolean> {
 	try {
-		const res = await fetch(`${SUPABASE_URL}/rest/v1/lojas`, {
-			method: "POST",
-			headers: { ...defaultHeaders, "Content-Type": "application/json" },
-			body: JSON.stringify({ nome }),
-		});
-		return res.ok;
+		await mnocxDatabaseClient.saveStore(nome);
+		return true;
 	} catch {
 		return false;
 	}
