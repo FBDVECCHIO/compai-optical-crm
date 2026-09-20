@@ -23,8 +23,8 @@ export interface SpeedometerGaugeProps {
 	title?: string;
 	/** Subtítulo descritivo */
 	subtitle?: string;
-	/** Tamanho do componente: "sm" (compacto para cards de vendedor) ou "lg" (destaque no topo) */
-	size?: "sm" | "md" | "lg";
+	/** Tamanho do componente: "xs" (ultra-compacto para linha contínua), "sm" (compacto), "md" ou "lg" */
+	size?: "xs" | "sm" | "md" | "lg";
 	/** Formatar valor como moeda brasileira BRL (padrão true) */
 	formatCurrency?: boolean;
 	/** Mostrar ticks de graduação (padrão true) */
@@ -50,6 +50,18 @@ export function SpeedometerGauge({
 }: SpeedometerGaugeProps) {
 	// Dimensões do SVG baseadas no tamanho
 	const config = {
+		xs: {
+			width: 170,
+			height: 112,
+			cx: 85,
+			cy: 88,
+			r: 60,
+			strokeWidth: 9,
+			needleLength: 50,
+			hubRadius: 7,
+			fontSizeVal: "text-sm font-bold",
+			fontSizePct: "text-[10px]",
+		},
 		sm: {
 			width: 240,
 			height: 155,
