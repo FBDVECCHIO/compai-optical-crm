@@ -972,12 +972,13 @@ export function OpticalSettingsView() {
 				aria-current={isActive ? "page" : undefined}
 				className={cn(
 					"w-full h-11 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer",
-					"flex items-center justify-center gap-2 text-center select-none whitespace-nowrap",
+					"flex items-center justify-center gap-2 text-center select-none min-w-0",
 					"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-white focus-visible:ring-offset-2",
 					isActive
 						? "bg-zinc-900 text-white border-2 border-zinc-900 shadow-sm dark:bg-white dark:text-zinc-900 dark:border-white font-bold"
 						: "bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-2 border-zinc-300 dark:border-zinc-700 shadow-2xs hover:bg-zinc-50 hover:border-zinc-400 dark:hover:bg-zinc-700 dark:hover:border-zinc-600"
 				)}
+				title={item.label}
 			>
 				<Icon
 					icon={item.icon}
@@ -986,7 +987,7 @@ export function OpticalSettingsView() {
 						isActive ? "text-white dark:text-zinc-900" : "text-zinc-500 dark:text-zinc-400"
 					)}
 				/>
-				<span className="font-semibold text-xs leading-none">{item.label}</span>
+				<span className="font-semibold text-xs leading-none truncate">{item.label}</span>
 			</button>
 		);
 	};
@@ -1050,7 +1051,7 @@ export function OpticalSettingsView() {
 					{/* Bloco Esquerda/Central: 2 fileiras perfeitamente simétricas com 6 botões de largura rigorosamente idêntica */}
 					<div className="flex-1 flex flex-col gap-2 min-w-0">
 						{/* Linha 1: 6 botões */}
-						<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 w-full">
+						<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 w-full">
 							{[
 								{ id: "lojas" as SettingsSubTab, label: `Lojas (${stores.length})`, icon: Building },
 								{ id: "labs" as SettingsSubTab, label: `Labs (${labs.length})`, icon: Chemistry },
@@ -1062,7 +1063,7 @@ export function OpticalSettingsView() {
 						</div>
 
 						{/* Linha 2: 6 botões */}
-						<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 w-full">
+						<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 w-full">
 							{[
 								{ id: "tipos_armacao" as SettingsSubTab, label: `Tipos Armação (${frameTypes.length})`, icon: Glasses },
 								{ id: "formatos_aro" as SettingsSubTab, label: `Formatos Aro (${frameShapes.length})`, icon: RulerAlt },
