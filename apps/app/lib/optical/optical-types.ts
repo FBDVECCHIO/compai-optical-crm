@@ -287,6 +287,7 @@ export interface LensCatalogItem {
 export interface FrameCatalogItem {
 	id: string;
 	tipo: FrameCategory;
+	tipoArmacao?: string; // Vinculado aos Tipos de Armação em Configurações (ex: Nylon, Metal, Acetato, Parafusado, Fio de Aço)
 	familia: string;
 	produto: string;
 	marca: string;
@@ -324,7 +325,7 @@ export interface MessageTemplateItem {
 // -------------------------------------------------------------
 // POLÍTICAS DE DESCONTO E ALÇADAS GERENCIAIS
 // -------------------------------------------------------------
-export type DiscountRole = "VENDEDOR" | "GERENTE" | "ADMIN";
+export type DiscountRole = "VENDEDOR" | "GERENTE" | "ADMIN" | string;
 
 export interface DiscountPolicy {
 	id: string;

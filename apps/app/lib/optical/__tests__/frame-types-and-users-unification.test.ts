@@ -116,4 +116,25 @@ describe("Tipos de Armação Parametrizáveis & Unificação de Usuários/Descon
 			expect(vendedores.some((v) => v.nome.includes("Camila"))).toBe(true);
 		});
 	});
+
+	describe("4. Catálogo de Peças & Solares integrado com Tipo de Armação", () => {
+		it("deve permitir vincular tipo de armação (Nylon, Metal, Acetato, Parafusado, Fio de Aço) a itens do catálogo", () => {
+			const item: import("../optical-types").FrameCatalogItem = {
+				id: "FRAME-TEST-01",
+				codigo: "RB-5154",
+				marca: "Ray-Ban",
+				modelo: "Clubmaster Classic",
+				tipo: "RECEITUARIO",
+				tipoArmacao: "Nylon",
+				cor: "Preto / Dourado",
+				tamanho: "51",
+				preco: 690,
+				custo: 280,
+				estoque: 8,
+			};
+
+			expect(item.tipoArmacao).toBe("Nylon");
+			expect(["Nylon", "Metal", "Acetato", "Parafusado", "Fio de Aço"]).toContain(item.tipoArmacao);
+		});
+	});
 });

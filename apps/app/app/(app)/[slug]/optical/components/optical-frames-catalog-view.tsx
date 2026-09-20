@@ -20,11 +20,13 @@ import Glasses from "@crm/ui/components/icons/glasses";
 import {
 	FrameCatalogItem,
 	FrameCategory,
+	FrameTypeItem,
 } from "@/lib/optical/optical-types";
 import {
 	fetchFrameCatalog,
 	saveFrameCatalogItem,
 	importFrameCatalogBatch,
+	fetchSupabaseFrameTypes,
 } from "@/lib/optical/supabase-optical";
 import { MnocxCard } from "./mnocx-card";
 import { MnocxButton } from "./mnocx-button";
@@ -71,9 +73,11 @@ function parseNumericField(val?: string, defaultVal = 0): number {
 
 export function OpticalFramesCatalogView() {
 	const [frames, setFrames] = useState<FrameCatalogItem[]>([]);
+	const [frameTypes, setFrameTypes] = useState<FrameTypeItem[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedType, setSelectedType] = useState<string>("ALL");
+	const [selectedFrameType, setSelectedFrameType] = useState<string>("ALL");
 	const [selectedBrand, setSelectedBrand] = useState<string>("ALL");
 	const [stockFilter, setStockFilter] = useState<string>("ALL");
 
@@ -90,6 +94,7 @@ export function OpticalFramesCatalogView() {
 
 	// Formulário Manual
 	const [formTipo, setFormTipo] = useState<FrameCategory>("RECEITUARIO");
+	const [formTipoArmacao, setFormTipoArmacao] = useState<string>("Metal");
 	const [formFamilia, setFormFamilia] = useState("");
 	const [formProduto, setFormProduto] = useState("");
 	const [formMarca, setFormMarca] = useState("");
@@ -107,8 +112,12 @@ export function OpticalFramesCatalogView() {
 
 	const loadData = async () => {
 		setIsLoading(true);
-		const data = await fetchFrameCatalog();
-		setFrames(data);
+		const [catalogData, typesData] = await Promise.all([
+			fetchFrameCatalog(),
+			fetchSupabaseFrameTypes(),
+		]);
+		setFrames(catalogData);
+		setFrameTypes(typesData);
 		setIsLoading(false);
 	};
 
@@ -119,7 +128,7 @@ export function OpticalFramesCatalogView() {
 	// Reseta página ao alterar filtros
 	useEffect(() => {
 		setCurrentPage(1);
-	}, [searchQuery, selectedType, selectedBrand, stockFilter]);
+	}, [searchQuery, selectedType, selectedFrameType, selectedBrand, stockFilter]);
 
 	const brands = useMemo(() => {
 		const set = new Set<string>();
@@ -140,6 +149,8 @@ export function OpticalFramesCatalogView() {
 
 			const matchesType =
 				selectedType === "ALL" || item.tipo === selectedType;
+			const matchesFrameType =
+				selectedFrameType === "ALL" || item.tipoArmacao === selectedFrameType;
 			const matchesBrand =
 				selectedBrand === "ALL" || item.marca === selectedBrand;
 
@@ -148,9 +159,9 @@ export function OpticalFramesCatalogView() {
 			else if (stockFilter === "ZERO") matchesStock = item.estoque === 0;
 			else if (stockFilter === "AVAILABLE") matchesStock = item.estoque > 0;
 
-			return matchesQuery && matchesType && matchesBrand && matchesStock;
+			return matchesQuery && matchesType && matchesFrameType && matchesBrand && matchesStock;
 		});
-	}, [frames, searchQuery, selectedType, selectedBrand, stockFilter]);
+	}, [frames, searchQuery, selectedType, selectedFrameType, selectedBrand, stockFilter]);
 
 	const totalPages = Math.max(1, Math.ceil(filteredFrames.length / pageSize));
 	const paginatedFrames = useMemo(() => {
@@ -161,6 +172,7 @@ export function OpticalFramesCatalogView() {
 	const handleOpenNew = () => {
 		setEditingItem(null);
 		setFormTipo("RECEITUARIO");
+		setFormTipoArmacao(frameTypes.find((t) => t.ativo)?.nome || "Metal");
 		setFormFamilia("");
 		setFormProduto("");
 		setFormMarca("Ray-Ban");
@@ -176,6 +188,7 @@ export function OpticalFramesCatalogView() {
 	const handleOpenEdit = (item: FrameCatalogItem) => {
 		setEditingItem(item);
 		setFormTipo(item.tipo);
+		setFormTipoArmacao(item.tipoArmacao || frameTypes.find((t) => t.ativo)?.nome || "Metal");
 		setFormFamilia(item.familia);
 		setFormProduto(item.produto);
 		setFormMarca(item.marca);
@@ -193,6 +206,7 @@ export function OpticalFramesCatalogView() {
 		const itemToSave: FrameCatalogItem = {
 			id: editingItem ? editingItem.id : `frame_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
 			tipo: formTipo,
+			tipoArmacao: formTipoArmacao,
 			familia: formFamilia.trim(),
 			produto: formProduto.trim(),
 			marca: formMarca.trim(),
@@ -487,10 +501,23 @@ export function OpticalFramesCatalogView() {
 							onChange={(e) => setSelectedType(e.target.value)}
 							className="text-xs py-1.5 px-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 focus:outline-none"
 						>
-							<option value="ALL">Todos os Tipos</option>
+							<option value="ALL">Todas Categorias</option>
 							<option value="RECEITUARIO">Receituário</option>
 							<option value="SOLAR">Solar</option>
 							<option value="CLIP_ON">Clip-On</option>
+						</select>
+
+						<select
+							value={selectedFrameType}
+							onChange={(e) => setSelectedFrameType(e.target.value)}
+							className="text-xs py-1.5 px-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 focus:outline-none"
+						>
+							<option value="ALL">Todos os Tipos de Armação</option>
+							{frameTypes.map((t) => (
+								<option key={t.id} value={t.nome}>
+									{t.nome}
+								</option>
+							))}
 						</select>
 
 						<select
@@ -517,11 +544,12 @@ export function OpticalFramesCatalogView() {
 							<option value="ZERO">Sem Estoque (0)</option>
 						</select>
 
-						{(searchQuery || selectedType !== "ALL" || selectedBrand !== "ALL" || stockFilter !== "ALL") && (
+						{(searchQuery || selectedType !== "ALL" || selectedFrameType !== "ALL" || selectedBrand !== "ALL" || stockFilter !== "ALL") && (
 							<button
 								onClick={() => {
 									setSearchQuery("");
 									setSelectedType("ALL");
+									setSelectedFrameType("ALL");
 									setSelectedBrand("ALL");
 									setStockFilter("ALL");
 								}}
@@ -634,11 +662,18 @@ export function OpticalFramesCatalogView() {
 												</div>
 											</td>
 
-											{/* Tipo */}
+											{/* Tipo & Armação */}
 											<td className="py-2 px-3 text-left">
-												<span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
-													{frame.tipo}
-												</span>
+												<div className="flex flex-col gap-1 items-start">
+													<span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+														{frame.tipo}
+													</span>
+													{frame.tipoArmacao && (
+														<span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20">
+															{frame.tipoArmacao}
+														</span>
+													)}
+												</div>
 											</td>
 
 											{/* Aro / Ponte */}
@@ -797,6 +832,11 @@ export function OpticalFramesCatalogView() {
 											<span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/90 dark:bg-zinc-800/90 text-zinc-800 dark:text-zinc-200 shadow-xs backdrop-blur-xs border border-zinc-200/60 dark:border-zinc-700/60">
 												{frame.tipo}
 											</span>
+											{frame.tipoArmacao && (
+												<span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-600 text-white shadow-xs backdrop-blur-xs">
+													{frame.tipoArmacao}
+												</span>
+											)}
 											{frame.origem === "PLANILHA" ? (
 												<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-100/90 text-emerald-800 border border-emerald-200 shadow-xs backdrop-blur-xs">
 													<span className="size-1.5 rounded-full bg-emerald-600 shrink-0" />
@@ -968,10 +1008,10 @@ export function OpticalFramesCatalogView() {
 						</div>
 
 						<form onSubmit={handleSaveManual} className="p-5 space-y-4">
-							<div className="grid grid-cols-2 gap-3">
+							<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
 								<div>
 									<label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-										Tipo *
+										Categoria *
 									</label>
 									<select
 										value={formTipo}
@@ -981,6 +1021,25 @@ export function OpticalFramesCatalogView() {
 										<option value="RECEITUARIO">Receituário</option>
 										<option value="SOLAR">Solar</option>
 										<option value="CLIP_ON">Clip-On</option>
+									</select>
+								</div>
+
+								<div>
+									<label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+										Tipo de Armação *
+									</label>
+									<select
+										value={formTipoArmacao}
+										onChange={(e) => setFormTipoArmacao(e.target.value)}
+										className="w-full text-xs p-2 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 font-semibold"
+									>
+										{frameTypes
+											.filter((t) => t.ativo)
+											.map((t) => (
+												<option key={t.id} value={t.nome}>
+													{t.nome}
+												</option>
+											))}
 									</select>
 								</div>
 

@@ -892,6 +892,7 @@ export interface OpticalUserSession {
 	nome: string;
 	loja: string;
 	isAdmin: boolean;
+	cargo?: string;
 	permissions: OpticalUserPermissions;
 	authenticatedAt: string;
 }
@@ -1017,6 +1018,7 @@ export async function authenticateOpticalUser(
 			nome: user.nome || user.usuario,
 			loja: user.loja || "Todos",
 			isAdmin,
+			cargo: user.cargo || (isAdmin ? "Administrador" : "Vendedor / Operador"),
 			permissions,
 			authenticatedAt: new Date().toISOString(),
 		};

@@ -493,10 +493,10 @@ export function OpticalSalesPerformanceView() {
 								padding="sm"
 								className="relative overflow-hidden w-full shadow-xs bg-white dark:bg-zinc-850 border border-zinc-200/90 dark:border-zinc-800"
 							>
-								{/* Linha Contínua Horizontal de Ponta a Ponta */}
-								<div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-2.5 w-full">
-									{/* Bloco 1: Perfil do Vendedor, Loja e Ação de Edição */}
-									<div className="w-full lg:w-48 xl:w-56 shrink-0 flex items-center justify-between gap-2.5 bg-zinc-50/90 dark:bg-zinc-900/70 p-2.5 rounded-xl border border-zinc-200/80 dark:border-zinc-800">
+								{/* Linha Contínua Horizontal de Ponta a Ponta em Grid de 12 Colunas */}
+								<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 items-stretch p-2.5 w-full">
+									{/* Bloco 1: Perfil do Vendedor, Loja e Ação de Edição (2 colunas) */}
+									<div className="lg:col-span-2 min-w-0 flex items-center justify-between gap-2 bg-zinc-50/90 dark:bg-zinc-900/70 p-2.5 rounded-xl border border-zinc-200/80 dark:border-zinc-800">
 										<div className="flex items-center gap-2 min-w-0">
 											<div className="flex size-8 items-center justify-center rounded-lg bg-zinc-800 text-white font-bold shrink-0 shadow-xs">
 												<Icon icon={UserAvatar} className="size-4" />
@@ -521,8 +521,8 @@ export function OpticalSalesPerformanceView() {
 										</button>
 									</div>
 
-									{/* Bloco 2: Velocímetro Power BI Compacto + Badge de Pace */}
-									<div className="w-full lg:w-40 xl:w-44 shrink-0 flex flex-col items-center justify-center bg-zinc-50/60 dark:bg-zinc-900/40 p-2 rounded-xl border border-zinc-200/60 dark:border-zinc-800/80">
+									{/* Bloco 2: Velocímetro Power BI Compacto + Badge de Pace (2 colunas) */}
+									<div className="lg:col-span-2 min-w-0 flex flex-col items-center justify-center bg-zinc-50/60 dark:bg-zinc-900/40 p-2 rounded-xl border border-zinc-200/60 dark:border-zinc-800/80">
 										<div className="scale-95 origin-center -my-1">
 											<SpeedometerGauge
 												size="xs"
@@ -550,8 +550,8 @@ export function OpticalSalesPerformanceView() {
 										</div>
 									</div>
 
-									{/* Bloco 3: Faturamento do Mês vs Meta com Barra de Progresso Horizontal Ampla */}
-									<div className="flex-1 min-w-[200px] p-2.5 rounded-xl bg-zinc-50/70 dark:bg-zinc-900/50 border border-zinc-200/80 dark:border-zinc-800 flex flex-col justify-between">
+									{/* Bloco 3: Faturamento do Mês vs Meta com Barra de Progresso Horizontal Ampla (3 colunas) */}
+									<div className="lg:col-span-3 min-w-0 p-2.5 rounded-xl bg-zinc-50/70 dark:bg-zinc-900/50 border border-zinc-200/80 dark:border-zinc-800 flex flex-col justify-between">
 										<div className="flex items-center justify-between gap-2 text-xs">
 											<span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
 												Faturamento no Mês
@@ -592,8 +592,8 @@ export function OpticalSalesPerformanceView() {
 										</div>
 									</div>
 
-									{/* Bloco 4: Meta Diária Necessária */}
-									<div className="w-full lg:w-40 xl:w-44 shrink-0 p-2.5 rounded-xl bg-zinc-50/70 dark:bg-zinc-900/50 border border-zinc-200/80 dark:border-zinc-800 flex flex-col justify-between">
+									{/* Bloco 4: Meta Diária Necessária (2 colunas) */}
+									<div className="lg:col-span-2 min-w-0 p-2.5 rounded-xl bg-zinc-50/70 dark:bg-zinc-900/50 border border-zinc-200/80 dark:border-zinc-800 flex flex-col justify-between">
 										<div className="flex items-center justify-between text-[10px] text-zinc-500">
 											<span className="font-semibold uppercase tracking-wider">Meta Diária</span>
 											<span className="text-[9px] text-zinc-400 font-medium">{diasRestantes}d úteis</span>
@@ -610,26 +610,26 @@ export function OpticalSalesPerformanceView() {
 										</div>
 									</div>
 
-									{/* Bloco 5: Meta da Semana */}
-									<div className="w-full lg:w-36 xl:w-40 shrink-0 p-2.5 rounded-xl bg-zinc-50/70 dark:bg-zinc-900/50 border border-zinc-200/80 dark:border-zinc-800 flex flex-col justify-between">
+									{/* Bloco 5: Meta da Semana (1 coluna) */}
+									<div className="lg:col-span-1 min-w-0 p-2.5 rounded-xl bg-zinc-50/70 dark:bg-zinc-900/50 border border-zinc-200/80 dark:border-zinc-800 flex flex-col justify-between">
 										<div className="flex items-center justify-between text-[10px] text-zinc-500">
-											<span className="font-semibold uppercase tracking-wider">Meta Semana</span>
-											<span className="text-[9px] text-zinc-400 font-medium">Ciclo 6d</span>
+											<span className="font-semibold uppercase tracking-wider truncate">Semana</span>
+											<span className="text-[9px] text-zinc-400 font-medium shrink-0">6d</span>
 										</div>
-										<div className="text-sm font-bold font-mono text-zinc-900 dark:text-zinc-100 my-0.5 truncate">
-											{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(seller.metaSemana)}
+										<div className="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 my-0.5 truncate">
+											{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(seller.metaSemana)}
 										</div>
 										<div className="text-[9px] text-zinc-500 font-mono pt-1 border-t border-zinc-200 dark:border-zinc-800 flex justify-between">
-											<span>Realizado:</span>
-											<span className="font-semibold text-zinc-700 dark:text-zinc-300">
-												{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(seller.vendasSemana)}
+											<span>Vendas:</span>
+											<span className="font-semibold text-zinc-700 dark:text-zinc-300 truncate">
+												{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(seller.vendasSemana)}
 											</span>
 										</div>
 									</div>
 
-									{/* Bloco 6: Prêmio da Semana */}
+									{/* Bloco 6: Prêmio da Semana (2 colunas) */}
 									<div
-										className={`w-full lg:w-44 xl:w-48 shrink-0 p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-colors ${
+										className={`lg:col-span-2 min-w-0 p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-colors ${
 											seller.atingiuPremioSemana
 												? "bg-amber-500/10 border-amber-500/30 text-amber-950 dark:text-amber-200"
 												: "bg-zinc-50/70 dark:bg-zinc-900/50 border-zinc-200/80 dark:border-zinc-800"
@@ -640,7 +640,7 @@ export function OpticalSalesPerformanceView() {
 												<Icon icon={Trophy} className="size-3.5" />
 											</div>
 											<div className="min-w-0">
-												<span className="text-[9px] font-bold uppercase tracking-wider block text-zinc-500 dark:text-zinc-400">
+												<span className="text-[9px] font-bold uppercase tracking-wider block text-zinc-500 dark:text-zinc-400 truncate">
 													Prêmio Semana
 												</span>
 												<span className="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 block truncate">

@@ -30,7 +30,6 @@ import { OpticalSettingsView } from "./components/optical-settings-view";
 import { OpticalSummaryCards } from "./components/optical-summary-cards";
 import { OpticalTopNav, type OpticalModuleTab } from "./components/optical-top-nav";
 import { OpticalSidebar } from "./components/optical-sidebar";
-import { OpticalCompactHeader } from "./components/optical-compact-header";
 import { OpticalWarrantiesView } from "./components/optical-warranties-view";
 import { OpticalOsJourneyView } from "./components/optical-os-journey-view";
 import { OpticalPostSalesView } from "./components/optical-post-sales-view";
@@ -145,7 +144,7 @@ export function OpticalClientView() {
 			className="flex flex-1 min-h-0 w-full h-full overflow-hidden bg-zinc-200 dark:bg-zinc-950 notranslate"
 			translate="no"
 		>
-			{/* 1. Menu Lateral Retrátil à Esquerda (Expandir/Contrair apenas ícones) */}
+			{/* 1. Menu Lateral Retrátil à Esquerda (Expandir/Contrair apenas ícones) sem cabeçalho */}
 			<OpticalSidebar
 				activeModule={activeModule}
 				onSelectModule={setActiveModule}
@@ -153,20 +152,12 @@ export function OpticalClientView() {
 				onToggleCollapsed={toggleSidebar}
 				userSession={session}
 				onLogout={logout}
+				isSyncingSupabase={isSyncingSupabase}
 			/>
 
-			{/* 2. Área Central de Trabalho com Barra de Topo Compacta (48px) subindo todo o conteúdo */}
+			{/* 2. Área Central de Trabalho ocupando 100% da altura desde o topo (sem cabeçalho) */}
 			<div className="flex flex-col min-h-0 flex-1 h-full overflow-hidden">
-				{/* Barra Superior Compacta (48px) */}
-				<OpticalCompactHeader
-					activeModule={activeModule}
-					isSyncingSupabase={isSyncingSupabase}
-					userSession={session}
-					onLogout={logout}
-					onNewOrder={() => setIsNewOrderSheetOpen(true)}
-				/>
-
-				{/* Área Rolável Independente que sobe até o topo */}
+				{/* Área Rolável Independente que sobe até o topo absoluto */}
 				<div className="flex flex-col gap-5 p-3.5 sm:p-5 min-h-0 flex-1 overflow-y-auto">
 					{/* Balcão & Vendas: Dashboard de Performance, Metas por Dias Úteis (Salesforce) e Lista de OSs */}
 					{activeModule === "balcao" && <OpticalSalesPerformanceView />}

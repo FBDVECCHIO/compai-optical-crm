@@ -79,9 +79,16 @@ function CreateOpticalOrderSheetContent({
 		<Sheet open={isOpen} onOpenChange={setOpen}>
 			{!hideTrigger && (
 				<SheetTrigger asChild>
-					<Button size="sm" className="font-semibold shadow-xs" data-action="nova-venda">
-						<Icon icon={Add} data-icon="inline-start" />
-						Lançar OS (Nova Venda)
+					<Button
+						size="sm"
+						className="font-bold shadow-xs bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-900 gap-2 h-9 px-3.5 rounded-xl cursor-pointer"
+						data-action="nova-venda"
+					>
+						<Icon icon={Add} className="size-4" />
+						<span>Lançar Ordem de Serviço</span>
+						<kbd className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-white/20 dark:bg-zinc-900/20 text-[10px] font-mono font-bold">
+							F2
+						</kbd>
 					</Button>
 				</SheetTrigger>
 			)}

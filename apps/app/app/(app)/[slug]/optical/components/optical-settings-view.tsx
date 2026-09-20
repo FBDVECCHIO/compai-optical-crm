@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Add from "@carbon/icons-react/es/Add";
 import Building from "@carbon/icons-react/es/Building";
 import Checkmark from "@carbon/icons-react/es/Checkmark";
@@ -154,7 +154,7 @@ export function OpticalSettingsView() {
 
 	// Políticas de Desconto
 	const [discountPolicies, setDiscountPolicies] = useState<DiscountPolicy[]>([]);
-	const [newPolicyRole, setNewPolicyRole] = useState<"VENDEDOR" | "GERENTE" | "ADMIN">("VENDEDOR");
+	const [newPolicyRole, setNewPolicyRole] = useState<string>("Vendedor Pleno");
 	const [newPolicyMaxPct, setNewPolicyMaxPct] = useState<number>(10);
 	const [newPolicyBrand, setNewPolicyBrand] = useState<string>("TODOS");
 	const [newPolicyCategory, setNewPolicyCategory] = useState<"GLOBAL" | "ARMAÇÃO" | "LENTE">("GLOBAL");
@@ -298,6 +298,16 @@ export function OpticalSettingsView() {
 	const [isolationModalOpen, setIsolationModalOpen] = useState(false);
 	const [shieldAudit, setShieldAudit] = useState(() => appLentesShield.getAuditReport());
 	const [dbStatus, setDbStatus] = useState(() => mnocxDatabaseClient.getStatus());
+	const [expandedUserIds, setExpandedUserIds] = useState<Set<string>>(new Set());
+
+	const toggleUserExpanded = (userId: string) => {
+		setExpandedUserIds((prev) => {
+			const next = new Set(prev);
+			if (next.has(userId)) next.delete(userId);
+			else next.add(userId);
+			return next;
+		});
+	};
 
 	const handleOpenIsolationModal = () => {
 		setShieldAudit(appLentesShield.getAuditReport());
@@ -1055,7 +1065,7 @@ export function OpticalSettingsView() {
 							{[
 								{ id: "lojas" as SettingsSubTab, label: `Lojas (${stores.length})`, icon: Building },
 								{ id: "labs" as SettingsSubTab, label: `Labs (${labs.length})`, icon: Chemistry },
-								{ id: "usuarios" as SettingsSubTab, label: `Usuários & Vendedores (${usersList.length})`, icon: UserMultiple },
+								{ id: "usuarios" as SettingsSubTab, label: `Usuários (${usersList.length})`, icon: UserMultiple },
 								{ id: "medicos" as SettingsSubTab, label: "Médicos & Clínicas", icon: UserFollow },
 								{ id: "captadores" as SettingsSubTab, label: `Captadores (${captadores.length})`, icon: UserSpeaker },
 								{ id: "comissoes" as SettingsSubTab, label: "Comissões", icon: Money },
@@ -2576,19 +2586,19 @@ export function OpticalSettingsView() {
 						<div>
 							<h3 className="text-sm font-bold tracking-tight flex items-center gap-2">
 								<Icon icon={User} className="size-4 text-primary" />
-								Gestão Unificada de Usuários, Vendedores & Alçadas de Desconto
+								Gestão de Usuários & Perfis de Acesso
 							</h3>
 							<p className="text-xs text-muted-foreground">
-								Base unificada de operadores e vendedores do Supabase ({usersList.length} cadastrados). Atribua cargos, tetos de desconto comercial e permissões de tela.
+								Operadores e vendedores do sistema ({usersList.length} cadastrados). Vendedor é um Perfil/Cargo com teto de desconto automático. Clique no [+] para ver lojas e módulos autorizados.
 							</p>
 						</div>
 						<Button
 							size="sm"
 							onClick={handleOpenCreateUser}
-							className="h-8 text-xs font-bold gap-1.5 bg-primary text-primary-foreground shadow-xs self-start sm:self-auto"
+							className="h-8 text-xs font-bold gap-1.5 bg-primary text-primary-foreground shadow-xs self-start sm:self-auto cursor-pointer"
 						>
 							<Icon icon={Add} className="size-3.5" />
-							Novo Usuário / Vendedor
+							Novo Usuário
 						</Button>
 					</div>
 
@@ -2597,133 +2607,193 @@ export function OpticalSettingsView() {
 							<table className="w-full text-left text-xs border-collapse">
 								<thead>
 									<tr className="border-b bg-muted/40 text-muted-foreground font-semibold">
-										<th className="p-3">Usuário</th>
-										<th className="p-3">Nome</th>
-										<th className="p-3">Perfil / Cargo</th>
-										<th className="p-3">Loja Vinculada</th>
-										<th className="p-3 text-center">Status</th>
-										<th className="p-3 text-center">Alçada Desconto</th>
-										<th className="p-3 text-center">Vendedor Balcão</th>
-										<th className="p-3">Módulos Autorizados</th>
-										<th className="p-3 text-center">Ações</th>
+										<th className="w-10 text-center py-2.5 px-2">#</th>
+										<th className="py-2.5 px-3">Usuário & Operador</th>
+										<th className="py-2.5 px-3">Perfil / Cargo</th>
+										<th className="py-2.5 px-3 text-center">Alçada Desconto</th>
+										<th className="py-2.5 px-3 text-center">Status</th>
+										<th className="py-2.5 px-3 text-center w-28">Ações</th>
 									</tr>
 								</thead>
 								<tbody className="divide-y">
 									{usersList.length === 0 ? (
 										<tr>
-											<td colSpan={9} className="p-8 text-center text-muted-foreground">
-												Nenhum usuário ou vendedor encontrado na base do Supabase.
+											<td colSpan={6} className="p-8 text-center text-muted-foreground">
+												Nenhum usuário ou operador encontrado na base do Supabase.
 											</td>
 										</tr>
 									) : (
 										usersList.map((usr) => {
 											const isAdm = usr.usuario.toLowerCase().trim() === "admin";
 											const perms = decodeUserPermissions(usr);
+											const userIdKey = String(usr.id ?? usr.usuario);
+											const isExpanded = expandedUserIds.has(userIdKey);
 
 											return (
-												<tr key={usr.id || usr.usuario} className="hover:bg-muted/30 transition-colors">
-													<td className="p-3 font-bold text-foreground">
-														<div className="flex items-center gap-2">
-															<span>{usr.usuario}</span>
-															{isAdm && (
-																<Badge variant="default" className="text-[9px] px-1.5 py-0 h-4 bg-primary text-primary-foreground font-bold">
-																	ADMIN
+												<Fragment key={userIdKey}>
+													<tr className="hover:bg-muted/30 transition-colors">
+														{/* 1. Botão de Expansão [+] */}
+														<td className="py-2.5 px-2 text-center">
+															<button
+																type="button"
+																onClick={() => toggleUserExpanded(userIdKey)}
+																className={cn(
+																	"size-6 mx-auto rounded-md flex items-center justify-center font-bold text-xs border transition-colors cursor-pointer",
+																	isExpanded
+																		? "bg-zinc-900 text-white border-zinc-900 dark:bg-white dark:text-zinc-900 dark:border-white"
+																		: "bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 border-zinc-300 dark:border-zinc-700"
+																)}
+																title={isExpanded ? "Recolher lojas e módulos" : "Expandir para ver lojas vinculadas e módulos autorizados (+)"}
+																aria-label="Expandir ou recolher detalhes do usuário"
+															>
+																{isExpanded ? "−" : "+"}
+															</button>
+														</td>
+
+														{/* 2. Usuário & Operador */}
+														<td className="py-2.5 px-3 font-bold text-foreground">
+															<div className="flex items-center gap-2">
+																<div className="flex size-7 items-center justify-center rounded-lg bg-zinc-800 text-white text-xs font-bold shrink-0">
+																	<Icon icon={User} className="size-3.5" />
+																</div>
+																<div className="min-w-0">
+																	<div className="flex items-center gap-1.5">
+																		<span className="font-bold text-foreground truncate">{usr.usuario}</span>
+																		{isAdm && (
+																			<Badge variant="default" className="text-[8px] px-1 py-0 h-3.5 bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-bold">
+																				ADMIN
+																			</Badge>
+																		)}
+																	</div>
+																	<span className="text-[11px] text-muted-foreground block truncate font-normal">{usr.nome || "—"}</span>
+																</div>
+															</div>
+														</td>
+
+														{/* 3. Perfil / Cargo */}
+														<td className="py-2.5 px-3 font-semibold text-zinc-800 dark:text-zinc-200">
+															<div className="flex items-center gap-1.5">
+																<Badge variant="outline" className="text-[10px] font-semibold border-zinc-300 dark:border-zinc-700">
+																	{usr.cargo || (isAdm ? "Diretoria / Admin" : (usr.isVendedor !== false ? "Vendedor Balcão" : "Operador"))}
 																</Badge>
-															)}
-														</div>
-													</td>
-													<td className="p-3 font-medium text-foreground">
-														{usr.nome || "—"}
-													</td>
-													<td className="p-3 font-semibold text-zinc-800 dark:text-zinc-200">
-														<Badge variant="outline" className="text-[10px] font-semibold border-zinc-300 dark:border-zinc-700">
-															{usr.cargo || (isAdm ? "Diretoria / Admin" : "Vendedor Pleno")}
-														</Badge>
-													</td>
-													<td className="p-3 text-muted-foreground font-medium whitespace-nowrap">
-														{usr.loja || "Todos"}
-													</td>
-													<td className="p-3 text-center whitespace-nowrap">
-														<Badge
-															variant={usr.status === "ATIVO" ? "default" : "secondary"}
-															className={`text-[10px] font-bold ${
-																usr.status === "ATIVO"
-																	? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-																	: "bg-muted text-muted-foreground"
-															}`}
-														>
-															{usr.status}
-														</Badge>
-													</td>
-													<td className="p-3 text-center whitespace-nowrap">
-														<Badge variant="secondary" className="font-mono text-[10px] font-bold text-blue-700 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20">
-															Até {usr.perfilDescontoMaxPct ?? (isAdm ? 100 : 10)}%
-														</Badge>
-													</td>
-													<td className="p-3 text-center whitespace-nowrap">
-														{usr.isVendedor !== false ? (
-															<Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
-																Sim (Balcão)
+																{usr.isVendedor !== false && (
+																	<Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-[9px] font-bold">
+																		Balcão
+																	</Badge>
+																)}
+															</div>
+														</td>
+
+														{/* 4. Alçada Desconto */}
+														<td className="py-2.5 px-3 text-center whitespace-nowrap">
+															<Badge variant="secondary" className="font-mono text-[10px] font-bold text-blue-700 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20">
+																Até {usr.perfilDescontoMaxPct ?? (isAdm ? 100 : 10)}%
 															</Badge>
-														) : (
-															<span className="text-zinc-400 text-[11px]">Não</span>
-														)}
-													</td>
-													<td className="p-3">
-														<div className="flex flex-wrap items-center gap-1">
-															{isAdm ? (
-																<Badge variant="outline" className="text-[10px] font-semibold text-primary">
-																	Acesso Irrestrito (Todos os Módulos)
-																</Badge>
-															) : (
-																<>
-																	{perms.balcao && <Badge variant="outline" className="text-[9px]">Balcão</Badge>}
-																	{perms.conferencia && <Badge variant="outline" className="text-[9px]">Conferência</Badge>}
-																	{perms.log_vendas && <Badge variant="outline" className="text-[9px]">Log Vendas</Badge>}
-																	{perms.resumo && <Badge variant="outline" className="text-[9px]">Resumo</Badge>}
-																	{perms.medicos && <Badge variant="outline" className="text-[9px]">Médicos</Badge>}
-																	{perms.garantias && <Badge variant="outline" className="text-[9px]">Garantias</Badge>}
-																	{perms.auditoria && <Badge variant="outline" className="text-[9px]">Auditoria</Badge>}
-																	{perms.config && <Badge variant="outline" className="text-[9px] text-amber-500">Config</Badge>}
-																</>
-															)}
-														</div>
-													</td>
-													<td className="p-3 text-center whitespace-nowrap">
-														<div className="flex items-center justify-center gap-1">
-															<Button
-																variant="outline"
-																size="sm"
-																className="h-7 px-2.5 text-xs font-semibold gap-1"
-																onClick={() => handleOpenEditUser(usr)}
-																title="Editar permissões ou alterar senha"
+														</td>
+
+														{/* 5. Status */}
+														<td className="py-2.5 px-3 text-center whitespace-nowrap">
+															<Badge
+																variant={usr.status === "ATIVO" ? "default" : "secondary"}
+																className={`text-[10px] font-bold ${
+																	usr.status === "ATIVO"
+																		? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+																		: "bg-muted text-muted-foreground"
+																}`}
 															>
-																<Icon icon={Edit} className="size-3" />
-																Editar / Senha
-															</Button>
-															<Button
-																variant="ghost"
-																size="sm"
-																className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-																onClick={() => handleToggleUserStatus(usr)}
-																title={usr.status === "ATIVO" ? "Desativar operador" : "Ativar operador"}
-															>
-																{usr.status === "ATIVO" ? "Desativar" : "Ativar"}
-															</Button>
-															{!isAdm && usr.id && (
-																<Button
-																	variant="ghost"
-																	size="sm"
-																	className="h-7 px-2 text-xs text-rose-500 hover:text-rose-600"
-																	onClick={() => handleDeleteUserAction(usr)}
-																	title="Excluir usuário"
+																{usr.status}
+															</Badge>
+														</td>
+
+														{/* 6. Ações (Apenas Ícones) */}
+														<td className="py-2.5 px-3 text-center whitespace-nowrap">
+															<div className="flex items-center justify-center gap-1">
+																<button
+																	type="button"
+																	onClick={() => handleOpenEditUser(usr)}
+																	className="p-1.5 rounded-lg text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/70 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+																	title="Editar permissões e senha do usuário"
+																	aria-label="Editar usuário"
 																>
-																	<Icon icon={TrashCan} className="size-3" />
-																</Button>
-															)}
-														</div>
-													</td>
-												</tr>
+																	<Icon icon={Edit} className="size-3.5" />
+																</button>
+																<button
+																	type="button"
+																	onClick={() => handleToggleUserStatus(usr)}
+																	className="p-1.5 rounded-lg text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/70 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+																	title={usr.status === "ATIVO" ? "Desativar operador" : "Ativar operador"}
+																	aria-label={usr.status === "ATIVO" ? "Desativar operador" : "Ativar operador"}
+																>
+																	<Icon icon={usr.status === "ATIVO" ? Close : Checkmark} className="size-3.5" />
+																</button>
+																{!isAdm && usr.id && (
+																	<button
+																		type="button"
+																		onClick={() => handleDeleteUserAction(usr)}
+																		className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-500/10 dark:text-rose-400 transition-colors cursor-pointer"
+																		title="Excluir operador permanentemente"
+																		aria-label="Excluir operador"
+																	>
+																		<Icon icon={TrashCan} className="size-3.5" />
+																	</button>
+																)}
+															</div>
+														</td>
+													</tr>
+
+													{/* Linha Expansível: Lojas Vinculadas e Módulos Autorizados */}
+													{isExpanded && (
+														<tr key={`${userIdKey}-expanded`} className="bg-zinc-50/80 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800">
+															<td colSpan={6} className="p-3">
+																<div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 rounded-xl p-3 bg-white dark:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700/80 shadow-2xs">
+																	{/* Lojas Vinculadas */}
+																	<div>
+																		<span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 mb-1.5">
+																			<Icon icon={Building} className="size-3.5 text-primary" />
+																			Lojas / Filiais Vinculadas:
+																		</span>
+																		<div className="flex flex-wrap items-center gap-1.5">
+																			<Badge variant="outline" className="text-[10px] font-semibold bg-zinc-50 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700">
+																				{usr.loja || "Todas as Lojas (Acesso Corporativo)"}
+																			</Badge>
+																			{usr.isVendedor !== false && (
+																				<span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+																					• Atua no Balcão de Vendas
+																				</span>
+																			)}
+																		</div>
+																	</div>
+
+																	{/* Módulos Autorizados */}
+																	<div>
+																		<span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 mb-1.5">
+																			<Icon icon={Security} className="size-3.5 text-primary" />
+																			Módulos Autorizados no Sistema:
+																		</span>
+																		<div className="flex flex-wrap items-center gap-1">
+																			{isAdm ? (
+																				<Badge variant="default" className="text-[9px] font-semibold bg-zinc-900 text-white dark:bg-white dark:text-zinc-900">
+																					Acesso Irrestrito (Todos os Módulos)
+																				</Badge>
+																			) : (
+																				<>
+																					{perms.balcao && <Badge variant="outline" className="text-[9px]">Balcão & Vendas</Badge>}
+																					{perms.conferencia && <Badge variant="outline" className="text-[9px]">Conferência Lab</Badge>}
+																					{perms.log_vendas && <Badge variant="outline" className="text-[9px]">Log Vendas</Badge>}
+																					{perms.resumo && <Badge variant="outline" className="text-[9px]">Resumo Gerencial</Badge>}
+																					{perms.medicos && <Badge variant="outline" className="text-[9px]">Médicos & Clínicas</Badge>}
+																					{perms.garantias && <Badge variant="outline" className="text-[9px]">Garantias</Badge>}
+																					{perms.auditoria && <Badge variant="outline" className="text-[9px]">Auditoria IA</Badge>}
+																					{perms.config && <Badge variant="outline" className="text-[9px] text-amber-600 border-amber-300">Configurações</Badge>}
+																				</>
+																			)}
+																		</div>
+																	</div>
+																</div>
+															</td>
+														</tr>
+													)}
+												</Fragment>
 											);
 										})
 									)}
@@ -2755,67 +2825,19 @@ export function OpticalSettingsView() {
 						</div>
 					</div>
 
-					{/* 3 Cards de Alçadas Padrão */}
-					<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-						{/* Vendedor */}
-						<div className="rounded-xl border bg-card p-4 shadow-2xs space-y-2 border-l-4 border-l-blue-500">
-							<div className="flex items-center justify-between">
-								<span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-									Vendedor de Balcão
-								</span>
-								<Badge variant="secondary" className="font-mono text-xs font-bold">
-									Até 10%
-								</Badge>
-							</div>
-							<p className="text-xs text-muted-foreground">
-								Descontos em armações ou lentes até 10% são aplicados imediatamente. Acima de 10%, o sistema bloqueia e solicita validação do gerente.
-							</p>
-						</div>
-
-						{/* Gerente */}
-						<div className="rounded-xl border bg-card p-4 shadow-2xs space-y-2 border-l-4 border-l-amber-500">
-							<div className="flex items-center justify-between">
-								<span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-									Gerente de Loja
-								</span>
-								<Badge variant="secondary" className="font-mono text-xs font-bold">
-									Até 20%
-								</Badge>
-							</div>
-							<p className="text-xs text-muted-foreground">
-								Descontos até 20% mediante senha gerencial (120212). Registro de auditoria gravado no log de vendas da ordem de serviço.
-							</p>
-						</div>
-
-						{/* Admin */}
-						<div className="rounded-xl border bg-card p-4 shadow-2xs space-y-2 border-l-4 border-l-purple-500">
-							<div className="flex items-center justify-between">
-								<span className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
-									Diretoria / Admin
-								</span>
-								<Badge variant="secondary" className="font-mono text-xs font-bold">
-									Até 100%
-								</Badge>
-							</div>
-							<p className="text-xs text-muted-foreground">
-								Alçada irrestrita para cortesias, vouchers, garantias da rede e parcerias institucionais sem bloqueio de margem.
-							</p>
-						</div>
-					</div>
-
-					{/* NÍVEIS DE ACESSO A DESCONTOS POR PERFIL / CARGO (PARAMETRIZÁVEIS) */}
+					{/* MATRIZ UNIFICADA DE NÍVEIS DE ACESSO A DESCONTOS POR PERFIL / CARGO */}
 					<div className="rounded-xl border bg-card shadow-xs overflow-hidden">
 						<div className="border-b px-4 py-3 bg-muted/30 flex items-center justify-between">
 							<div>
 								<span className="text-xs font-bold text-foreground">
-									Níveis de Acesso a Descontos por Perfil / Cargo ({roleDiscountTiers.length})
+									Matriz Oficial de Políticas de Desconto por Perfil / Cargo ({roleDiscountTiers.length})
 								</span>
 								<p className="text-[11px] text-muted-foreground">
-									Parâmetros oficiais que definem automaticamente a alçada de desconto no cadastro de usuários e vendedores.
+									Parâmetros oficiais que definem automaticamente a alçada de desconto no cadastro de usuários e operadores.
 								</p>
 							</div>
 							<Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30">
-								Governança de Alçadas
+								Governança Oficial de Alçadas
 							</Badge>
 						</div>
 
@@ -2885,29 +2907,31 @@ export function OpticalSettingsView() {
 						</div>
 					</div>
 
-					{/* Formulário de Nova Política e Tabela de Regras */}
+					{/* Formulário de Regras de Desconto por Marca / Laboratório */}
 					<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 						{/* Card Formulário */}
 						<div className="rounded-xl border bg-card p-5 shadow-xs space-y-4">
 							<h4 className="text-sm font-bold flex items-center gap-2">
 								<Icon icon={Add} className="size-4 text-primary" />
-								Nova Regra de Desconto
+								Nova Exceção por Marca / Lab
 							</h4>
 							<p className="text-xs text-muted-foreground">
-								Crie regras personalizadas para marcas específicas ou tetos customizados por cargo.
+								Defina tetos diferenciados por marca ou laboratório diretamente atrelados aos 5 perfis oficiais.
 							</p>
 
 							<div className="space-y-3">
 								<div>
-									<label className="text-xs font-semibold text-foreground mb-1 block">Perfil / Cargo</label>
+									<label className="text-xs font-semibold text-foreground mb-1 block">Perfil / Cargo Oficial</label>
 									<select
 										value={newPolicyRole}
-										onChange={(e) => setNewPolicyRole(e.target.value as any)}
-										className="h-8 w-full rounded-md border bg-background px-2 text-xs"
+										onChange={(e) => setNewPolicyRole(e.target.value)}
+										className="h-8 w-full rounded-md border bg-background px-2 text-xs font-semibold"
 									>
-										<option value="VENDEDOR">Vendedor</option>
-										<option value="GERENTE">Gerente</option>
-										<option value="ADMIN">Administrador</option>
+										{roleDiscountTiers.map((tier) => (
+											<option key={tier.id} value={tier.cargo}>
+												{tier.cargo} (Teto padrão: {tier.maxDiscountPct}%)
+											</option>
+										))}
 									</select>
 								</div>
 
