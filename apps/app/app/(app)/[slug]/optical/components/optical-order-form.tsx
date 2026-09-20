@@ -1,11 +1,16 @@
 "use client";
 
+import Add from "@carbon/icons-react/es/Add";
+import Building from "@carbon/icons-react/es/Building";
 import Checkmark from "@carbon/icons-react/es/Checkmark";
 import Copy from "@carbon/icons-react/es/Copy";
 import Locked from "@carbon/icons-react/es/Locked";
 import Money from "@carbon/icons-react/es/Money";
+import Password from "@carbon/icons-react/es/Password";
 import Percentage from "@carbon/icons-react/es/Percentage";
+import Receipt from "@carbon/icons-react/es/Receipt";
 import Search from "@carbon/icons-react/es/Search";
+import ShoppingBag from "@carbon/icons-react/es/ShoppingBag";
 import UserAvatar from "@carbon/icons-react/es/UserAvatar";
 import { Badge } from "@crm/ui/components/badge";
 import { Button } from "@crm/ui/components/button";
@@ -13,6 +18,8 @@ import { Checkbox } from "@crm/ui/components/checkbox";
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
+	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from "@crm/ui/components/dialog";
@@ -38,7 +45,15 @@ import {
 	fetchLensCatalog,
 	fetchFrameCatalog,
 	decrementFrameStock,
+	fetchSupabaseStores,
+	fetchSupabaseSellers,
+	fetchSupabaseDoctors,
+	saveSupabaseDoctors,
+	type StoreItem,
+	type SellerItem,
+	type DoctorItem,
 } from "@/lib/optical/supabase-optical";
+import { validateCrm, isDoctorDuplicate } from "@/lib/optical/doctor-validation";
 import type {
 	AroItem,
 	EyePrescription,
@@ -107,10 +122,27 @@ export function OpticalOrderForm({
 		d.setDate(d.getDate() + 5);
 		return d.toISOString().split("T")[0];
 	});
-	const [storeName, _setStoreName] = useState("Óptica Central - Matriz");
-	const [sellerName, _setSellerName] = useState("Rodrigo Almeida");
-	const [doctorName, setDoctorName] = useState("Dra. Juliana Mendes");
-	const [doctorCrm, setDoctorCrm] = useState("148920/SP");
+
+	// Registered Entities State
+	const [stores, setStores] = useState<StoreItem[]>([]);
+	const [sellers, setSellers] = useState<SellerItem[]>([]);
+	const [doctors, setDoctors] = useState<DoctorItem[]>([]);
+	const [storeName, setStoreName] = useState("Conceição (Matriz)");
+	const [sellerName, setSellerName] = useState("Fabiano");
+	const [doctorName, setDoctorName] = useState("");
+	const [doctorCrm, setDoctorCrm] = useState("");
+	const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
+
+	// Quick New Doctor Modal
+	const [isNewDocModalOpen, setIsNewDocModalOpen] = useState(false);
+	const [newDocNome, setNewDocNome] = useState("");
+	const [newDocCrm, setNewDocCrm] = useState("");
+	const [newDocClinica, setNewDocClinica] = useState("");
+	const [newDocError, setNewDocError] = useState("");
+
+	// Frame Modes (Estoque da Loja vs Trazida pelo Cliente)
+	const [aro1FrameMode, setAro1FrameMode] = useState<"STOCK" | "CUSTOMER">("STOCK");
+	const [aro2FrameMode, setAro2FrameMode] = useState<"STOCK" | "CUSTOMER">("STOCK");
 
 	// Patient state
 	const [patient, setPatient] = useState<OpticalPatient>({
@@ -191,9 +223,65 @@ export function OpticalOrderForm({
 	const [lensSearchQuery2, setLensSearchQuery2] = useState<string>("");
 
 	useEffect(() => {
-		fetchLensCatalog().then((items) => setLensCatalog(items));
-		fetchFrameCatalog().then((items) => setFrameCatalog(items));
+		Promise.all([
+			fetchSupabaseStores(),
+			fetchSupabaseSellers(),
+			fetchSupabaseDoctors(),
+			fetchLensCatalog(),
+			fetchFrameCatalog(),
+		]).then(([loadedStores, loadedSellers, loadedDoctors, loadedLenses, loadedFrames]) => {
+			setStores(loadedStores);
+			setSellers(loadedSellers);
+			setDoctors(loadedDoctors);
+			setLensCatalog(loadedLenses);
+			setFrameCatalog(loadedFrames);
+
+			if (loadedStores.length > 0) {
+				setStoreName(loadedStores[0]!.nome);
+				const sellersForStore = loadedSellers.filter(
+					(s) => !s.loja || s.loja === loadedStores[0]!.nome || s.loja.includes(loadedStores[0]!.nome)
+				);
+				if (sellersForStore.length > 0) {
+					setSellerName(sellersForStore[0]!.nome);
+				} else if (loadedSellers.length > 0) {
+					setSellerName(loadedSellers[0]!.nome);
+				}
+			} else if (loadedSellers.length > 0) {
+				setSellerName(loadedSellers[0]!.nome);
+			}
+
+			if (loadedDoctors.length > 0) {
+				const firstDoc = loadedDoctors[0]!;
+				setSelectedDoctorId(String(firstDoc.id ?? firstDoc.nome));
+				setDoctorName(firstDoc.nome);
+				setDoctorCrm(firstDoc.crm);
+			}
+
+			if (loadedFrames.length > 0) {
+				const f = loadedFrames[0]!;
+				setAro1((a) => ({
+					...a,
+					frameCode: f.produto.split(" ")[1] || f.produto.slice(0, 8),
+					frameBrand: f.marca,
+					frameModel: f.produto,
+					framePrice: f.preco,
+					frameType: f.tipo,
+					frameFamily: f.familia,
+					frameManufacturer: f.fabricante,
+					frameAro: f.tamanhoAro,
+					framePonte: f.tamanhoPonte,
+				}));
+			}
+		});
 	}, []);
+
+	const filteredSellers = useMemo(() => {
+		if (!storeName) return sellers;
+		const matching = sellers.filter(
+			(s) => !s.loja || s.loja === storeName || s.loja.toLowerCase().includes(storeName.toLowerCase())
+		);
+		return matching.length > 0 ? matching : sellers;
+	}, [sellers, storeName]);
 
 	// Filtros inteligentes de lentes por laboratório, tipo, IR e busca - Aro 1
 	const filteredLensesAro1 = useMemo(() => {
@@ -310,8 +398,8 @@ export function OpticalOrderForm({
 
 	// Financial Calculations
 	const subtotalFrames =
-		(Number(aro1.framePrice) || 0) +
-		(hasAro2 ? Number(aro2.framePrice) || 0 : 0);
+		(aro1FrameMode === "CUSTOMER" ? 0 : Number(aro1.framePrice) || 0) +
+		(hasAro2 ? (aro2FrameMode === "CUSTOMER" ? 0 : Number(aro2.framePrice) || 0) : 0);
 	const subtotalLenses =
 		(aro1.differentLensesPerEye
 			? (Number(aro1.lensPriceOd) || 0) + (Number(aro1.lensPriceOe) || 0)
@@ -369,6 +457,42 @@ export function OpticalOrderForm({
 		}
 	}, [paymentMode, totalAmount, manualPaidAmount]);
 
+	// Cadastro Rápido de Médico
+	const handleCreateQuickDoctor = async () => {
+		setNewDocError("");
+		if (!newDocNome.trim()) {
+			setNewDocError("Por favor, preencha o nome do médico.");
+			return;
+		}
+		const crmValidation = validateCrm(newDocCrm);
+		if (!crmValidation.isValid) {
+			setNewDocError(crmValidation.error || "CRM inválido.");
+			return;
+		}
+		const dupCheck = isDoctorDuplicate({ nome: newDocNome, crm: newDocCrm }, doctors);
+		if (dupCheck.isDuplicate) {
+			setNewDocError(dupCheck.reason || "Já existe um médico cadastrado com este CRM.");
+			return;
+		}
+		const newDoc: DoctorItem = {
+			id: `doc_${Date.now()}`,
+			nome: newDocNome.trim(),
+			crm: newDocCrm.trim().toUpperCase(),
+			clinica: newDocClinica.trim() || undefined,
+		};
+		const updated = [newDoc, ...doctors];
+		setDoctors(updated);
+		await saveSupabaseDoctors(updated);
+		setSelectedDoctorId(String(newDoc.id));
+		setDoctorName(newDoc.nome);
+		setDoctorCrm(newDoc.crm);
+		setIsNewDocModalOpen(false);
+		setNewDocNome("");
+		setNewDocCrm("");
+		setNewDocClinica("");
+		toast.success(`Médico ${newDoc.nome} cadastrado e vinculado com sucesso!`);
+	};
+
 	// Autorização de Desconto pelo Gerente
 	const handleAuthorizeDiscount = () => {
 		if (managerPasswordInput === "120212") {
@@ -412,11 +536,14 @@ export function OpticalOrderForm({
 
 		setIsSubmitting(true);
 		try {
+			const currentStore = stores.find((s) => s.nome === storeName);
+			const currentSeller = sellers.find((s) => s.nome === sellerName);
+
 			const newOrder: OpticalOrder = {
 				id: `ord_${Date.now()}`,
 				orderNumber,
-				store: { id: "store_matriz", name: storeName },
-				seller: { id: "user_rodrigo", name: sellerName },
+				store: { id: currentStore?.id ? String(currentStore.id) : "store_matriz", name: storeName },
+				seller: { id: currentSeller?.id ? String(currentSeller.id) : "user_seller", name: sellerName },
 				doctor: doctorName ? { name: doctorName, crm: doctorCrm } : undefined,
 				status: "DIGITADA",
 				invoiceIssued,
@@ -427,10 +554,18 @@ export function OpticalOrderForm({
 					...patient,
 					name: patient.name.toUpperCase(),
 				},
-				aro1,
+				aro1: {
+					...aro1,
+					framePrice: aro1FrameMode === "CUSTOMER" ? 0 : aro1.framePrice,
+				},
 				hasAro2,
 				isAro2CopyOfAro1: isAro2Copy,
-				aro2: hasAro2 ? aro2 : undefined,
+				aro2: hasAro2
+					? {
+							...aro2,
+							framePrice: aro2FrameMode === "CUSTOMER" ? 0 : aro2.framePrice,
+						}
+					: undefined,
 				financials: {
 					subtotalFrames,
 					subtotalLenses,
@@ -483,11 +618,11 @@ export function OpticalOrderForm({
 				updatedAt: new Date().toISOString(),
 			};
 
-			// Baixa de estoque automática de armação (-1 un.)
-			if (aro1.frameCode) {
+			// Baixa de estoque automática apenas se for peça do estoque da loja
+			if (aro1FrameMode === "STOCK" && aro1.frameCode && aro1.frameCode !== "CLIENTE") {
 				await decrementFrameStock(aro1.frameCode, 1);
 			}
-			if (hasAro2 && aro2.frameCode) {
+			if (hasAro2 && aro2FrameMode === "STOCK" && aro2.frameCode && aro2.frameCode !== "CLIENTE") {
 				await decrementFrameStock(aro2.frameCode, 1);
 			}
 
@@ -501,8 +636,8 @@ export function OpticalOrderForm({
 					id: `ord_${Date.now() + 1}_b`,
 					orderNumber: childOrderNumber,
 					parentOrderId: newOrder.id,
-					store: { id: "store_matriz", name: storeName },
-					seller: { id: "user_rodrigo", name: sellerName },
+					store: { id: currentStore?.id ? String(currentStore.id) : "store_matriz", name: storeName },
+					seller: { id: currentSeller?.id ? String(currentSeller.id) : "user_seller", name: sellerName },
 					doctor: doctorName ? { name: doctorName, crm: doctorCrm } : undefined,
 					status: "DIGITADA",
 					orderDate: new Date().toISOString(),
@@ -513,11 +648,12 @@ export function OpticalOrderForm({
 					},
 					aro1: {
 						...aro2,
+						framePrice: aro2FrameMode === "CUSTOMER" ? 0 : aro2.framePrice,
 					},
 					hasAro2: false,
 					isAro2CopyOfAro1: false,
 					financials: {
-						subtotalFrames: Number(aro2.framePrice) || 0,
+						subtotalFrames: aro2FrameMode === "CUSTOMER" ? 0 : Number(aro2.framePrice) || 0,
 						subtotalLenses: aro2.differentLensesPerEye
 							? (Number(aro2.lensPriceOd) || 0) + (Number(aro2.lensPriceOe) || 0)
 							: Number(aro2.lensPrice) || 0,
@@ -579,8 +715,8 @@ export function OpticalOrderForm({
 
 	return (
 		<form onSubmit={handleSubmit} className="flex flex-col gap-6 p-1">
-			{/* Top Header Information */}
-			<div className="rounded-xl border bg-muted/30 p-4 shadow-xs">
+			{/* Top Header Information & Stepper Flow Banner */}
+			<div className="rounded-xl border bg-card p-4 shadow-xs space-y-3">
 				<div className="flex flex-wrap items-center justify-between gap-4">
 					<div className="flex items-center gap-3">
 						<div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -589,341 +725,542 @@ export function OpticalOrderForm({
 						<div>
 							<div className="flex items-center gap-2">
 								<h2 className="font-bold text-base tracking-tight text-foreground">
-									Lançar OS — Venda de Balcão Óptico
+									Lançar OS — Nova Venda de Balcão Óptico
 								</h2>
 								<Badge
 									variant="outline"
-									className="font-mono text-xs font-bold text-primary"
+									className="font-mono text-xs font-bold text-primary border-primary/30"
 								>
 									{orderNumber}
 								</Badge>
 							</div>
 							<p className="text-xs text-muted-foreground">
-								Lançamento de armações, lentes, tratamentos, dioptrias e
-								faturamento
+								Fluxo sequencial estruturado: Origem ➔ Paciente & Prescritor ➔ Receita ➔ Aro 1 ➔ Aro 2 ➔ Fechamento
 							</p>
 						</div>
 					</div>
+					<div className="flex items-center gap-2">
+						<span className="text-[11px] font-semibold text-muted-foreground">Status Inicial:</span>
+						<Badge variant="secondary" className="text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20">
+							DIGITADA
+						</Badge>
+					</div>
+				</div>
 
-					<div className="flex flex-wrap items-center gap-3">
-						<div className="flex flex-col">
-							<span className="text-[11px] font-medium text-muted-foreground">
-								Previsão / Promessa de Entrega
-							</span>
-							<Input
-								type="date"
-								value={promisedDate}
-								onChange={(e) => setPromisedDate(e.target.value)}
-								className="h-8 w-40 text-xs font-medium"
-								required
-							/>
-						</div>
+				{/* 6-Step Visual Indicator */}
+				<div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-center text-xs pt-1 border-t">
+					<div className="p-2 rounded-lg border bg-primary/10 border-primary/30 text-primary font-bold flex items-center justify-center gap-1">
+						<span>1. Origem</span>
+					</div>
+					<div className="p-2 rounded-lg border bg-primary/10 border-primary/30 text-primary font-bold flex items-center justify-center gap-1">
+						<span>2. Paciente</span>
+					</div>
+					<div className="p-2 rounded-lg border bg-primary/10 border-primary/30 text-primary font-bold flex items-center justify-center gap-1">
+						<span>3. Receita</span>
+					</div>
+					<div className="p-2 rounded-lg border bg-primary/10 border-primary/30 text-primary font-bold flex items-center justify-center gap-1">
+						<span>4. Aro 1</span>
+					</div>
+					<div className="p-2 rounded-lg border bg-muted/40 border-border text-muted-foreground font-medium flex items-center justify-center gap-1">
+						<span>5. Aro 2 {hasAro2 ? "✓" : "(Opt)"}</span>
+					</div>
+					<div className="p-2 rounded-lg border bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 font-bold flex items-center justify-center gap-1">
+						<span>6. Fechamento</span>
 					</div>
 				</div>
 			</div>
 
 			<div className="flex flex-col gap-6 w-full">
-					{/* Card Paciente */}
-					<div className="rounded-xl border bg-card p-5 shadow-xs">
-						<div className="mb-4 flex items-center justify-between border-b pb-3">
-							<div className="flex items-center gap-2 font-semibold text-sm text-foreground">
-								<Icon icon={UserAvatar} className="size-4 text-primary" />
-								Cadastro do Paciente / Cliente
-							</div>
+				{/* ETAPA 1: ORIGEM & ATENDIMENTO */}
+				<div className="rounded-xl border bg-card p-5 shadow-xs">
+					<div className="mb-4 flex items-center justify-between border-b pb-3">
+						<div className="flex items-center gap-2 font-bold text-sm text-foreground">
+							<Icon icon={Building} className="size-4 text-primary" />
+							Etapa 1 • Origem & Atendimento na Loja
+						</div>
+						<Badge variant="outline" className="text-[10px] font-bold text-primary">
+							Passo 1 de 6
+						</Badge>
+					</div>
+
+					<div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+						<Field>
+							<FieldLabel htmlFor="order-store">Loja de Atendimento *</FieldLabel>
+							<select
+								id="order-store"
+								value={storeName}
+								onChange={(e) => {
+									const newStore = e.target.value;
+									setStoreName(newStore);
+									const matchingSellers = sellers.filter(
+										(s) => !s.loja || s.loja === newStore || s.loja.toLowerCase().includes(newStore.toLowerCase())
+									);
+									if (matchingSellers.length > 0) {
+										setSellerName(matchingSellers[0]!.nome);
+									}
+								}}
+								className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
+								required
+							>
+								{stores.length === 0 && <option value="Conceição (Matriz)">Conceição (Matriz)</option>}
+								{stores.map((s) => (
+									<option key={s.id} value={s.nome}>
+										{s.nome}
+									</option>
+								))}
+							</select>
+						</Field>
+
+						<Field>
+							<FieldLabel htmlFor="order-seller">Vendedor Responsável *</FieldLabel>
+							<select
+								id="order-seller"
+								value={sellerName}
+								onChange={(e) => setSellerName(e.target.value)}
+								className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
+								required
+							>
+								{filteredSellers.length === 0 && <option value="Fabiano">Fabiano</option>}
+								{filteredSellers.map((s) => (
+									<option key={s.id} value={s.nome}>
+										{s.nome} {s.loja ? `— ${s.loja}` : ""}
+									</option>
+								))}
+							</select>
+						</Field>
+
+						<Field>
+							<FieldLabel htmlFor="order-promised-date">Promessa de Entrega *</FieldLabel>
+							<Input
+								id="order-promised-date"
+								type="date"
+								value={promisedDate}
+								onChange={(e) => setPromisedDate(e.target.value)}
+								className="h-8 text-xs font-medium"
+								required
+							/>
+						</Field>
+					</div>
+				</div>
+
+				{/* ETAPA 2: PACIENTE & MÉDICO PRESCRITOR */}
+				<div className="rounded-xl border bg-card p-5 shadow-xs">
+					<div className="mb-4 flex items-center justify-between border-b pb-3">
+						<div className="flex items-center gap-2 font-bold text-sm text-foreground">
+							<Icon icon={UserAvatar} className="size-4 text-primary" />
+							Etapa 2 • Cadastro do Paciente & Médico Prescritor
+						</div>
+						<div className="flex items-center gap-2">
 							<Badge variant="secondary" className="text-[10px]">
 								ViaCEP Ativo
 							</Badge>
+							<Badge variant="outline" className="text-[10px] font-bold text-primary">
+								Passo 2 de 6
+							</Badge>
 						</div>
+					</div>
 
-						<FieldGroup className="gap-3">
+					<FieldGroup className="gap-3">
+						<Field>
+							<FieldLabel htmlFor="patient-name">Nome Completo do Paciente *</FieldLabel>
+							<Input
+								id="patient-name"
+								value={patient.name}
+								onChange={(e) =>
+									setPatient((p) => ({
+										...p,
+										name: e.target.value.toUpperCase(),
+									}))
+								}
+								placeholder="DIGITE O NOME COMPLETO DO CLIENTE"
+								required
+								className="text-xs font-semibold uppercase"
+							/>
+						</Field>
+
+						<div className="grid grid-cols-2 gap-3">
 							<Field>
-								<FieldLabel htmlFor="patient-name">Nome Completo *</FieldLabel>
+								<FieldLabel htmlFor="patient-cpf">CPF *</FieldLabel>
 								<Input
-									id="patient-name"
-									value={patient.name}
+									id="patient-cpf"
+									value={patient.cpf}
 									onChange={(e) =>
 										setPatient((p) => ({
 											...p,
-											name: e.target.value.toUpperCase(),
+											cpf: formatCpf(e.target.value),
 										}))
 									}
-									placeholder="DIGITE O NOME DO CLIENTE"
+									placeholder="000.000.000-00"
 									required
-									className="text-xs font-semibold uppercase"
+									className="text-xs font-mono"
 								/>
 							</Field>
-
-							<div className="grid grid-cols-2 gap-3">
-								<Field>
-									<FieldLabel htmlFor="patient-cpf">CPF *</FieldLabel>
-									<Input
-										id="patient-cpf"
-										value={patient.cpf}
-										onChange={(e) =>
-											setPatient((p) => ({
-												...p,
-												cpf: formatCpf(e.target.value),
-											}))
-										}
-										placeholder="000.000.000-00"
-										required
-										className="text-xs font-mono"
-									/>
-								</Field>
-								<Field>
-									<FieldLabel htmlFor="patient-birth">
-										Data Nascimento
-									</FieldLabel>
-									<Input
-										id="patient-birth"
-										type="date"
-										value={patient.birthDate}
-										onChange={(e) =>
-											setPatient((p) => ({
-												...p,
-												birthDate: e.target.value,
-											}))
-										}
-										className="text-xs"
-									/>
-								</Field>
-							</div>
-
-							<div className="grid grid-cols-2 gap-3">
-								<Field>
-									<FieldLabel htmlFor="patient-whatsapp">WhatsApp *</FieldLabel>
-									<Input
-										id="patient-whatsapp"
-										value={patient.whatsapp}
-										onChange={(e) =>
-											setPatient((p) => ({
-												...p,
-												whatsapp: formatPhone(e.target.value),
-											}))
-										}
-										placeholder="(11) 90000-0000"
-										required
-										className="text-xs"
-									/>
-								</Field>
-								<Field>
-									<div className="flex items-center justify-between">
-										<FieldLabel htmlFor="patient-phone">
-											Tel. Secundário
-										</FieldLabel>
-										<button
-											type="button"
-											onClick={handleCloneWhatsApp}
-											title="Clonar WhatsApp"
-											className="flex items-center gap-1 text-[10px] text-primary hover:underline"
-										>
-											<Icon icon={Copy} className="size-3" />
-											Clonar Whats
-										</button>
-									</div>
-									<Input
-										id="patient-phone"
-										value={patient.secondaryPhone}
-										onChange={(e) =>
-											setPatient((p) => ({
-												...p,
-												secondaryPhone: formatPhone(e.target.value),
-											}))
-										}
-										placeholder="(11) 0000-0000"
-										className="text-xs"
-									/>
-								</Field>
-							</div>
-
 							<Field>
-								<FieldLabel htmlFor="patient-email">E-mail</FieldLabel>
+								<FieldLabel htmlFor="patient-birth">Data de Nascimento</FieldLabel>
 								<Input
-									id="patient-email"
-									type="email"
-									value={patient.email}
+									id="patient-birth"
+									type="date"
+									value={patient.birthDate}
 									onChange={(e) =>
-										setPatient((p) => ({ ...p, email: e.target.value }))
+										setPatient((p) => ({
+											...p,
+											birthDate: e.target.value,
+										}))
 									}
-									placeholder="cliente@email.com"
 									className="text-xs"
 								/>
 							</Field>
+						</div>
 
-							{/* CEP e Endereço */}
-							<Separator className="my-1" />
-							<div className="flex items-end gap-2">
-								<Field className="flex-1">
-									<FieldLabel htmlFor="patient-cep">CEP</FieldLabel>
+						<div className="grid grid-cols-2 gap-3">
+							<Field>
+								<FieldLabel htmlFor="patient-whatsapp">WhatsApp (Contato Principal) *</FieldLabel>
+								<Input
+									id="patient-whatsapp"
+									value={patient.whatsapp}
+									onChange={(e) =>
+										setPatient((p) => ({
+											...p,
+											whatsapp: formatPhone(e.target.value),
+										}))
+									}
+									placeholder="(11) 90000-0000"
+									required
+									className="text-xs font-semibold"
+								/>
+							</Field>
+							<Field>
+								<div className="flex items-center justify-between">
+									<FieldLabel htmlFor="patient-phone">Tel. Secundário</FieldLabel>
+									<button
+										type="button"
+										onClick={handleCloneWhatsApp}
+										title="Clonar WhatsApp"
+										className="flex items-center gap-1 text-[10px] text-primary hover:underline cursor-pointer"
+									>
+										<Icon icon={Copy} className="size-3" />
+										Clonar Whats
+									</button>
+								</div>
+								<Input
+									id="patient-phone"
+									value={patient.secondaryPhone}
+									onChange={(e) =>
+										setPatient((p) => ({
+											...p,
+											secondaryPhone: formatPhone(e.target.value),
+										}))
+									}
+									placeholder="(11) 0000-0000"
+									className="text-xs"
+								/>
+							</Field>
+						</div>
+
+						<Field>
+							<FieldLabel htmlFor="patient-email">E-mail</FieldLabel>
+							<Input
+								id="patient-email"
+								type="email"
+								value={patient.email}
+								onChange={(e) => setPatient((p) => ({ ...p, email: e.target.value }))}
+								placeholder="cliente@email.com"
+								className="text-xs"
+							/>
+						</Field>
+
+						{/* Endereço & ViaCEP */}
+						<Separator className="my-1" />
+						<div className="flex items-end gap-2">
+							<Field className="flex-1">
+								<FieldLabel htmlFor="patient-cep">CEP</FieldLabel>
+								<Input
+									id="patient-cep"
+									value={patient.cep}
+									disabled={loadingCep}
+									onChange={(e) => {
+										const formatted = formatCep(e.target.value);
+										setPatient((p) => ({ ...p, cep: formatted }));
+										if (formatted.replace(/\D/g, "").length === 8) {
+											handleSearchCep(formatted);
+										}
+									}}
+									placeholder="00000-000"
+									className="text-xs font-mono"
+									aria-label="CEP do paciente"
+								/>
+							</Field>
+							<Button
+								type="button"
+								variant="secondary"
+								size="sm"
+								className="h-9 px-3 text-xs cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-hidden"
+								disabled={loadingCep}
+								onClick={() => handleSearchCep()}
+								aria-label={loadingCep ? "Buscando endereço via CEP no ViaCEP..." : "Buscar endereço no ViaCEP"}
+								title="Buscar endereço no ViaCEP"
+							>
+								{loadingCep ? (
+									<Spinner className="size-3" />
+								) : (
+									<>
+										<Icon icon={Search} className="mr-1 size-3" />
+										Buscar CEP
+									</>
+								)}
+							</Button>
+						</div>
+
+						<div className="grid grid-cols-4 gap-2">
+							<Field className="col-span-3">
+								<FieldLabel htmlFor="patient-street">Logradouro / Rua</FieldLabel>
+								<Input
+									id="patient-street"
+									value={patient.street}
+									onChange={(e) => setPatient((p) => ({ ...p, street: e.target.value }))}
+									placeholder="Avenida / Rua"
+									className="text-xs"
+								/>
+							</Field>
+							<Field className="col-span-1">
+								<FieldLabel htmlFor="patient-number">Nº</FieldLabel>
+								<Input
+									id="patient-number"
+									value={patient.number}
+									onChange={(e) => setPatient((p) => ({ ...p, number: e.target.value }))}
+									placeholder="1500"
+									className="text-xs"
+								/>
+							</Field>
+						</div>
+
+						<div className="grid grid-cols-3 gap-2">
+							<Field>
+								<FieldLabel htmlFor="patient-comp">Complemento</FieldLabel>
+								<Input
+									id="patient-comp"
+									value={patient.complement}
+									onChange={(e) => setPatient((p) => ({ ...p, complement: e.target.value }))}
+									placeholder="Apto / Bloco"
+									className="text-xs"
+								/>
+							</Field>
+							<Field>
+								<FieldLabel htmlFor="patient-neighborhood">Bairro</FieldLabel>
+								<Input
+									id="patient-neighborhood"
+									value={patient.neighborhood}
+									onChange={(e) => setPatient((p) => ({ ...p, neighborhood: e.target.value }))}
+									placeholder="Bairro"
+									className="text-xs"
+								/>
+							</Field>
+							<Field>
+								<FieldLabel htmlFor="patient-city">Cidade / UF</FieldLabel>
+								<div className="flex gap-1">
 									<Input
-										id="patient-cep"
-										value={patient.cep}
-										disabled={loadingCep}
-										onChange={(e) => {
-											const formatted = formatCep(e.target.value);
-											setPatient((p) => ({ ...p, cep: formatted }));
-											if (formatted.replace(/\D/g, "").length === 8) {
-												handleSearchCep(formatted);
-											}
-										}}
-										placeholder="00000-000"
-										className="text-xs font-mono"
-										aria-label="CEP do paciente"
+										id="patient-city"
+										value={patient.city}
+										onChange={(e) => setPatient((p) => ({ ...p, city: e.target.value }))}
+										placeholder="Cidade"
+										className="text-xs"
 									/>
-								</Field>
+									<Input
+										id="patient-state"
+										value={patient.state}
+										onChange={(e) =>
+											setPatient((p) => ({
+												...p,
+												state: e.target.value.toUpperCase(),
+											}))
+										}
+										maxLength={2}
+										placeholder="SP"
+										className="w-12 text-center text-xs font-mono uppercase"
+									/>
+								</div>
+							</Field>
+						</div>
+
+						{/* Sub-bloco Médico Oftalmologista Prescritor com Integração ao Cadastro */}
+						<Separator className="my-2" />
+						<div className="p-3.5 rounded-xl bg-muted/30 border space-y-2.5">
+							<div className="flex items-center justify-between">
+								<div className="flex items-center gap-1.5 font-semibold text-xs text-foreground">
+									<Icon icon={Receipt} className="size-3.5 text-primary" />
+									Médico Oftalmologista / Optometrista Prescritor
+								</div>
 								<Button
 									type="button"
-									variant="secondary"
+									variant="outline"
 									size="sm"
-									className="h-9 px-3 text-xs focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-hidden"
-									disabled={loadingCep}
-									onClick={() => handleSearchCep()}
-									aria-label={loadingCep ? "Buscando endereço via CEP no ViaCEP..." : "Buscar endereço no ViaCEP"}
-									title="Buscar endereço no ViaCEP"
+									onClick={() => {
+										setNewDocError("");
+										setIsNewDocModalOpen(true);
+									}}
+									className="h-7 px-2 text-[11px] font-bold text-primary hover:bg-primary/10 cursor-pointer gap-1"
 								>
-									{loadingCep ? (
-										<Spinner className="size-3" />
-									) : (
-										<>
-											<Icon icon={Search} className="mr-1 size-3" />
-											Buscar
-										</>
-									)}
+									<Icon icon={Add} className="size-3" />
+									+ Cadastrar Novo Médico
 								</Button>
 							</div>
 
-							<div className="grid grid-cols-4 gap-2">
-								<Field className="col-span-3">
-									<FieldLabel htmlFor="patient-street">
-										Logradouro / Rua
-									</FieldLabel>
-									<Input
-										id="patient-street"
-										value={patient.street}
-										onChange={(e) =>
-											setPatient((p) => ({ ...p, street: e.target.value }))
+							<div>
+								<FieldLabel className="text-[10px] font-semibold text-muted-foreground mb-1 block">
+									Selecionar Médico do Cadastro
+								</FieldLabel>
+								<select
+									value={selectedDoctorId}
+									onChange={(e) => {
+										const val = e.target.value;
+										setSelectedDoctorId(val);
+										const doc = doctors.find((d) => String(d.id ?? d.nome) === val);
+										if (doc) {
+											setDoctorName(doc.nome);
+											setDoctorCrm(doc.crm);
+										} else {
+											setDoctorName("");
+											setDoctorCrm("");
 										}
-										placeholder="Avenida Paulista"
-										className="text-xs"
-									/>
-								</Field>
-								<Field className="col-span-1">
-									<FieldLabel htmlFor="patient-number">Nº</FieldLabel>
-									<Input
-										id="patient-number"
-										value={patient.number}
-										onChange={(e) =>
-											setPatient((p) => ({ ...p, number: e.target.value }))
-										}
-										placeholder="1500"
-										className="text-xs"
-									/>
-								</Field>
+									}}
+									className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
+								>
+									<option value="">Selecione um médico cadastrado...</option>
+									{doctors.map((d) => (
+										<option key={d.id ?? d.nome} value={String(d.id ?? d.nome)}>
+											[{d.crm}] {d.nome} {d.clinica ? `— ${d.clinica}` : ""}
+										</option>
+									))}
+								</select>
 							</div>
 
-							<div className="grid grid-cols-3 gap-2">
-								<Field>
-									<FieldLabel htmlFor="patient-comp">Complemento</FieldLabel>
+							<div className="grid grid-cols-3 gap-2 pt-1">
+								<div className="col-span-2">
+									<FieldLabel className="text-[10px]">Nome do Médico</FieldLabel>
 									<Input
-										id="patient-comp"
-										value={patient.complement}
-										onChange={(e) =>
-											setPatient((p) => ({
-												...p,
-												complement: e.target.value,
-											}))
-										}
-										placeholder="Apto 12"
-										className="text-xs"
+										value={doctorName}
+										onChange={(e) => setDoctorName(e.target.value)}
+										placeholder="Dr(a). Nome do Médico"
+										className="h-7 text-xs"
 									/>
-								</Field>
-								<Field>
-									<FieldLabel htmlFor="patient-neighborhood">Bairro</FieldLabel>
+								</div>
+								<div className="col-span-1">
+									<FieldLabel className="text-[10px]">CRM / UF</FieldLabel>
 									<Input
-										id="patient-neighborhood"
-										value={patient.neighborhood}
-										onChange={(e) =>
-											setPatient((p) => ({
-												...p,
-												neighborhood: e.target.value,
-											}))
-										}
-										placeholder="Centro"
-										className="text-xs"
+										value={doctorCrm}
+										onChange={(e) => setDoctorCrm(e.target.value.toUpperCase())}
+										placeholder="CRM/UF"
+										className="h-7 text-xs font-mono uppercase"
 									/>
-								</Field>
-								<Field>
-									<FieldLabel htmlFor="patient-city">Cidade / UF</FieldLabel>
-									<div className="flex gap-1">
-										<Input
-											id="patient-city"
-											value={patient.city}
-											onChange={(e) =>
-												setPatient((p) => ({ ...p, city: e.target.value }))
-											}
-											placeholder="Cidade"
-											className="text-xs"
-										/>
-										<Input
-											id="patient-state"
-											value={patient.state}
-											onChange={(e) =>
-												setPatient((p) => ({
-													...p,
-													state: e.target.value.toUpperCase(),
-												}))
-											}
-											maxLength={2}
-											placeholder="SP"
-											className="w-12 text-center text-xs font-mono uppercase"
-										/>
-									</div>
-								</Field>
+								</div>
 							</div>
-						</FieldGroup>
+						</div>
+					</FieldGroup>
+				</div>
+
+				{/* ETAPA 3: RECEITA & DIOPTRIAS CLÍNICAS */}
+				<div className="rounded-xl border bg-card p-5 shadow-xs">
+					<div className="mb-4 flex items-center justify-between border-b pb-3">
+						<div className="flex items-center gap-2 font-bold text-sm text-foreground">
+							<Icon icon={Receipt} className="size-4 text-primary" />
+							Etapa 3 • Prescrição Médica & Dioptrias Clínicas (OD / OE)
+						</div>
+						<Badge variant="outline" className="text-[10px] font-bold text-primary">
+							Passo 3 de 6
+						</Badge>
 					</div>
 
-					{/* Médico Responsável */}
-					<div className="rounded-xl border bg-card p-4 shadow-xs">
-						<div className="mb-3 flex items-center justify-between">
-							<span className="font-semibold text-xs text-foreground">
-								Médico Oftalmologista / Optometrista
-							</span>
+					<p className="text-xs text-muted-foreground mb-4">
+						Lance as dioptrias esféricas, cilíndricas, eixos, adições e DNP da receita médica. A IA óptica fará a validação automática de consistência e transposição.
+					</p>
+
+					<OpticalDioptersTable
+						idPrefix="receita"
+						title="Dioptrias e Medidas da Prescrição Médica"
+						value={aro1.diopters}
+						onChange={(diopters) => setAro1((a) => ({ ...a, diopters }))}
+						onOcrCompleted={(doc, pat) => {
+							if (doc) setDoctorName(doc);
+							if (pat && !patient.name)
+								setPatient((p) => ({ ...p, name: pat.toUpperCase() }));
+						}}
+					/>
+				</div>
+
+				{/* ETAPA 4: ARO 1 (PRINCIPAL) */}
+				<div className="rounded-xl border bg-card p-5 shadow-xs">
+					<div className="mb-4 flex items-center justify-between border-b pb-3">
+						<div className="flex items-center gap-2 font-bold text-sm text-foreground">
+							<Icon icon={Glasses} className="size-4 text-primary" />
+							Etapa 4 • Aro 1 (Armação & Lentes Principais)
 						</div>
-						<div className="grid grid-cols-3 gap-2">
-							<div className="col-span-2">
-								<Input
-									value={doctorName}
-									onChange={(e) => setDoctorName(e.target.value)}
-									placeholder="Dr(a). Nome do Médico"
-									className="h-8 text-xs"
-								/>
-							</div>
-							<div className="col-span-1">
-								<Input
-									value={doctorCrm}
-									onChange={(e) => setDoctorCrm(e.target.value)}
-									placeholder="CRM/UF"
-									className="h-8 text-xs font-mono"
-								/>
-							</div>
-						</div>
+						<Badge variant="outline" className="text-[10px] font-bold text-primary">
+							Passo 4 de 6 • 1º Par
+						</Badge>
 					</div>
-					{/* Aro 1 Card */}
-					<div className="rounded-xl border bg-card p-5 shadow-xs">
-						<div className="mb-4 flex items-center justify-between border-b pb-3">
-							<div className="flex items-center gap-2 font-bold text-sm text-foreground">
-								<Icon icon={Glasses} className="size-4 text-primary" />
-								Aro 1
+
+					{/* Armação Aro 1 */}
+					<div className="space-y-3">
+						{/* Toggle: Peça do Estoque vs Armação Trazida */}
+						<div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/40 border">
+							<div>
+								<span className="text-xs font-semibold text-foreground block">
+									Origem da Armação — Aro 1
+								</span>
+								<span className="text-[10px] text-muted-foreground">
+									Defina se a armação é comprada do estoque da ótica ou trazida pelo próprio cliente
+								</span>
 							</div>
-							<Badge variant="outline" className="text-xs font-semibold">
-								1º Par
-							</Badge>
+							<div className="flex items-center gap-1.5">
+								<Button
+									type="button"
+									variant={aro1FrameMode === "STOCK" ? "default" : "outline"}
+									size="sm"
+									className="h-7 text-xs font-bold cursor-pointer"
+									onClick={() => {
+										setAro1FrameMode("STOCK");
+										if (frameCatalog.length > 0) {
+											const f = frameCatalog[0]!;
+											setAro1((a) => ({
+												...a,
+												frameCode: f.produto.split(" ")[1] || f.produto.slice(0, 8),
+												frameBrand: f.marca,
+												frameModel: f.produto,
+												framePrice: f.preco,
+												frameType: f.tipo,
+												frameFamily: f.familia,
+												frameManufacturer: f.fabricante,
+												frameAro: f.tamanhoAro,
+												framePonte: f.tamanhoPonte,
+											}));
+										}
+									}}
+								>
+									📦 Peça do Estoque
+								</Button>
+								<Button
+									type="button"
+									variant={aro1FrameMode === "CUSTOMER" ? "default" : "outline"}
+									size="sm"
+									className="h-7 text-xs font-bold cursor-pointer"
+									onClick={() => {
+										setAro1FrameMode("CUSTOMER");
+										setAro1((a) => ({
+											...a,
+											frameCode: "CLIENTE",
+											frameBrand: "Armação do Cliente",
+											frameModel: "Armação Própria Trazida",
+											framePrice: 0,
+										}));
+									}}
+								>
+									👓 Armação Trazida (R$ 0,00)
+								</Button>
+							</div>
 						</div>
 
-						{/* Armação Aro 1 */}
-						<div className="space-y-3">
-							{/* Seletor Dropdown do Catálogo de Armações & Solares com Estoque */}
+						{/* Seletor Dropdown do Catálogo de Armações (se estoque) */}
+						{aro1FrameMode === "STOCK" ? (
 							<div className="p-3.5 rounded-xl bg-muted/30 border space-y-2">
 								<div className="flex items-center justify-between">
 									<FieldLabel className="text-xs font-semibold">
@@ -946,7 +1283,7 @@ export function OpticalOrderForm({
 												}`}
 											>
 												{currentFrame.estoque > 0
-													? `Estoque: ${currentFrame.estoque} un. disponíveis`
+													? `Estoque: ${currentFrame.estoque} un. disponíveis (baixa aut.)`
 													: "⚠️ Sem Estoque no Momento"}
 											</Badge>
 										);
@@ -992,838 +1329,878 @@ export function OpticalOrderForm({
 									))}
 								</select>
 							</div>
-
-							<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-								<Field>
-									<FieldLabel>Cód. Armação</FieldLabel>
-									<Input
-										value={aro1.frameCode}
-										onChange={(e) =>
-											setAro1((a) => ({ ...a, frameCode: e.target.value }))
-										}
-										placeholder="RB5228"
-										className="h-8 text-xs font-mono"
-									/>
-								</Field>
-								<Field>
-									<FieldLabel>Marca</FieldLabel>
-									<Input
-										value={aro1.frameBrand}
-										onChange={(e) =>
-											setAro1((a) => ({ ...a, frameBrand: e.target.value }))
-										}
-										placeholder="Ray-Ban"
-										className="h-8 text-xs"
-									/>
-								</Field>
-								<Field>
-									<FieldLabel>Modelo</FieldLabel>
-									<Input
-										value={aro1.frameModel}
-										onChange={(e) =>
-											setAro1((a) => ({ ...a, frameModel: e.target.value }))
-										}
-										placeholder="Acetato Preto"
-										className="h-8 text-xs"
-									/>
-								</Field>
-								<Field>
-									<FieldLabel>R$ Armação</FieldLabel>
-									<Input
-										type="number"
-										step="0.01"
-										value={aro1.framePrice}
-										onChange={(e) =>
-											setAro1((a) => ({
-												...a,
-												framePrice: Number(e.target.value) || 0,
-											}))
-										}
-										className="h-8 text-xs font-semibold"
-									/>
-								</Field>
-							</div>
-
-							{/* Especificações Técnicas da Armação Espelhadas do Catálogo */}
-							<div className="p-2.5 rounded-lg bg-muted/20 border grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
-								<div>
-									<FieldLabel className="text-[10px] text-muted-foreground">
-										Tipo da Peça
-									</FieldLabel>
-									<select
-										value={aro1.frameType || "RECEITUARIO"}
-										onChange={(e) =>
-											setAro1((a) => ({ ...a, frameType: e.target.value as any }))
-										}
-										className="w-full h-7 px-2 rounded border bg-background text-xs"
-									>
-										<option value="RECEITUARIO">Receituário</option>
-										<option value="SOLAR">Solar</option>
-										<option value="CLIP_ON">Clip-on</option>
-									</select>
-								</div>
-								<div>
-									<FieldLabel className="text-[10px] text-muted-foreground">
-										Família / Coleção
-									</FieldLabel>
-									<Input
-										value={aro1.frameFamily || ""}
-										onChange={(e) =>
-											setAro1((a) => ({ ...a, frameFamily: e.target.value }))
-										}
-										placeholder="Ex: Wayfarer"
-										className="h-7 text-xs"
-									/>
-								</div>
-								<div>
-									<FieldLabel className="text-[10px] text-muted-foreground">
-										Fabricante
-									</FieldLabel>
-									<Input
-										value={aro1.frameManufacturer || ""}
-										onChange={(e) =>
-											setAro1((a) => ({
-												...a,
-												frameManufacturer: e.target.value,
-											}))
-										}
-										placeholder="Ex: Luxottica"
-										className="h-7 text-xs"
-									/>
-								</div>
-								<div>
-									<FieldLabel className="text-[10px] text-muted-foreground">
-										Tamanho Aro (mm)
-									</FieldLabel>
-									<Input
-										value={aro1.frameAro || ""}
-										onChange={(e) =>
-											setAro1((a) => ({ ...a, frameAro: e.target.value }))
-										}
-										placeholder="Ex: 52"
-										className="h-7 text-xs font-mono"
-									/>
-								</div>
-								<div>
-									<FieldLabel className="text-[10px] text-muted-foreground">
-										Tamanho Ponte (mm)
-									</FieldLabel>
-									<Input
-										value={aro1.framePonte || ""}
-										onChange={(e) =>
-											setAro1((a) => ({ ...a, framePonte: e.target.value }))
-										}
-										placeholder="Ex: 18"
-										className="h-7 text-xs font-mono"
-									/>
-								</div>
-							</div>
-						</div>
-
-						{/* Toggle Variação de Lente por Olho */}
-						<div className="mt-3 flex items-center justify-between p-2.5 rounded-lg bg-muted/40 border">
-							<div>
-								<span className="text-xs font-semibold text-foreground block">
-									Variação por Olho (Lentes diferentes em OD e OE)
-								</span>
-								<span className="text-[10px] text-muted-foreground">
-									Permite selecionar designs, laboratórios ou valores diferentes para cada olho
-								</span>
-							</div>
-							<Switch
-								checked={Boolean(aro1.differentLensesPerEye)}
-								onCheckedChange={(checked) =>
-									setAro1((a) => ({
-										...a,
-										differentLensesPerEye: checked,
-										lensOd: checked ? (a.lensOd || a.lensName) : undefined,
-										lensOe: checked ? (a.lensOe || a.lensName) : undefined,
-										labOd: checked ? (a.labOd || a.lab) : undefined,
-										labOe: checked ? (a.labOe || a.lab) : undefined,
-										lensPriceOd: checked ? (a.lensPriceOd || Math.round(a.lensPrice / 2)) : undefined,
-										lensPriceOe: checked ? (a.lensPriceOe || Math.round(a.lensPrice / 2)) : undefined,
-										treatmentOd: checked ? (a.treatmentOd || a.treatment) : undefined,
-										treatmentOe: checked ? (a.treatmentOe || a.treatment) : undefined,
-									}))
-								}
-							/>
-						</div>
-
-						{/* Lente Aro 1: Modo Variação por Olho */}
-						{aro1.differentLensesPerEye ? (
-							<div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-								{/* Olho Direito (OD) */}
-								<div className="p-3 rounded-lg border bg-background space-y-2.5">
-									<div className="flex items-center justify-between border-b pb-1.5">
-										<span className="text-xs font-bold text-blue-600 dark:text-blue-400">
-											Olho Direito (OD) — Peça Avulsa
-										</span>
-									</div>
-
-									{/* Dropdown Catálogo OD */}
-									<div>
-										<FieldLabel className="text-[10px] font-semibold text-muted-foreground mb-1 block">
-											Lente OD do Catálogo
-										</FieldLabel>
-										<select
-											value={
-												lensCatalog.find(
-													(l) =>
-														l.produto === aro1.lensOd &&
-														(!aro1.labOd ||
-															l.laboratorio.toLowerCase() === aro1.labOd.toLowerCase()),
-												)?.id || ""
-											}
-											onChange={(e) => {
-												const selected = lensCatalog.find((l) => l.id === e.target.value);
-												if (selected) {
-													setAro1((a) => ({
-														...a,
-														lensOd: selected.produto,
-														labOd: selected.laboratorio,
-														lensPriceOd: selected.valorPeca || Math.round(selected.preco / 2),
-														lensTypeOd: selected.tipo,
-														lensFamilyOd: selected.familia,
-														lensIndexOd: selected.indiceRefrativo,
-														lensTechOd: selected.tecnologia,
-													}));
-												}
-											}}
-											className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs"
-										>
-											<option value="">Selecione lente para OD...</option>
-											{lensCatalog.map((l) => (
-												<option key={l.id} value={l.id}>
-													[{l.laboratorio}] {l.produto} — R$ {l.valorPeca || l.preco / 2}
-												</option>
-											))}
-										</select>
-									</div>
-
-									<div className="grid grid-cols-2 gap-2">
-										<div>
-											<FieldLabel className="text-[10px]">Laboratório OD</FieldLabel>
-											<select
-												value={aro1.labOd || ""}
-												onChange={(e) => setAro1((a) => ({ ...a, labOd: e.target.value }))}
-												className="w-full h-7 px-2 rounded border bg-background text-xs"
-											>
-												<option value="">Selecione...</option>
-												{LAB_CATALOG.map((lab) => (
-													<option key={lab} value={lab}>
-														{lab}
-													</option>
-												))}
-											</select>
-										</div>
-										<div>
-											<FieldLabel className="text-[10px]">R$ Peça OD</FieldLabel>
-											<Input
-												type="number"
-												step="0.01"
-												value={aro1.lensPriceOd ?? 0}
-												onChange={(e) =>
-													setAro1((a) => ({
-														...a,
-														lensPriceOd: Number(e.target.value) || 0,
-													}))
-												}
-												className="h-7 text-xs font-semibold text-blue-600"
-											/>
-										</div>
-									</div>
-									<div>
-										<FieldLabel className="text-[10px]">Nome da Lente OD</FieldLabel>
-										<Input
-											value={aro1.lensOd || ""}
-											onChange={(e) => setAro1((a) => ({ ...a, lensOd: e.target.value }))}
-											placeholder="Ex: Sync III 1.50"
-											className="h-7 text-xs"
-										/>
-									</div>
-
-									{/* Especificações Técnicas Espelhadas OD */}
-									<div className="p-2 rounded bg-muted/30 border grid grid-cols-2 gap-1.5 text-[11px]">
-										<div>
-											<span className="text-[9px] text-muted-foreground block">Tipo OD</span>
-											<span className="font-semibold text-foreground truncate block">
-												{aro1.lensTypeOd || "MULTIFOCAL"}
-											</span>
-										</div>
-										<div>
-											<span className="text-[9px] text-muted-foreground block">IR / Tech</span>
-											<span className="font-semibold text-foreground truncate block">
-												{aro1.lensIndexOd || "1.50"} • {aro1.lensTechOd || "Freeform"}
-											</span>
-										</div>
-									</div>
-
-									{/* Tratamento OD */}
-									<div>
-										<FieldLabel className="text-[10px] mb-1 block">Tratamento OD</FieldLabel>
-										<select
-											value={
-												TREATMENT_OPTIONS.find((t) => t.name === aro1.treatmentOd)?.name ||
-												(aro1.treatmentOd ? "CUSTOM" : "")
-											}
-											onChange={(e) => {
-												const val = e.target.value;
-												if (val !== "CUSTOM") {
-													const selected = TREATMENT_OPTIONS.find((t) => t.name === val);
-													if (selected) {
-														setAro1((a) => ({ ...a, treatmentOd: selected.name }));
-													}
-												}
-											}}
-											className="w-full h-7 px-2 rounded border bg-background text-xs mb-1"
-										>
-											<option value="">Selecione tratamento OD...</option>
-											{TREATMENT_OPTIONS.map((t) => (
-												<option key={t.name} value={t.name}>
-													{t.name} (R$ {t.price})
-												</option>
-											))}
-											<option value="CUSTOM">Personalizado...</option>
-										</select>
-										<Input
-											value={aro1.treatmentOd || ""}
-											onChange={(e) => setAro1((a) => ({ ...a, treatmentOd: e.target.value }))}
-											placeholder="Nome do tratamento OD"
-											className="h-7 text-xs"
-										/>
-									</div>
-								</div>
-
-								{/* Olho Esquerdo (OE) */}
-								<div className="p-3 rounded-lg border bg-background space-y-2.5">
-									<div className="flex items-center justify-between border-b pb-1.5">
-										<span className="text-xs font-bold text-amber-600 dark:text-amber-400">
-											Olho Esquerdo (OE) — Peça Avulsa
-										</span>
-									</div>
-
-									{/* Dropdown Catálogo OE */}
-									<div>
-										<FieldLabel className="text-[10px] font-semibold text-muted-foreground mb-1 block">
-											Lente OE do Catálogo
-										</FieldLabel>
-										<select
-											value={
-												lensCatalog.find(
-													(l) =>
-														l.produto === aro1.lensOe &&
-														(!aro1.labOe ||
-															l.laboratorio.toLowerCase() === aro1.labOe.toLowerCase()),
-												)?.id || ""
-											}
-											onChange={(e) => {
-												const selected = lensCatalog.find((l) => l.id === e.target.value);
-												if (selected) {
-													setAro1((a) => ({
-														...a,
-														lensOe: selected.produto,
-														labOe: selected.laboratorio,
-														lensPriceOe: selected.valorPeca || Math.round(selected.preco / 2),
-														lensTypeOe: selected.tipo,
-														lensFamilyOe: selected.familia,
-														lensIndexOe: selected.indiceRefrativo,
-														lensTechOe: selected.tecnologia,
-													}));
-												}
-											}}
-											className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs"
-										>
-											<option value="">Selecione lente para OE...</option>
-											{lensCatalog.map((l) => (
-												<option key={l.id} value={l.id}>
-													[{l.laboratorio}] {l.produto} — R$ {l.valorPeca || l.preco / 2}
-												</option>
-											))}
-										</select>
-									</div>
-
-									<div className="grid grid-cols-2 gap-2">
-										<div>
-											<FieldLabel className="text-[10px]">Laboratório OE</FieldLabel>
-											<select
-												value={aro1.labOe || ""}
-												onChange={(e) => setAro1((a) => ({ ...a, labOe: e.target.value }))}
-												className="w-full h-7 px-2 rounded border bg-background text-xs"
-											>
-												<option value="">Selecione...</option>
-												{LAB_CATALOG.map((lab) => (
-													<option key={lab} value={lab}>
-														{lab}
-													</option>
-												))}
-											</select>
-										</div>
-										<div>
-											<FieldLabel className="text-[10px]">R$ Peça OE</FieldLabel>
-											<Input
-												type="number"
-												step="0.01"
-												value={aro1.lensPriceOe ?? 0}
-												onChange={(e) =>
-													setAro1((a) => ({
-														...a,
-														lensPriceOe: Number(e.target.value) || 0,
-													}))
-												}
-												className="h-7 text-xs font-semibold text-amber-600"
-											/>
-										</div>
-									</div>
-									<div>
-										<FieldLabel className="text-[10px]">Nome da Lente OE</FieldLabel>
-										<Input
-											value={aro1.lensOe || ""}
-											onChange={(e) => setAro1((a) => ({ ...a, lensOe: e.target.value }))}
-											placeholder="Ex: Sync III 1.50"
-											className="h-7 text-xs"
-										/>
-									</div>
-
-									{/* Especificações Técnicas Espelhadas OE */}
-									<div className="p-2 rounded bg-muted/30 border grid grid-cols-2 gap-1.5 text-[11px]">
-										<div>
-											<span className="text-[9px] text-muted-foreground block">Tipo OE</span>
-											<span className="font-semibold text-foreground truncate block">
-												{aro1.lensTypeOe || "MULTIFOCAL"}
-											</span>
-										</div>
-										<div>
-											<span className="text-[9px] text-muted-foreground block">IR / Tech</span>
-											<span className="font-semibold text-foreground truncate block">
-												{aro1.lensIndexOe || "1.50"} • {aro1.lensTechOe || "Freeform"}
-											</span>
-										</div>
-									</div>
-
-									{/* Tratamento OE */}
-									<div>
-										<FieldLabel className="text-[10px] mb-1 block">Tratamento OE</FieldLabel>
-										<select
-											value={
-												TREATMENT_OPTIONS.find((t) => t.name === aro1.treatmentOe)?.name ||
-												(aro1.treatmentOe ? "CUSTOM" : "")
-											}
-											onChange={(e) => {
-												const val = e.target.value;
-												if (val !== "CUSTOM") {
-													const selected = TREATMENT_OPTIONS.find((t) => t.name === val);
-													if (selected) {
-														setAro1((a) => ({ ...a, treatmentOe: selected.name }));
-													}
-												}
-											}}
-											className="w-full h-7 px-2 rounded border bg-background text-xs mb-1"
-										>
-											<option value="">Selecione tratamento OE...</option>
-											{TREATMENT_OPTIONS.map((t) => (
-												<option key={t.name} value={t.name}>
-													{t.name} (R$ {t.price})
-												</option>
-											))}
-											<option value="CUSTOM">Personalizado...</option>
-										</select>
-										<Input
-											value={aro1.treatmentOe || ""}
-											onChange={(e) => setAro1((a) => ({ ...a, treatmentOe: e.target.value }))}
-											placeholder="Nome do tratamento OE"
-											className="h-7 text-xs"
-										/>
-									</div>
-								</div>
-							</div>
 						) : (
-							/* Lente Aro 1: Modo Par Único Padrão */
-							<div className="mt-3 space-y-3">
-								{/* Seletor Dropdown do Catálogo de Lentes com Filtro de Lab, Tipo, IR e Busca */}
-								<div className="p-3.5 rounded-xl bg-muted/30 border space-y-3">
-									<div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
-										{/* Laboratório Dropdown */}
-										<div>
-											<FieldLabel className="mb-1 text-xs font-semibold">
-												Laboratório Parceiro
-											</FieldLabel>
-											<select
-												value={aro1.lab}
-												onChange={(e) => setAro1((a) => ({ ...a, lab: e.target.value }))}
-												className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs"
-											>
-												<option value="">Todos os Labs...</option>
-												{LAB_CATALOG.map((lab) => (
-													<option key={lab} value={lab}>
-														{lab}
-													</option>
-												))}
-											</select>
-										</div>
-
-										{/* Filtro Tipo */}
-										<div>
-											<FieldLabel className="mb-1 text-xs font-semibold">
-												Tipo de Lente
-											</FieldLabel>
-											<select
-												value={lensTypeFilter1}
-												onChange={(e) => setLensTypeFilter1(e.target.value)}
-												className="w-full h-8 px-2 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
-											>
-												<option value="ALL">Todos os Tipos</option>
-												<option value="MULTIFOCAL">Multifocal</option>
-												<option value="MONOFOCAL">Monofocal</option>
-												<option value="BIFOCAL">Bifocal</option>
-												<option value="OCUPACIONAL">Ocupacional</option>
-											</select>
-										</div>
-
-										{/* Filtro IR */}
-										<div>
-											<FieldLabel className="mb-1 text-xs font-semibold">
-												Índice Refrativo (IR)
-											</FieldLabel>
-											<select
-												value={lensIndexFilter1}
-												onChange={(e) => setLensIndexFilter1(e.target.value)}
-												className="w-full h-8 px-2 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
-											>
-												<option value="ALL">Todos os Índices</option>
-												<option value="1.50">1.50 (Resina)</option>
-												<option value="1.56">1.56 (Interm.)</option>
-												<option value="1.59">1.59 (Poli)</option>
-												<option value="1.60">1.60 (Alto)</option>
-												<option value="1.67">1.67 (Ultra)</option>
-												<option value="1.74">1.74 (Hi-Index)</option>
-											</select>
-										</div>
-
-										{/* Busca */}
-										<div>
-											<FieldLabel className="mb-1 text-xs font-semibold">
-												Buscar Lente
-											</FieldLabel>
-											<Input
-												value={lensSearchQuery1}
-												onChange={(e) => setLensSearchQuery1(e.target.value)}
-												placeholder="Nome ou família..."
-												className="h-8 text-xs bg-background"
-											/>
-										</div>
-									</div>
-
-									{/* Lente do Catálogo Dropdown */}
-									<div>
-										<div className="flex items-center justify-between mb-1">
-											<FieldLabel className="text-xs font-semibold">
-												Lente do Catálogo (Par)
-											</FieldLabel>
-											<span className="text-[10px] text-muted-foreground font-normal">
-												{filteredLensesAro1.length} opções cadastradas
-											</span>
-										</div>
-										<select
-											value={
-												lensCatalog.find(
-													(l) =>
-														l.produto === aro1.lensName &&
-														(!aro1.lab ||
-															l.laboratorio.toLowerCase() === aro1.lab.toLowerCase()),
-												)?.id || ""
-											}
-											onChange={(e) => {
-												const selected = lensCatalog.find((l) => l.id === e.target.value);
-												if (selected) {
-													setAro1((a) => ({
-														...a,
-														lensName: selected.produto,
-														lab: selected.laboratorio,
-														lensPrice: selected.preco,
-														lensType: selected.tipo,
-														lensFamily: selected.familia,
-														lensIndex: selected.indiceRefrativo,
-														lensTech: selected.tecnologia,
-													}));
-												}
-											}}
-											className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
-										>
-											<option value="">Selecione uma lente do catálogo...</option>
-											{filteredLensesAro1.map((l) => (
-												<option key={l.id} value={l.id}>
-													[{l.laboratorio}] {l.produto} — {l.tipo} (IR {l.indiceRefrativo}) — R$ {l.preco}
-												</option>
-											))}
-										</select>
-									</div>
-
-									{/* Campos Diretos da Lente */}
-									<div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-										<div className="sm:col-span-8">
-											<FieldLabel className="mb-1 text-xs">Nome / Design da Lente</FieldLabel>
-											<Input
-												value={aro1.lensName}
-												onChange={(e) =>
-													setAro1((a) => ({ ...a, lensName: e.target.value }))
-												}
-												placeholder="Nome / Design da Lente"
-												className="h-8 text-xs"
-											/>
-										</div>
-
-										<div className="sm:col-span-2">
-											<FieldLabel className="mb-1 text-xs">Qtd</FieldLabel>
-											<select
-												value={String(aro1.quantity)}
-												onChange={(e) =>
-													setAro1((a) => ({ ...a, quantity: Number(e.target.value) }))
-												}
-												className="w-full h-8 px-2 rounded-lg border border-input bg-background text-xs"
-											>
-												<option value="1">1 (Par)</option>
-												<option value="0.5">0.5 (Meio)</option>
-											</select>
-										</div>
-
-										<div className="sm:col-span-2">
-											<FieldLabel className="mb-1 text-xs">R$ Lente</FieldLabel>
-											<Input
-												type="number"
-												step="0.01"
-												value={aro1.lensPrice}
-												onChange={(e) =>
-													setAro1((a) => ({
-														...a,
-														lensPrice: Number(e.target.value) || 0,
-													}))
-												}
-												className="h-8 text-xs font-semibold text-primary"
-											/>
-										</div>
-									</div>
-
-									{/* Especificações Técnicas da Lente Espelhadas do Catálogo */}
-									<div className="p-2.5 rounded-lg bg-muted/20 border grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-										<div>
-											<FieldLabel className="text-[10px] text-muted-foreground">
-												Tipo Lente
-											</FieldLabel>
-											<select
-												value={aro1.lensType || "MULTIFOCAL"}
-												onChange={(e) =>
-													setAro1((a) => ({ ...a, lensType: e.target.value as any }))
-												}
-												className="w-full h-7 px-2 rounded border bg-background text-xs"
-											>
-												<option value="MONOFOCAL">Monofocal</option>
-												<option value="MULTIFOCAL">Multifocal</option>
-												<option value="BIFOCAL">Bifocal</option>
-												<option value="OCUPACIONAL">Ocupacional</option>
-											</select>
-										</div>
-										<div>
-											<FieldLabel className="text-[10px] text-muted-foreground">
-												Família
-											</FieldLabel>
-											<Input
-												value={aro1.lensFamily || ""}
-												onChange={(e) =>
-													setAro1((a) => ({ ...a, lensFamily: e.target.value }))
-												}
-												placeholder="Ex: Varilux"
-												className="h-7 text-xs"
-											/>
-										</div>
-										<div>
-											<FieldLabel className="text-[10px] text-muted-foreground">
-												Índice Refrativo (IR)
-											</FieldLabel>
-											<select
-												value={aro1.lensIndex || "1.50"}
-												onChange={(e) =>
-													setAro1((a) => ({ ...a, lensIndex: e.target.value }))
-												}
-												className="w-full h-7 px-2 rounded border bg-background text-xs"
-											>
-												<option value="1.50">1.50 (Resina CR-39)</option>
-												<option value="1.56">1.56 (Intermediário)</option>
-												<option value="1.59">1.59 (Policarbonato)</option>
-												<option value="1.60">1.60 (Alto Índice)</option>
-												<option value="1.67">1.67 (Ultra Fino)</option>
-												<option value="1.74">1.74 (Hi-Index)</option>
-											</select>
-										</div>
-										<div>
-											<FieldLabel className="text-[10px] text-muted-foreground">
-												Tecnologia
-											</FieldLabel>
-											<select
-												value={aro1.lensTech || "Freeform"}
-												onChange={(e) =>
-													setAro1((a) => ({ ...a, lensTech: e.target.value }))
-												}
-												className="w-full h-7 px-2 rounded border bg-background text-xs"
-											>
-												<option value="Freeform">Freeform</option>
-												<option value="Digital">Digital</option>
-												<option value="Surfaçada">Surfaçada</option>
-												<option value="Convencional">Convencional</option>
-												<option value="HD">HD</option>
-											</select>
-										</div>
-									</div>
-								</div>
-
-								{/* Tratamento Aro 1 */}
-								<div className="p-3 rounded-lg bg-muted/30 border space-y-2">
-									<div className="flex items-center justify-between">
-										<FieldLabel className="text-xs font-semibold">
-											Tratamento Antirreflexo / Proteção
-										</FieldLabel>
-										<div className="flex items-center gap-1.5 text-[11px] font-normal text-muted-foreground">
-											<Checkbox
-												id="aro1-no-treatment"
-												checked={aro1.noTreatment}
-												onCheckedChange={(c) =>
-													setAro1((a) => ({
-														...a,
-														noTreatment: Boolean(c),
-														treatmentPrice: c ? 0 : a.treatmentPrice,
-													}))
-												}
-											/>
-											<label htmlFor="aro1-no-treatment" className="cursor-pointer">
-												Sem Tratamento
-											</label>
-										</div>
-									</div>
-
-									<div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-										<div className="sm:col-span-8 space-y-1.5">
-											{/* Dropdown de Tratamento */}
-											<select
-												disabled={aro1.noTreatment}
-												value={
-													TREATMENT_OPTIONS.find((t) => t.name === aro1.treatment)?.name ||
-													(aro1.treatment ? "CUSTOM" : "")
-												}
-												onChange={(e) => {
-													const val = e.target.value;
-													if (val !== "CUSTOM") {
-														const selected = TREATMENT_OPTIONS.find((t) => t.name === val);
-														if (selected) {
-															setAro1((a) => ({
-																...a,
-																treatment: selected.name,
-																treatmentPrice: selected.price,
-															}));
-														}
-													}
-												}}
-												className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs disabled:opacity-50"
-											>
-												<option value="">Selecione o Tratamento...</option>
-												{TREATMENT_OPTIONS.map((t) => (
-													<option key={t.name} value={t.name}>
-														[{t.lab}] {t.name} — R$ {t.price}
-													</option>
-												))}
-												<option value="CUSTOM">Outro (Digitar nome abaixo)...</option>
-											</select>
-											<Input
-												value={aro1.treatment}
-												disabled={aro1.noTreatment}
-												onChange={(e) =>
-													setAro1((a) => ({ ...a, treatment: e.target.value }))
-												}
-												placeholder="Ex: Crizal Rock / Antirreflexo"
-												className="h-8 text-xs"
-											/>
-										</div>
-										<div className="sm:col-span-4">
-											<FieldLabel className="mb-1 text-xs">R$ Tratamento</FieldLabel>
-											<Input
-												type="number"
-												step="0.01"
-												disabled={aro1.noTreatment}
-												value={aro1.treatmentPrice}
-												onChange={(e) =>
-													setAro1((a) => ({
-														...a,
-														treatmentPrice: Number(e.target.value) || 0,
-													}))
-												}
-												className="h-8 text-xs font-semibold text-primary"
-											/>
-										</div>
-									</div>
-								</div>
+							<div className="p-3 rounded-lg border border-blue-500/20 bg-blue-500/10 text-xs text-blue-700 dark:text-blue-300 flex items-center gap-2">
+								<Icon icon={Glasses} className="size-4 shrink-0" />
+								<span>Armação de propriedade do cliente cadastrada com valor R$ 0,00. Não haverá baixa de estoque físico na ótica.</span>
 							</div>
 						)}
 
-						{/* Dioptrias Aro 1 */}
-						<div className="mt-4">
-							<OpticalDioptersTable
-								idPrefix="aro1"
-								title="Dioptrias e Medidas — Aro 1"
-								value={aro1.diopters}
-								onChange={(diopters) => setAro1((a) => ({ ...a, diopters }))}
-								onOcrCompleted={(doc, pat) => {
-									if (doc) setDoctorName(doc);
-									if (pat && !patient.name)
-										setPatient((p) => ({ ...p, name: pat.toUpperCase() }));
-								}}
-							/>
+						<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+							<Field>
+								<FieldLabel>Cód. Armação</FieldLabel>
+								<Input
+									value={aro1.frameCode}
+									onChange={(e) =>
+										setAro1((a) => ({ ...a, frameCode: e.target.value }))
+									}
+									placeholder="RB5228"
+									className="h-8 text-xs font-mono"
+								/>
+							</Field>
+							<Field>
+								<FieldLabel>Marca</FieldLabel>
+								<Input
+									value={aro1.frameBrand}
+									onChange={(e) =>
+										setAro1((a) => ({ ...a, frameBrand: e.target.value }))
+									}
+									placeholder="Ray-Ban"
+									className="h-8 text-xs"
+								/>
+							</Field>
+							<Field>
+								<FieldLabel>Modelo</FieldLabel>
+								<Input
+									value={aro1.frameModel}
+									onChange={(e) =>
+										setAro1((a) => ({ ...a, frameModel: e.target.value }))
+									}
+									placeholder="Acetato Preto"
+									className="h-8 text-xs"
+								/>
+							</Field>
+							<Field>
+								<FieldLabel>R$ Armação</FieldLabel>
+								<Input
+									type="number"
+									step="0.01"
+									disabled={aro1FrameMode === "CUSTOMER"}
+									value={aro1FrameMode === "CUSTOMER" ? 0 : aro1.framePrice}
+									onChange={(e) =>
+										setAro1((a) => ({
+											...a,
+											framePrice: Number(e.target.value) || 0,
+										}))
+									}
+									className="h-8 text-xs font-semibold"
+								/>
+							</Field>
+						</div>
+
+						{/* Especificações Técnicas da Armação Espelhadas do Catálogo */}
+						<div className="p-2.5 rounded-lg bg-muted/20 border grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+							<div>
+								<FieldLabel className="text-[10px] text-muted-foreground">
+									Tipo da Peça
+								</FieldLabel>
+								<select
+									value={aro1.frameType || "RECEITUARIO"}
+									onChange={(e) =>
+										setAro1((a) => ({ ...a, frameType: e.target.value as any }))
+									}
+									className="w-full h-7 px-2 rounded border bg-background text-xs"
+								>
+									<option value="RECEITUARIO">Receituário</option>
+									<option value="SOLAR">Solar</option>
+									<option value="CLIP_ON">Clip-on</option>
+								</select>
+							</div>
+							<div>
+								<FieldLabel className="text-[10px] text-muted-foreground">
+									Família / Coleção
+								</FieldLabel>
+								<Input
+									value={aro1.frameFamily || ""}
+									onChange={(e) =>
+										setAro1((a) => ({ ...a, frameFamily: e.target.value }))
+									}
+									placeholder="Ex: Wayfarer"
+									className="h-7 text-xs"
+								/>
+							</div>
+							<div>
+								<FieldLabel className="text-[10px] text-muted-foreground">
+									Fabricante
+								</FieldLabel>
+								<Input
+									value={aro1.frameManufacturer || ""}
+									onChange={(e) =>
+										setAro1((a) => ({
+											...a,
+											frameManufacturer: e.target.value,
+										}))
+									}
+									placeholder="Ex: Luxottica"
+									className="h-7 text-xs"
+								/>
+							</div>
+							<div>
+								<FieldLabel className="text-[10px] text-muted-foreground">
+									Tamanho Aro (mm)
+								</FieldLabel>
+								<Input
+									value={aro1.frameAro || ""}
+									onChange={(e) =>
+										setAro1((a) => ({ ...a, frameAro: e.target.value }))
+									}
+									placeholder="Ex: 52"
+									className="h-7 text-xs font-mono"
+								/>
+							</div>
+							<div>
+								<FieldLabel className="text-[10px] text-muted-foreground">
+									Tamanho Ponte (mm)
+								</FieldLabel>
+								<Input
+									value={aro1.framePonte || ""}
+									onChange={(e) =>
+										setAro1((a) => ({ ...a, framePonte: e.target.value }))
+									}
+									placeholder="Ex: 18"
+									className="h-7 text-xs font-mono"
+								/>
+							</div>
 						</div>
 					</div>
 
-					{/* Aro 2 Activator & Card */}
-					<div className="rounded-xl border bg-card p-4 shadow-xs">
-						<div className="flex items-center justify-between">
-							<div className="flex items-center gap-3">
-								<Switch
-									id="aro2-toggle"
-									checked={hasAro2}
-									onCheckedChange={(checked) => setHasAro2(checked)}
-								/>
-								<label
-									htmlFor="aro2-toggle"
-									className="cursor-pointer font-semibold text-sm text-foreground"
-								>
-									Ativar Aro 2 / Dobro (2º Par com Desconto)
-								</label>
+					{/* Toggle Variação de Lente por Olho */}
+					<div className="mt-4 flex items-center justify-between p-2.5 rounded-lg bg-muted/40 border">
+						<div>
+							<span className="text-xs font-semibold text-foreground block">
+								Variação por Olho (Lentes diferentes em OD e OE)
+							</span>
+							<span className="text-[10px] text-muted-foreground">
+								Permite selecionar designs, laboratórios ou valores diferentes para cada olho
+							</span>
+						</div>
+						<Switch
+							checked={Boolean(aro1.differentLensesPerEye)}
+							onCheckedChange={(checked) =>
+								setAro1((a) => ({
+									...a,
+									differentLensesPerEye: checked,
+									lensOd: checked ? (a.lensOd || a.lensName) : undefined,
+									lensOe: checked ? (a.lensOe || a.lensName) : undefined,
+									labOd: checked ? (a.labOd || a.lab) : undefined,
+									labOe: checked ? (a.labOe || a.lab) : undefined,
+									lensPriceOd: checked ? (a.lensPriceOd || Math.round(a.lensPrice / 2)) : undefined,
+									lensPriceOe: checked ? (a.lensPriceOe || Math.round(a.lensPrice / 2)) : undefined,
+									treatmentOd: checked ? (a.treatmentOd || a.treatment) : undefined,
+									treatmentOe: checked ? (a.treatmentOe || a.treatment) : undefined,
+								}))
+							}
+						/>
+					</div>
+
+					{/* Lente Aro 1: Modo Variação por Olho */}
+					{aro1.differentLensesPerEye ? (
+						<div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+							{/* Olho Direito (OD) */}
+							<div className="p-3 rounded-lg border bg-background space-y-2.5">
+								<div className="flex items-center justify-between border-b pb-1.5">
+									<span className="text-xs font-bold text-blue-600 dark:text-blue-400">
+										Olho Direito (OD) — Peça Avulsa
+									</span>
+								</div>
+
+								<div>
+									<FieldLabel className="text-[10px] font-semibold text-muted-foreground mb-1 block">
+										Lente OD do Catálogo
+									</FieldLabel>
+									<select
+										value={
+											lensCatalog.find(
+												(l) =>
+													l.produto === aro1.lensOd &&
+													(!aro1.labOd ||
+														l.laboratorio.toLowerCase() === aro1.labOd.toLowerCase()),
+											)?.id || ""
+										}
+										onChange={(e) => {
+											const selected = lensCatalog.find((l) => l.id === e.target.value);
+											if (selected) {
+												setAro1((a) => ({
+													...a,
+													lensOd: selected.produto,
+													labOd: selected.laboratorio,
+													lensPriceOd: selected.valorPeca || Math.round(selected.preco / 2),
+													lensTypeOd: selected.tipo,
+													lensFamilyOd: selected.familia,
+													lensIndexOd: selected.indiceRefrativo,
+													lensTechOd: selected.tecnologia,
+												}));
+											}
+										}}
+										className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs"
+									>
+										<option value="">Selecione lente para OD...</option>
+										{lensCatalog.map((l) => (
+											<option key={l.id} value={l.id}>
+												[{l.laboratorio}] {l.produto} — R$ {l.valorPeca || l.preco / 2}
+											</option>
+										))}
+									</select>
+								</div>
+
+								<div className="grid grid-cols-2 gap-2">
+									<div>
+										<FieldLabel className="text-[10px]">Laboratório OD</FieldLabel>
+										<select
+											value={aro1.labOd || ""}
+											onChange={(e) => setAro1((a) => ({ ...a, labOd: e.target.value }))}
+											className="w-full h-7 px-2 rounded border bg-background text-xs"
+										>
+											<option value="">Selecione...</option>
+											{LAB_CATALOG.map((lab) => (
+												<option key={lab} value={lab}>
+													{lab}
+												</option>
+											))}
+										</select>
+									</div>
+									<div>
+										<FieldLabel className="text-[10px]">R$ Peça OD</FieldLabel>
+										<Input
+											type="number"
+											step="0.01"
+											value={aro1.lensPriceOd ?? 0}
+											onChange={(e) =>
+												setAro1((a) => ({
+													...a,
+													lensPriceOd: Number(e.target.value) || 0,
+												}))
+											}
+											className="h-7 text-xs font-semibold text-blue-600"
+										/>
+									</div>
+								</div>
+								<div>
+									<FieldLabel className="text-[10px]">Nome da Lente OD</FieldLabel>
+									<Input
+										value={aro1.lensOd || ""}
+										onChange={(e) => setAro1((a) => ({ ...a, lensOd: e.target.value }))}
+										placeholder="Ex: Sync III 1.50"
+										className="h-7 text-xs"
+									/>
+								</div>
+
+								<div className="p-2 rounded bg-muted/30 border grid grid-cols-2 gap-1.5 text-[11px]">
+									<div>
+										<span className="text-[9px] text-muted-foreground block">Tipo OD</span>
+										<span className="font-semibold text-foreground truncate block">
+											{aro1.lensTypeOd || "MULTIFOCAL"}
+										</span>
+									</div>
+									<div>
+										<span className="text-[9px] text-muted-foreground block">IR / Tech</span>
+										<span className="font-semibold text-foreground truncate block">
+											{aro1.lensIndexOd || "1.50"} • {aro1.lensTechOd || "Freeform"}
+										</span>
+									</div>
+								</div>
+
+								<div>
+									<FieldLabel className="text-[10px] mb-1 block">Tratamento OD</FieldLabel>
+									<select
+										value={
+											TREATMENT_OPTIONS.find((t) => t.name === aro1.treatmentOd)?.name ||
+											(aro1.treatmentOd ? "CUSTOM" : "")
+										}
+										onChange={(e) => {
+											const val = e.target.value;
+											if (val !== "CUSTOM") {
+												const selected = TREATMENT_OPTIONS.find((t) => t.name === val);
+												if (selected) {
+													setAro1((a) => ({ ...a, treatmentOd: selected.name }));
+												}
+											}
+										}}
+										className="w-full h-7 px-2 rounded border bg-background text-xs mb-1"
+									>
+										<option value="">Selecione tratamento OD...</option>
+										{TREATMENT_OPTIONS.map((t) => (
+											<option key={t.name} value={t.name}>
+												{t.name} (R$ {t.price})
+											</option>
+										))}
+										<option value="CUSTOM">Personalizado...</option>
+									</select>
+									<Input
+										value={aro1.treatmentOd || ""}
+										onChange={(e) => setAro1((a) => ({ ...a, treatmentOd: e.target.value }))}
+										placeholder="Nome do tratamento OD"
+										className="h-7 text-xs"
+									/>
+								</div>
 							</div>
 
-							{hasAro2 && (
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									onClick={handleCopyAro1}
-									className="h-8 gap-1.5 text-xs font-medium text-primary hover:bg-primary/10 cursor-pointer"
+							{/* Olho Esquerdo (OE) */}
+							<div className="p-3 rounded-lg border bg-background space-y-2.5">
+								<div className="flex items-center justify-between border-b pb-1.5">
+									<span className="text-xs font-bold text-amber-600 dark:text-amber-400">
+										Olho Esquerdo (OE) — Peça Avulsa
+									</span>
+								</div>
+
+								<div>
+									<FieldLabel className="text-[10px] font-semibold text-muted-foreground mb-1 block">
+										Lente OE do Catálogo
+									</FieldLabel>
+									<select
+										value={
+											lensCatalog.find(
+												(l) =>
+													l.produto === aro1.lensOe &&
+													(!aro1.labOe ||
+														l.laboratorio.toLowerCase() === aro1.labOe.toLowerCase()),
+											)?.id || ""
+										}
+										onChange={(e) => {
+											const selected = lensCatalog.find((l) => l.id === e.target.value);
+											if (selected) {
+												setAro1((a) => ({
+													...a,
+													lensOe: selected.produto,
+													labOe: selected.laboratorio,
+													lensPriceOe: selected.valorPeca || Math.round(selected.preco / 2),
+													lensTypeOe: selected.tipo,
+													lensFamilyOe: selected.familia,
+													lensIndexOe: selected.indiceRefrativo,
+													lensTechOe: selected.tecnologia,
+												}));
+											}
+										}}
+										className="w-full h-8 px-2 rounded-md border border-input bg-background text-xs"
+									>
+										<option value="">Selecione lente para OE...</option>
+										{lensCatalog.map((l) => (
+											<option key={l.id} value={l.id}>
+												[{l.laboratorio}] {l.produto} — R$ {l.valorPeca || l.preco / 2}
+											</option>
+										))}
+									</select>
+								</div>
+
+								<div className="grid grid-cols-2 gap-2">
+									<div>
+										<FieldLabel className="text-[10px]">Laboratório OE</FieldLabel>
+										<select
+											value={aro1.labOe || ""}
+											onChange={(e) => setAro1((a) => ({ ...a, labOe: e.target.value }))}
+											className="w-full h-7 px-2 rounded border bg-background text-xs"
+										>
+											<option value="">Selecione...</option>
+											{LAB_CATALOG.map((lab) => (
+												<option key={lab} value={lab}>
+													{lab}
+												</option>
+											))}
+										</select>
+									</div>
+									<div>
+										<FieldLabel className="text-[10px]">R$ Peça OE</FieldLabel>
+										<Input
+											type="number"
+											step="0.01"
+											value={aro1.lensPriceOe ?? 0}
+											onChange={(e) =>
+												setAro1((a) => ({
+													...a,
+													lensPriceOe: Number(e.target.value) || 0,
+												}))
+											}
+											className="h-7 text-xs font-semibold text-amber-600"
+										/>
+									</div>
+								</div>
+								<div>
+									<FieldLabel className="text-[10px]">Nome da Lente OE</FieldLabel>
+									<Input
+										value={aro1.lensOe || ""}
+										onChange={(e) => setAro1((a) => ({ ...a, lensOe: e.target.value }))}
+										placeholder="Ex: Sync III 1.50"
+										className="h-7 text-xs"
+									/>
+								</div>
+
+								<div className="p-2 rounded bg-muted/30 border grid grid-cols-2 gap-1.5 text-[11px]">
+									<div>
+										<span className="text-[9px] text-muted-foreground block">Tipo OE</span>
+										<span className="font-semibold text-foreground truncate block">
+											{aro1.lensTypeOe || "MULTIFOCAL"}
+										</span>
+									</div>
+									<div>
+										<span className="text-[9px] text-muted-foreground block">IR / Tech</span>
+										<span className="font-semibold text-foreground truncate block">
+											{aro1.lensIndexOe || "1.50"} • {aro1.lensTechOe || "Freeform"}
+										</span>
+									</div>
+								</div>
+
+								<div>
+									<FieldLabel className="text-[10px] mb-1 block">Tratamento OE</FieldLabel>
+									<select
+										value={
+											TREATMENT_OPTIONS.find((t) => t.name === aro1.treatmentOe)?.name ||
+											(aro1.treatmentOe ? "CUSTOM" : "")
+										}
+										onChange={(e) => {
+											const val = e.target.value;
+											if (val !== "CUSTOM") {
+												const selected = TREATMENT_OPTIONS.find((t) => t.name === val);
+												if (selected) {
+													setAro1((a) => ({ ...a, treatmentOe: selected.name }));
+												}
+											}
+										}}
+										className="w-full h-7 px-2 rounded border bg-background text-xs mb-1"
+									>
+										<option value="">Selecione tratamento OE...</option>
+										{TREATMENT_OPTIONS.map((t) => (
+											<option key={t.name} value={t.name}>
+												{t.name} (R$ {t.price})
+											</option>
+										))}
+										<option value="CUSTOM">Personalizado...</option>
+									</select>
+									<Input
+										value={aro1.treatmentOe || ""}
+										onChange={(e) => setAro1((a) => ({ ...a, treatmentOe: e.target.value }))}
+										placeholder="Nome do tratamento OE"
+										className="h-7 text-xs"
+									/>
+								</div>
+							</div>
+						</div>
+					) : (
+						/* Lente Aro 1: Modo Par Único Padrão */
+						<div className="mt-3 space-y-3">
+							<div className="p-3.5 rounded-xl bg-muted/30 border space-y-3">
+								<div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+									<div>
+										<FieldLabel className="mb-1 text-xs font-semibold">
+											Laboratório Parceiro
+										</FieldLabel>
+										<select
+											value={aro1.lab}
+											onChange={(e) => setAro1((a) => ({ ...a, lab: e.target.value }))}
+											className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs"
+										>
+											<option value="">Todos os Labs...</option>
+											{LAB_CATALOG.map((lab) => (
+												<option key={lab} value={lab}>
+													{lab}
+												</option>
+											))}
+										</select>
+									</div>
+
+									<div>
+										<FieldLabel className="mb-1 text-xs font-semibold">
+											Tipo de Lente
+										</FieldLabel>
+										<select
+											value={lensTypeFilter1}
+											onChange={(e) => setLensTypeFilter1(e.target.value)}
+											className="w-full h-8 px-2 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
+										>
+											<option value="ALL">Todos os Tipos</option>
+											<option value="MULTIFOCAL">Multifocal</option>
+											<option value="MONOFOCAL">Monofocal</option>
+											<option value="BIFOCAL">Bifocal</option>
+											<option value="OCUPACIONAL">Ocupacional</option>
+										</select>
+									</div>
+
+									<div>
+										<FieldLabel className="mb-1 text-xs font-semibold">
+											Índice Refrativo (IR)
+										</FieldLabel>
+										<select
+											value={lensIndexFilter1}
+											onChange={(e) => setLensIndexFilter1(e.target.value)}
+											className="w-full h-8 px-2 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
+										>
+											<option value="ALL">Todos os Índices</option>
+											<option value="1.50">1.50 (Resina)</option>
+											<option value="1.56">1.56 (Interm.)</option>
+											<option value="1.59">1.59 (Poli)</option>
+											<option value="1.60">1.60 (Alto)</option>
+											<option value="1.67">1.67 (Ultra)</option>
+											<option value="1.74">1.74 (Hi-Index)</option>
+										</select>
+									</div>
+
+									<div>
+										<FieldLabel className="mb-1 text-xs font-semibold">
+											Buscar Lente
+										</FieldLabel>
+										<Input
+											value={lensSearchQuery1}
+											onChange={(e) => setLensSearchQuery1(e.target.value)}
+											placeholder="Nome ou família..."
+											className="h-8 text-xs bg-background"
+										/>
+									</div>
+								</div>
+
+								{/* Lente do Catálogo Dropdown */}
+								<div>
+									<div className="flex items-center justify-between mb-1">
+										<FieldLabel className="text-xs font-semibold">
+											Lente do Catálogo (Par)
+										</FieldLabel>
+										<span className="text-[10px] text-muted-foreground font-normal">
+											{filteredLensesAro1.length} opções cadastradas
+										</span>
+									</div>
+									<select
+										value={
+											lensCatalog.find(
+												(l) =>
+													l.produto === aro1.lensName &&
+													(!aro1.lab ||
+														l.laboratorio.toLowerCase() === aro1.lab.toLowerCase()),
+											)?.id || ""
+										}
+										onChange={(e) => {
+											const selected = lensCatalog.find((l) => l.id === e.target.value);
+											if (selected) {
+												setAro1((a) => ({
+													...a,
+													lensName: selected.produto,
+													lab: selected.laboratorio,
+													lensPrice: selected.preco,
+													lensType: selected.tipo,
+													lensFamily: selected.familia,
+													lensIndex: selected.indiceRefrativo,
+													lensTech: selected.tecnologia,
+												}));
+											}
+										}}
+										className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
+									>
+										<option value="">Selecione uma lente do catálogo...</option>
+										{filteredLensesAro1.map((l) => (
+											<option key={l.id} value={l.id}>
+												[{l.laboratorio}] {l.produto} — {l.tipo} (IR {l.indiceRefrativo}) — R$ {l.preco}
+											</option>
+										))}
+									</select>
+								</div>
+
+								<div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+									<div className="sm:col-span-8">
+										<FieldLabel className="mb-1 text-xs">Nome / Design da Lente</FieldLabel>
+										<Input
+											value={aro1.lensName}
+											onChange={(e) =>
+												setAro1((a) => ({ ...a, lensName: e.target.value }))
+											}
+											placeholder="Nome / Design da Lente"
+											className="h-8 text-xs"
+										/>
+									</div>
+
+									<div className="sm:col-span-2">
+										<FieldLabel className="mb-1 text-xs">Qtd</FieldLabel>
+										<select
+											value={String(aro1.quantity)}
+											onChange={(e) =>
+												setAro1((a) => ({ ...a, quantity: Number(e.target.value) }))
+											}
+											className="w-full h-8 px-2 rounded-lg border border-input bg-background text-xs"
+										>
+											<option value="1">1 (Par)</option>
+											<option value="0.5">0.5 (Meio)</option>
+										</select>
+									</div>
+
+									<div className="sm:col-span-2">
+										<FieldLabel className="mb-1 text-xs">R$ Lente</FieldLabel>
+										<Input
+											type="number"
+											step="0.01"
+											value={aro1.lensPrice}
+											onChange={(e) =>
+												setAro1((a) => ({
+													...a,
+													lensPrice: Number(e.target.value) || 0,
+												}))
+											}
+											className="h-8 text-xs font-semibold text-primary"
+										/>
+									</div>
+								</div>
+
+								<div className="p-2.5 rounded-lg bg-muted/20 border grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+									<div>
+										<FieldLabel className="text-[10px] text-muted-foreground">
+											Tipo Lente
+										</FieldLabel>
+										<select
+											value={aro1.lensType || "MULTIFOCAL"}
+											onChange={(e) =>
+												setAro1((a) => ({ ...a, lensType: e.target.value as any }))
+											}
+											className="w-full h-7 px-2 rounded border bg-background text-xs"
+										>
+											<option value="MONOFOCAL">Monofocal</option>
+											<option value="MULTIFOCAL">Multifocal</option>
+											<option value="BIFOCAL">Bifocal</option>
+											<option value="OCUPACIONAL">Ocupacional</option>
+										</select>
+									</div>
+									<div>
+										<FieldLabel className="text-[10px] text-muted-foreground">
+											Família
+										</FieldLabel>
+										<Input
+											value={aro1.lensFamily || ""}
+											onChange={(e) =>
+												setAro1((a) => ({ ...a, lensFamily: e.target.value }))
+											}
+											placeholder="Ex: Varilux"
+											className="h-7 text-xs"
+										/>
+									</div>
+									<div>
+										<FieldLabel className="text-[10px] text-muted-foreground">
+											Índice Refrativo (IR)
+										</FieldLabel>
+										<select
+											value={aro1.lensIndex || "1.50"}
+											onChange={(e) =>
+												setAro1((a) => ({ ...a, lensIndex: e.target.value }))
+											}
+											className="w-full h-7 px-2 rounded border bg-background text-xs"
+										>
+											<option value="1.50">1.50 (Resina CR-39)</option>
+											<option value="1.56">1.56 (Intermediário)</option>
+											<option value="1.59">1.59 (Policarbonato)</option>
+											<option value="1.60">1.60 (Alto Índice)</option>
+											<option value="1.67">1.67 (Ultra Fino)</option>
+											<option value="1.74">1.74 (Hi-Index)</option>
+										</select>
+									</div>
+									<div>
+										<FieldLabel className="text-[10px] text-muted-foreground">
+											Tecnologia
+										</FieldLabel>
+										<select
+											value={aro1.lensTech || "Freeform"}
+											onChange={(e) =>
+												setAro1((a) => ({ ...a, lensTech: e.target.value }))
+											}
+											className="w-full h-7 px-2 rounded border bg-background text-xs"
+										>
+											<option value="Freeform">Freeform</option>
+											<option value="Digital">Digital</option>
+											<option value="Surfaçada">Surfaçada</option>
+											<option value="Convencional">Convencional</option>
+											<option value="HD">HD</option>
+										</select>
+									</div>
+								</div>
+							</div>
+
+							{/* Tratamento Aro 1 */}
+							<div className="p-3 rounded-lg bg-muted/30 border space-y-2">
+								<div className="flex items-center justify-between">
+									<FieldLabel className="text-xs font-semibold">
+										Tratamento Antirreflexo / Proteção
+									</FieldLabel>
+									<div className="flex items-center gap-1.5 text-[11px] font-normal text-muted-foreground">
+										<Checkbox
+											id="aro1-no-treatment"
+											checked={aro1.noTreatment}
+											onCheckedChange={(c) =>
+												setAro1((a) => ({
+													...a,
+													noTreatment: Boolean(c),
+													treatmentPrice: c ? 0 : a.treatmentPrice,
+												}))
+											}
+										/>
+										<label htmlFor="aro1-no-treatment" className="cursor-pointer">
+											Sem Tratamento
+										</label>
+									</div>
+								</div>
+
+								<div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+									<div className="sm:col-span-8 space-y-1.5">
+										<select
+											disabled={aro1.noTreatment}
+											value={
+												TREATMENT_OPTIONS.find((t) => t.name === aro1.treatment)?.name ||
+												(aro1.treatment ? "CUSTOM" : "")
+											}
+											onChange={(e) => {
+												const val = e.target.value;
+												if (val !== "CUSTOM") {
+													const selected = TREATMENT_OPTIONS.find((t) => t.name === val);
+													if (selected) {
+														setAro1((a) => ({
+															...a,
+															treatment: selected.name,
+															treatmentPrice: selected.price,
+														}));
+													}
+												}
+											}}
+											className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs disabled:opacity-50"
+										>
+											<option value="">Selecione o Tratamento...</option>
+											{TREATMENT_OPTIONS.map((t) => (
+												<option key={t.name} value={t.name}>
+													[{t.lab}] {t.name} — R$ {t.price}
+												</option>
+											))}
+											<option value="CUSTOM">Outro (Digitar nome abaixo)...</option>
+										</select>
+										<Input
+											value={aro1.treatment}
+											disabled={aro1.noTreatment}
+											onChange={(e) =>
+												setAro1((a) => ({ ...a, treatment: e.target.value }))
+											}
+											placeholder="Ex: Crizal Rock / Antirreflexo"
+											className="h-8 text-xs"
+										/>
+									</div>
+									<div className="sm:col-span-4">
+										<FieldLabel className="mb-1 text-xs">R$ Tratamento</FieldLabel>
+										<Input
+											type="number"
+											step="0.01"
+											disabled={aro1.noTreatment}
+											value={aro1.treatmentPrice}
+											onChange={(e) =>
+												setAro1((a) => ({
+													...a,
+													treatmentPrice: Number(e.target.value) || 0,
+												}))
+											}
+											className="h-8 text-xs font-semibold text-primary"
+										/>
+									</div>
+								</div>
+							</div>
+						</div>
+					)}
+				</div>
+
+				{/* ETAPA 5: ARO 2 (DOBRO / 2º PAR - OPCIONAL) */}
+				<div className="rounded-xl border bg-card p-4 shadow-xs">
+					<div className="flex items-center justify-between">
+						<div className="flex items-center gap-3">
+							<Switch
+								id="aro2-toggle"
+								checked={hasAro2}
+								onCheckedChange={(checked) => setHasAro2(checked)}
+							/>
+							<div>
+								<label
+									htmlFor="aro2-toggle"
+									className="cursor-pointer font-bold text-sm text-foreground block"
 								>
-									<Icon icon={Copy} className="size-3.5" />
-									Copiar Aro 1
-								</Button>
-							)}
+									Etapa 5 • Ativar Aro 2 / Dobro (2º Par com Desconto)
+								</label>
+								<span className="text-[10px] text-muted-foreground">
+									Gera OS filha vinculada no laboratório para montagem independente com 30% desc. no par
+								</span>
+							</div>
 						</div>
 
 						{hasAro2 && (
-							<div className="mt-4 border-t pt-4 space-y-4">
-								<div className="flex items-center justify-between pb-2 border-b">
-									<div className="flex items-center gap-2 font-bold text-sm text-foreground">
-										<Icon icon={Glasses} className="size-4 text-amber-600" />
-										Aro 2 / Dobro — Desdobramento Técnico de Laboratório
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={handleCopyAro1}
+								className="h-8 gap-1.5 text-xs font-medium text-primary hover:bg-primary/10 cursor-pointer"
+							>
+								<Icon icon={Copy} className="size-3.5" />
+								Copiar Aro 1 (c/ 30% Desc.)
+							</Button>
+						)}
+					</div>
+
+					{hasAro2 && (
+						<div className="mt-4 border-t pt-4 space-y-4">
+							<div className="flex items-center justify-between pb-2 border-b">
+								<div className="flex items-center gap-2 font-bold text-sm text-foreground">
+									<Icon icon={Glasses} className="size-4 text-amber-600" />
+									Aro 2 / Dobro — Desdobramento Técnico de Laboratório
+								</div>
+								<Badge variant="outline" className="text-xs font-semibold border-amber-500/30 text-amber-600">
+									Gera OS Vinculada {orderNumber}-B
+								</Badge>
+							</div>
+
+							{/* Armação Aro 2 */}
+							<div className="space-y-3">
+								<div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/40 border">
+									<div>
+										<span className="text-xs font-semibold text-foreground block">
+											Origem da Armação — Aro 2
+										</span>
+										<span className="text-[10px] text-muted-foreground">
+											Defina se o 2º par usa armação do estoque ou trazida
+										</span>
 									</div>
-									<Badge variant="outline" className="text-xs font-semibold border-amber-500/30 text-amber-600">
-										Gera OS Vinculada {orderNumber}-B
-									</Badge>
+									<div className="flex items-center gap-1.5">
+										<Button
+											type="button"
+											variant={aro2FrameMode === "STOCK" ? "default" : "outline"}
+											size="sm"
+											className="h-7 text-xs font-bold cursor-pointer"
+											onClick={() => {
+												setAro2FrameMode("STOCK");
+												if (frameCatalog.length > 1) {
+													const f = frameCatalog[1]!;
+													setAro2((a) => ({
+														...a,
+														frameCode: f.produto.split(" ")[1] || f.produto.slice(0, 8),
+														frameBrand: f.marca,
+														frameModel: f.produto,
+														framePrice: f.preco,
+														frameType: f.tipo,
+														frameFamily: f.familia,
+														frameManufacturer: f.fabricante,
+														frameAro: f.tamanhoAro,
+														framePonte: f.tamanhoPonte,
+													}));
+												}
+											}}
+										>
+											📦 Peça do Estoque
+										</Button>
+										<Button
+											type="button"
+											variant={aro2FrameMode === "CUSTOMER" ? "default" : "outline"}
+											size="sm"
+											className="h-7 text-xs font-bold cursor-pointer"
+											onClick={() => {
+												setAro2FrameMode("CUSTOMER");
+												setAro2((a) => ({
+													...a,
+													frameCode: "CLIENTE",
+													frameBrand: "Armação do Cliente",
+													frameModel: "Armação Própria Trazida",
+													framePrice: 0,
+												}));
+											}}
+										>
+											👓 Armação Trazida (R$ 0,00)
+										</Button>
+									</div>
 								</div>
 
-								{/* Armação Aro 2 */}
-								<div className="space-y-3">
-									{/* Seletor Dropdown do Catálogo de Peças - Aro 2 com Estoque */}
+								{aro2FrameMode === "STOCK" ? (
 									<div className="p-3.5 rounded-xl bg-muted/30 border space-y-2">
 										<div className="flex items-center justify-between">
 											<FieldLabel className="text-xs font-semibold">
@@ -1892,831 +2269,778 @@ export function OpticalOrderForm({
 											))}
 										</select>
 									</div>
-
-									<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-										<Field>
-											<FieldLabel>Cód. Armação</FieldLabel>
-											<Input
-												value={aro2.frameCode}
-												onChange={(e) =>
-													setAro2((a) => ({ ...a, frameCode: e.target.value }))
-												}
-												placeholder="VO5322"
-												className="h-8 text-xs font-mono"
-											/>
-										</Field>
-										<Field>
-											<FieldLabel>Marca</FieldLabel>
-											<Input
-												value={aro2.frameBrand}
-												onChange={(e) =>
-													setAro2((a) => ({ ...a, frameBrand: e.target.value }))
-												}
-												placeholder="Vogue"
-												className="h-8 text-xs"
-											/>
-										</Field>
-										<Field>
-											<FieldLabel>Modelo</FieldLabel>
-											<Input
-												value={aro2.frameModel}
-												onChange={(e) =>
-													setAro2((a) => ({ ...a, frameModel: e.target.value }))
-												}
-												placeholder="Solar Tartaruga"
-												className="h-8 text-xs"
-											/>
-										</Field>
-										<Field>
-											<FieldLabel>R$ Armação</FieldLabel>
-											<Input
-												type="number"
-												step="0.01"
-												value={aro2.framePrice}
-												onChange={(e) =>
-													setAro2((a) => ({
-														...a,
-														framePrice: Number(e.target.value) || 0,
-													}))
-												}
-												className="h-8 text-xs font-semibold"
-											/>
-										</Field>
+								) : (
+									<div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/10 text-xs text-amber-700 dark:text-amber-300 flex items-center gap-2">
+										<Icon icon={Glasses} className="size-4 shrink-0" />
+										<span>Armação de 2º par de propriedade do cliente — R$ 0,00 sem baixa de estoque.</span>
 									</div>
+								)}
 
-									{/* Especificações Técnicas da Armação Aro 2 */}
-									<div className="p-2.5 rounded-lg bg-muted/20 border grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
-										<div>
-											<FieldLabel className="text-[10px] text-muted-foreground">
-												Tipo Peça
-											</FieldLabel>
-											<select
-												value={aro2.frameType || "SOLAR"}
-												onChange={(e) =>
-													setAro2((a) => ({ ...a, frameType: e.target.value as any }))
-												}
-												className="w-full h-7 px-2 rounded border bg-background text-xs"
-											>
-												<option value="RECEITUARIO">Receituário</option>
-												<option value="SOLAR">Solar</option>
-												<option value="CLIP_ON">Clip-on</option>
-											</select>
-										</div>
-										<div>
-											<FieldLabel className="text-[10px] text-muted-foreground">
-												Família / Coleção
-											</FieldLabel>
-											<Input
-												value={aro2.frameFamily || ""}
-												onChange={(e) =>
-													setAro2((a) => ({ ...a, frameFamily: e.target.value }))
-												}
-												placeholder="Ex: Gigi"
-												className="h-7 text-xs"
-											/>
-										</div>
-										<div>
-											<FieldLabel className="text-[10px] text-muted-foreground">
-												Fabricante
-											</FieldLabel>
-											<Input
-												value={aro2.frameManufacturer || ""}
-												onChange={(e) =>
-													setAro2((a) => ({
-														...a,
-														frameManufacturer: e.target.value,
-													}))
-												}
-												placeholder="Ex: Luxottica"
-												className="h-7 text-xs"
-											/>
-										</div>
-										<div>
-											<FieldLabel className="text-[10px] text-muted-foreground">
-												Tamanho Aro (mm)
-											</FieldLabel>
-											<Input
-												value={aro2.frameAro || ""}
-												onChange={(e) =>
-													setAro2((a) => ({ ...a, frameAro: e.target.value }))
-												}
-												placeholder="Ex: 54"
-												className="h-7 text-xs font-mono"
-											/>
-										</div>
-										<div>
-											<FieldLabel className="text-[10px] text-muted-foreground">
-												Tamanho Ponte (mm)
-											</FieldLabel>
-											<Input
-												value={aro2.framePonte || ""}
-												onChange={(e) =>
-													setAro2((a) => ({ ...a, framePonte: e.target.value }))
-												}
-												placeholder="Ex: 19"
-												className="h-7 text-xs font-mono"
-											/>
-										</div>
-									</div>
+								<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+									<Field>
+										<FieldLabel>Cód. Armação</FieldLabel>
+										<Input
+											value={aro2.frameCode}
+											onChange={(e) =>
+												setAro2((a) => ({ ...a, frameCode: e.target.value }))
+											}
+											placeholder="VO5322"
+											className="h-8 text-xs font-mono"
+										/>
+									</Field>
+									<Field>
+										<FieldLabel>Marca</FieldLabel>
+										<Input
+											value={aro2.frameBrand}
+											onChange={(e) =>
+												setAro2((a) => ({ ...a, frameBrand: e.target.value }))
+											}
+											placeholder="Vogue"
+											className="h-8 text-xs"
+										/>
+									</Field>
+									<Field>
+										<FieldLabel>Modelo</FieldLabel>
+										<Input
+											value={aro2.frameModel}
+											onChange={(e) =>
+												setAro2((a) => ({ ...a, frameModel: e.target.value }))
+											}
+											placeholder="Solar Tartaruga"
+											className="h-8 text-xs"
+										/>
+									</Field>
+									<Field>
+										<FieldLabel>R$ Armação</FieldLabel>
+										<Input
+											type="number"
+											step="0.01"
+											disabled={aro2FrameMode === "CUSTOMER"}
+											value={aro2FrameMode === "CUSTOMER" ? 0 : aro2.framePrice}
+											onChange={(e) =>
+												setAro2((a) => ({
+													...a,
+													framePrice: Number(e.target.value) || 0,
+												}))
+											}
+											className="h-8 text-xs font-semibold"
+										/>
+									</Field>
 								</div>
+							</div>
 
-								{/* Lente & Laboratório Aro 2 */}
-								<div className="space-y-3">
-									<div className="p-3.5 rounded-xl bg-muted/30 border space-y-3">
-										<div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
-											{/* Laboratório Dropdown */}
-											<div>
-												<FieldLabel className="mb-1 text-xs font-semibold">
-													Laboratório (2º Par)
-												</FieldLabel>
-												<select
-													value={aro2.lab}
-													onChange={(e) =>
-														setAro2((a) => ({ ...a, lab: e.target.value }))
-													}
-													className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs"
-												>
-													<option value="">Todos os Labs...</option>
-													{LAB_CATALOG.map((lab) => (
-														<option key={lab} value={lab}>
-															{lab}
-														</option>
-													))}
-												</select>
-											</div>
-
-											{/* Filtro Tipo */}
-											<div>
-												<FieldLabel className="mb-1 text-xs font-semibold">
-													Tipo de Lente (2º Par)
-												</FieldLabel>
-												<select
-													value={lensTypeFilter2}
-													onChange={(e) => setLensTypeFilter2(e.target.value)}
-													className="w-full h-8 px-2 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
-												>
-													<option value="ALL">Todos os Tipos</option>
-													<option value="MULTIFOCAL">Multifocal</option>
-													<option value="MONOFOCAL">Monofocal</option>
-													<option value="BIFOCAL">Bifocal</option>
-													<option value="OCUPACIONAL">Ocupacional</option>
-												</select>
-											</div>
-
-											{/* Filtro IR */}
-											<div>
-												<FieldLabel className="mb-1 text-xs font-semibold">
-													Índice Refrativo (IR)
-												</FieldLabel>
-												<select
-													value={lensIndexFilter2}
-													onChange={(e) => setLensIndexFilter2(e.target.value)}
-													className="w-full h-8 px-2 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
-												>
-													<option value="ALL">Todos os Índices</option>
-													<option value="1.50">1.50 (Resina)</option>
-													<option value="1.56">1.56 (Interm.)</option>
-													<option value="1.59">1.59 (Poli)</option>
-													<option value="1.60">1.60 (Alto)</option>
-													<option value="1.67">1.67 (Ultra)</option>
-													<option value="1.74">1.74 (Hi-Index)</option>
-												</select>
-											</div>
-
-											{/* Busca */}
-											<div>
-												<FieldLabel className="mb-1 text-xs font-semibold">
-													Buscar Lente (2º Par)
-												</FieldLabel>
-												<Input
-													value={lensSearchQuery2}
-													onChange={(e) => setLensSearchQuery2(e.target.value)}
-													placeholder="Nome ou família..."
-													className="h-8 text-xs bg-background"
-												/>
-											</div>
-										</div>
-
-										{/* Lente do Catálogo Dropdown */}
+							{/* Lente & Laboratório Aro 2 */}
+							<div className="space-y-3">
+								<div className="p-3.5 rounded-xl bg-muted/30 border space-y-3">
+									<div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
 										<div>
-											<div className="flex items-center justify-between mb-1">
-												<FieldLabel className="text-xs font-semibold">
-													Lente do Catálogo (2º Par com Desconto)
-												</FieldLabel>
-												<span className="text-[10px] text-muted-foreground font-normal">
-													{filteredLensesAro2.length} opções cadastradas
-												</span>
-											</div>
+											<FieldLabel className="mb-1 text-xs font-semibold">
+												Laboratório (2º Par)
+											</FieldLabel>
 											<select
-												value={
-													lensCatalog.find(
-														(l) =>
-															l.produto === aro2.lensName &&
-															(!aro2.lab ||
-																l.laboratorio.toLowerCase() ===
-																	aro2.lab.toLowerCase()),
-													)?.id || ""
+												value={aro2.lab}
+												onChange={(e) =>
+													setAro2((a) => ({ ...a, lab: e.target.value }))
 												}
-												onChange={(e) => {
-													const selected = lensCatalog.find(
-														(l) => l.id === e.target.value,
-													);
-													if (selected) {
-														setAro2((a) => ({
-															...a,
-															lensName: selected.produto,
-															lab: selected.laboratorio,
-															lensPrice: Math.round(selected.preco * 0.7), // 30% desc
-															lensType: selected.tipo,
-															lensFamily: selected.familia,
-															lensIndex: selected.indiceRefrativo,
-															lensTech: selected.tecnologia,
-														}));
-													}
-												}}
-												className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
+												className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs"
 											>
-												<option value="">Selecione uma lente para o 2º par...</option>
-												{filteredLensesAro2.map((l) => (
-													<option key={l.id} value={l.id}>
-														[{l.laboratorio}] {l.produto} — {l.tipo} (IR {l.indiceRefrativo}) — R$ {l.preco}
+												<option value="">Todos os Labs...</option>
+												{LAB_CATALOG.map((lab) => (
+													<option key={lab} value={lab}>
+														{lab}
 													</option>
 												))}
 											</select>
 										</div>
 
-										<div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-											<div className="sm:col-span-8">
-												<FieldLabel className="mb-1 text-xs">
-													Nome / Design da Lente
-												</FieldLabel>
-												<Input
-													value={aro2.lensName}
-													onChange={(e) =>
-														setAro2((a) => ({ ...a, lensName: e.target.value }))
-													}
-													placeholder="Nome da Lente"
-													className="h-8 text-xs"
-												/>
-											</div>
-
-											<div className="sm:col-span-2">
-												<FieldLabel className="mb-1 text-xs">Qtd</FieldLabel>
-												<select
-													value={String(aro2.quantity)}
-													onChange={(e) =>
-														setAro2((a) => ({
-															...a,
-															quantity: Number(e.target.value),
-														}))
-													}
-													className="w-full h-8 px-2 rounded-lg border border-input bg-background text-xs"
-												>
-													<option value="1">1 (Par)</option>
-													<option value="0.5">0.5 (Meio)</option>
-												</select>
-											</div>
-
-											<div className="sm:col-span-2">
-												<FieldLabel className="mb-1 text-xs">R$ Lente</FieldLabel>
-												<Input
-													type="number"
-													step="0.01"
-													value={aro2.lensPrice}
-													onChange={(e) =>
-														setAro2((a) => ({
-															...a,
-															lensPrice: Number(e.target.value) || 0,
-														}))
-													}
-													className="h-8 text-xs font-semibold text-primary"
-												/>
-											</div>
-										</div>
-
-										{/* Especificações Técnicas da Lente Aro 2 */}
-										<div className="p-2.5 rounded-lg bg-muted/20 border grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-											<div>
-												<FieldLabel className="text-[10px] text-muted-foreground">
-													Tipo Lente
-												</FieldLabel>
-												<select
-													value={aro2.lensType || "MULTIFOCAL"}
-													onChange={(e) =>
-														setAro2((a) => ({
-															...a,
-															lensType: e.target.value as any,
-														}))
-													}
-													className="w-full h-7 px-2 rounded border bg-background text-xs"
-												>
-													<option value="MONOFOCAL">Monofocal</option>
-													<option value="MULTIFOCAL">Multifocal</option>
-													<option value="BIFOCAL">Bifocal</option>
-													<option value="OCUPACIONAL">Ocupacional</option>
-												</select>
-											</div>
-											<div>
-												<FieldLabel className="text-[10px] text-muted-foreground">
-													Família
-												</FieldLabel>
-												<Input
-													value={aro2.lensFamily || ""}
-													onChange={(e) =>
-														setAro2((a) => ({ ...a, lensFamily: e.target.value }))
-													}
-													placeholder="Ex: Varilux"
-													className="h-7 text-xs"
-												/>
-											</div>
-											<div>
-												<FieldLabel className="text-[10px] text-muted-foreground">
-													Índice Refrativo (IR)
-												</FieldLabel>
-												<select
-													value={aro2.lensIndex || "1.50"}
-													onChange={(e) =>
-														setAro2((a) => ({
-															...a,
-															lensIndex: e.target.value,
-														}))
-													}
-													className="w-full h-7 px-2 rounded border bg-background text-xs"
-												>
-													<option value="1.50">1.50 (Resina CR-39)</option>
-													<option value="1.56">1.56 (Intermediário)</option>
-													<option value="1.59">1.59 (Policarbonato)</option>
-													<option value="1.60">1.60 (Alto Índice)</option>
-													<option value="1.67">1.67 (Ultra Fino)</option>
-													<option value="1.74">1.74 (Hi-Index)</option>
-												</select>
-											</div>
-											<div>
-												<FieldLabel className="text-[10px] text-muted-foreground">
-													Tecnologia
-												</FieldLabel>
-												<select
-													value={aro2.lensTech || "Freeform"}
-													onChange={(e) =>
-														setAro2((a) => ({
-															...a,
-															lensTech: e.target.value,
-														}))
-													}
-													className="w-full h-7 px-2 rounded border bg-background text-xs"
-												>
-													<option value="Freeform">Freeform</option>
-													<option value="Digital">Digital</option>
-													<option value="Surfaçada">Surfaçada</option>
-													<option value="Convencional">Convencional</option>
-													<option value="HD">HD</option>
-												</select>
-											</div>
-										</div>
-									</div>
-
-									{/* Tratamento Aro 2 */}
-									<div className="p-3 rounded-lg bg-muted/30 border space-y-2">
-										<div className="flex items-center justify-between">
-											<FieldLabel className="text-xs font-semibold">
-												Tratamento Antirreflexo / Proteção (2º Par)
+										<div>
+											<FieldLabel className="mb-1 text-xs font-semibold">
+												Tipo de Lente (2º Par)
 											</FieldLabel>
-											<div className="flex items-center gap-1.5 text-[11px] font-normal text-muted-foreground">
-												<Checkbox
-													id="aro2-no-treatment"
-													checked={aro2.noTreatment}
-													onCheckedChange={(c) =>
-														setAro2((a) => ({
-															...a,
-															noTreatment: Boolean(c),
-															treatmentPrice: c ? 0 : a.treatmentPrice,
-														}))
-													}
-												/>
-												<label
-													htmlFor="aro2-no-treatment"
-													className="cursor-pointer"
-												>
-													Sem Tratamento
-												</label>
-											</div>
+											<select
+												value={lensTypeFilter2}
+												onChange={(e) => setLensTypeFilter2(e.target.value)}
+												className="w-full h-8 px-2 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
+											>
+												<option value="ALL">Todos os Tipos</option>
+												<option value="MULTIFOCAL">Multifocal</option>
+												<option value="MONOFOCAL">Monofocal</option>
+												<option value="BIFOCAL">Bifocal</option>
+												<option value="OCUPACIONAL">Ocupacional</option>
+											</select>
 										</div>
 
-										<div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-											<div className="sm:col-span-8 space-y-1.5">
-												<select
-													disabled={aro2.noTreatment}
-													value={
-														TREATMENT_OPTIONS.find((t) => t.name === aro2.treatment)?.name ||
-														(aro2.treatment ? "CUSTOM" : "")
-													}
-													onChange={(e) => {
-														const val = e.target.value;
-														if (val !== "CUSTOM") {
-															const selected = TREATMENT_OPTIONS.find((t) => t.name === val);
-															if (selected) {
-																setAro2((a) => ({
-																	...a,
-																	treatment: selected.name,
-																	treatmentPrice: Math.round(selected.price * 0.7),
-																}));
-															}
-														}
-													}}
-													className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs disabled:opacity-50"
-												>
-													<option value="">Selecione o Tratamento...</option>
-													{TREATMENT_OPTIONS.map((t) => (
-														<option key={t.name} value={t.name}>
-															[{t.lab}] {t.name} — R$ {Math.round(t.price * 0.7)} (Desc. 2º par)
-														</option>
-													))}
-													<option value="CUSTOM">Outro (Digitar nome abaixo)...</option>
-												</select>
-												<Input
-													value={aro2.treatment}
-													disabled={aro2.noTreatment}
-													onChange={(e) =>
-														setAro2((a) => ({ ...a, treatment: e.target.value }))
-													}
-													placeholder="Ex: Crizal Sun UV"
-													className="h-8 text-xs"
-												/>
-											</div>
-											<div className="sm:col-span-4">
-												<FieldLabel className="mb-1 text-xs">
-													R$ Tratamento
-												</FieldLabel>
-												<Input
-													type="number"
-													step="0.01"
-													disabled={aro2.noTreatment}
-													value={aro2.treatmentPrice}
-													onChange={(e) =>
-														setAro2((a) => ({
-															...a,
-															treatmentPrice: Number(e.target.value) || 0,
-														}))
-													}
-													className="h-8 text-xs font-semibold text-primary"
-												/>
-											</div>
+										<div>
+											<FieldLabel className="mb-1 text-xs font-semibold">
+												Índice Refrativo (IR)
+											</FieldLabel>
+											<select
+												value={lensIndexFilter2}
+												onChange={(e) => setLensIndexFilter2(e.target.value)}
+												className="w-full h-8 px-2 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
+											>
+												<option value="ALL">Todos os Índices</option>
+												<option value="1.50">1.50 (Resina)</option>
+												<option value="1.56">1.56 (Interm.)</option>
+												<option value="1.59">1.59 (Poli)</option>
+												<option value="1.60">1.60 (Alto)</option>
+												<option value="1.67">1.67 (Ultra)</option>
+												<option value="1.74">1.74 (Hi-Index)</option>
+											</select>
+										</div>
+
+										<div>
+											<FieldLabel className="mb-1 text-xs font-semibold">
+												Buscar Lente (2º Par)
+											</FieldLabel>
+											<Input
+												value={lensSearchQuery2}
+												onChange={(e) => setLensSearchQuery2(e.target.value)}
+												placeholder="Nome ou família..."
+												className="h-8 text-xs bg-background"
+											/>
+										</div>
+									</div>
+
+									<div>
+										<div className="flex items-center justify-between mb-1">
+											<FieldLabel className="text-xs font-semibold">
+												Lente do Catálogo (2º Par com Desconto)
+											</FieldLabel>
+											<span className="text-[10px] text-muted-foreground font-normal">
+												{filteredLensesAro2.length} opções cadastradas
+											</span>
+										</div>
+										<select
+											value={
+												lensCatalog.find(
+													(l) =>
+														l.produto === aro2.lensName &&
+														(!aro2.lab ||
+															l.laboratorio.toLowerCase() ===
+																aro2.lab.toLowerCase()),
+												)?.id || ""
+											}
+											onChange={(e) => {
+												const selected = lensCatalog.find(
+													(l) => l.id === e.target.value,
+												);
+												if (selected) {
+													setAro2((a) => ({
+														...a,
+														lensName: selected.produto,
+														lab: selected.laboratorio,
+														lensPrice: Math.round(selected.preco * 0.7), // 30% desc
+														lensType: selected.tipo,
+														lensFamily: selected.familia,
+														lensIndex: selected.indiceRefrativo,
+														lensTech: selected.tecnologia,
+													}));
+												}
+											}}
+											className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs cursor-pointer"
+										>
+											<option value="">Selecione uma lente para o 2º par...</option>
+											{filteredLensesAro2.map((l) => (
+												<option key={l.id} value={l.id}>
+													[{l.laboratorio}] {l.produto} — {l.tipo} (IR {l.indiceRefrativo}) — R$ {l.preco}
+												</option>
+											))}
+										</select>
+									</div>
+
+									<div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+										<div className="sm:col-span-8">
+											<FieldLabel className="mb-1 text-xs">
+												Nome / Design da Lente
+											</FieldLabel>
+											<Input
+												value={aro2.lensName}
+												onChange={(e) =>
+													setAro2((a) => ({ ...a, lensName: e.target.value }))
+												}
+												placeholder="Nome da Lente"
+												className="h-8 text-xs"
+											/>
+										</div>
+
+										<div className="sm:col-span-2">
+											<FieldLabel className="mb-1 text-xs">Qtd</FieldLabel>
+											<select
+												value={String(aro2.quantity)}
+												onChange={(e) =>
+													setAro2((a) => ({
+														...a,
+														quantity: Number(e.target.value),
+													}))
+												}
+												className="w-full h-8 px-2 rounded-lg border border-input bg-background text-xs"
+											>
+												<option value="1">1 (Par)</option>
+												<option value="0.5">0.5 (Meio)</option>
+											</select>
+										</div>
+
+										<div className="sm:col-span-2">
+											<FieldLabel className="mb-1 text-xs">R$ Lente</FieldLabel>
+											<Input
+												type="number"
+												step="0.01"
+												value={aro2.lensPrice}
+												onChange={(e) =>
+													setAro2((a) => ({
+														...a,
+														lensPrice: Number(e.target.value) || 0,
+													}))
+												}
+												className="h-8 text-xs font-semibold text-primary"
+											/>
 										</div>
 									</div>
 								</div>
 
-								{/* Dioptrias Aro 2 */}
-								<div className="mt-4">
-									<OpticalDioptersTable
-										idPrefix="aro2"
-										title="Dioptrias e Medidas — Aro 2 (2º Par)"
-										value={aro2.diopters}
-										onChange={(diopters) =>
-											setAro2((a) => ({ ...a, diopters }))
-										}
-									/>
+								{/* Tratamento Aro 2 */}
+								<div className="p-3 rounded-lg bg-muted/30 border space-y-2">
+									<div className="flex items-center justify-between">
+										<FieldLabel className="text-xs font-semibold">
+											Tratamento Antirreflexo / Proteção (2º Par)
+										</FieldLabel>
+										<div className="flex items-center gap-1.5 text-[11px] font-normal text-muted-foreground">
+											<Checkbox
+												id="aro2-no-treatment"
+												checked={aro2.noTreatment}
+												onCheckedChange={(c) =>
+													setAro2((a) => ({
+														...a,
+														noTreatment: Boolean(c),
+														treatmentPrice: c ? 0 : a.treatmentPrice,
+													}))
+												}
+											/>
+											<label
+												htmlFor="aro2-no-treatment"
+												className="cursor-pointer"
+											>
+												Sem Tratamento
+											</label>
+										</div>
+									</div>
+
+									<div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+										<div className="sm:col-span-8 space-y-1.5">
+											<select
+												disabled={aro2.noTreatment}
+												value={
+													TREATMENT_OPTIONS.find((t) => t.name === aro2.treatment)?.name ||
+													(aro2.treatment ? "CUSTOM" : "")
+												}
+												onChange={(e) => {
+													const val = e.target.value;
+													if (val !== "CUSTOM") {
+														const selected = TREATMENT_OPTIONS.find((t) => t.name === val);
+														if (selected) {
+															setAro2((a) => ({
+																...a,
+																treatment: selected.name,
+																treatmentPrice: Math.round(selected.price * 0.7),
+															}));
+														}
+													}
+												}}
+												className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs disabled:opacity-50"
+											>
+												<option value="">Selecione o Tratamento...</option>
+												{TREATMENT_OPTIONS.map((t) => (
+													<option key={t.name} value={t.name}>
+														[{t.lab}] {t.name} — R$ {Math.round(t.price * 0.7)} (Desc. 2º par)
+													</option>
+												))}
+												<option value="CUSTOM">Outro (Digitar nome abaixo)...</option>
+											</select>
+											<Input
+												value={aro2.treatment}
+												disabled={aro2.noTreatment}
+												onChange={(e) =>
+													setAro2((a) => ({ ...a, treatment: e.target.value }))
+												}
+												placeholder="Ex: Crizal Sun UV"
+												className="h-8 text-xs"
+											/>
+										</div>
+										<div className="sm:col-span-4">
+											<FieldLabel className="mb-1 text-xs">
+												R$ Tratamento
+											</FieldLabel>
+											<Input
+												type="number"
+												step="0.01"
+												disabled={aro2.noTreatment}
+												value={aro2.treatmentPrice}
+												onChange={(e) =>
+													setAro2((a) => ({
+														...a,
+														treatmentPrice: Number(e.target.value) || 0,
+													}))
+												}
+												className="h-8 text-xs font-semibold text-primary"
+											/>
+										</div>
+									</div>
 								</div>
 							</div>
-						)}
-					</div>
 
-					{/* Painel Financeiro e Faturamento em Tempo Real */}
-					<div className="rounded-xl border bg-gradient-to-br from-card via-card to-muted/20 p-5 shadow-xs">
-						<div className="mb-4 flex items-center justify-between border-b pb-3">
-							<div className="flex items-center gap-2 font-bold text-sm text-foreground">
-								<Icon icon={Money} className="size-4 text-emerald-500" />
-								Painel Financeiro & Faturamento em Tempo Real
+							{/* Dioptrias Aro 2 */}
+							<div className="mt-4">
+								<OpticalDioptersTable
+									idPrefix="aro2"
+									title="Dioptrias e Medidas — Aro 2 (2º Par)"
+									value={aro2.diopters}
+									onChange={(diopters) =>
+										setAro2((a) => ({ ...a, diopters }))
+									}
+								/>
 							</div>
+						</div>
+					)}
+				</div>
+
+				{/* ETAPA 6: FECHAMENTO COMERCIAL, DESCONTOS & RECEBIMENTO */}
+				<div className="rounded-xl border bg-gradient-to-br from-card via-card to-muted/20 p-5 shadow-xs">
+					<div className="mb-4 flex items-center justify-between border-b pb-3">
+						<div className="flex items-center gap-2 font-bold text-sm text-foreground">
+							<Icon icon={Money} className="size-4 text-emerald-500" />
+							Etapa 6 • Fechamento Comercial, Descontos & Recebimento
+						</div>
+						<div className="flex items-center gap-2">
 							<Badge
 								variant={paymentMode === "TOTAL" ? "default" : "secondary"}
 								className="text-xs font-medium"
 							>
-								Modo:{" "}
-								{paymentMode === "TOTAL" ? "Quitação Total" : "Apenas Sinal"}
+								{paymentMode === "TOTAL" ? "Quitação Total (100%)" : "Apenas Sinal (Entrada)"}
+							</Badge>
+							<Badge variant="outline" className="text-[10px] font-bold text-emerald-600 border-emerald-500/30">
+								Passo 6 de 6
 							</Badge>
 						</div>
+					</div>
 
-						{/* Seletor de Modo e Forma de Pagamento */}
-						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-							<div>
-								<FieldLabel className="mb-1 text-xs font-semibold">
-									Modo de Recebimento
-								</FieldLabel>
-								<div className="grid grid-cols-2 gap-2">
-									<Button
-										type="button"
-										variant={paymentMode === "TOTAL" ? "default" : "outline"}
-										size="sm"
-										className="h-9 text-xs font-semibold"
-										onClick={() => setPaymentMode("TOTAL")}
-									>
-										Quitação Total (100%)
-									</Button>
-									<Button
-										type="button"
-										variant={paymentMode === "SINAL" ? "default" : "outline"}
-										size="sm"
-										className="h-9 text-xs font-semibold"
-										onClick={() => setPaymentMode("SINAL")}
-									>
-										Apenas Sinal (Entrada)
-									</Button>
-								</div>
+					{/* Seletor de Modo e Forma de Pagamento */}
+					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+						<div>
+							<FieldLabel className="mb-1 text-xs font-semibold">
+								Modo de Recebimento
+							</FieldLabel>
+							<div className="grid grid-cols-2 gap-2">
+								<Button
+									type="button"
+									variant={paymentMode === "TOTAL" ? "default" : "outline"}
+									size="sm"
+									className="h-9 text-xs font-semibold cursor-pointer"
+									onClick={() => setPaymentMode("TOTAL")}
+								>
+									Quitação Total (100%)
+								</Button>
+								<Button
+									type="button"
+									variant={paymentMode === "SINAL" ? "default" : "outline"}
+									size="sm"
+									className="h-9 text-xs font-semibold cursor-pointer"
+									onClick={() => setPaymentMode("SINAL")}
+								>
+									Apenas Sinal (Entrada)
+								</Button>
 							</div>
+						</div>
 
+						<div>
+							<FieldLabel className="mb-1 text-xs font-semibold">
+								Forma de Pagamento
+							</FieldLabel>
+							<Select
+								value={paymentMethod1}
+								onValueChange={(val) =>
+									setPaymentMethod1(val as OpticalPaymentMethod)
+								}
+							>
+								<SelectTrigger className="h-9 text-xs font-medium">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="DINHEIRO">Dinheiro (Espécie)</SelectItem>
+									<SelectItem value="PIX">Pix Instantâneo</SelectItem>
+									<SelectItem value="CARTAO_CREDITO">
+										Cartão de Crédito
+									</SelectItem>
+									<SelectItem value="CARTAO_DEBITO">
+										Cartão de Débito
+									</SelectItem>
+									<SelectItem value="CREDIARIO">Crediário da Loja</SelectItem>
+									<SelectItem value="BOLETO">Boleto Bancário</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+					</div>
+
+					{/* Parcelamento e Desconto */}
+					<div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+						{paymentMethod1 === "CARTAO_CREDITO" && (
 							<div>
-								<FieldLabel className="mb-1 text-xs font-semibold">
-									Forma de Pagamento
+								<FieldLabel className="mb-1 text-xs">
+									Parcelas no Cartão
 								</FieldLabel>
 								<Select
-									value={paymentMethod1}
-									onValueChange={(val) =>
-										setPaymentMethod1(val as OpticalPaymentMethod)
-									}
+									value={String(cardInstallments1)}
+									onValueChange={(val) => setCardInstallments1(Number(val))}
 								>
-									<SelectTrigger className="h-9 text-xs font-medium">
+									<SelectTrigger className="h-8 text-xs font-medium">
 										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
-										<SelectItem value="DINHEIRO">Dinheiro (Espécie)</SelectItem>
-										<SelectItem value="PIX">Pix Instantâneo</SelectItem>
-										<SelectItem value="CARTAO_CREDITO">
-											Cartão de Crédito
-										</SelectItem>
-										<SelectItem value="CARTAO_DEBITO">
-											Cartão de Débito
-										</SelectItem>
-										<SelectItem value="CREDIARIO">Crediário da Loja</SelectItem>
-										<SelectItem value="BOLETO">Boleto Bancário</SelectItem>
+										{[1, 2, 3, 4, 5, 6, 10, 12].map((num) => (
+											<SelectItem key={num} value={String(num)}>
+												{num}x{" "}
+												{num === 1
+													? "(À vista)"
+													: `de R$ ${(paidAmount / num).toFixed(2)}`}
+											</SelectItem>
+										))}
 									</SelectContent>
 								</Select>
 							</div>
-						</div>
+						)}
 
-						{/* Parcelamento e Entrada */}
-						<div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
-							{paymentMethod1 === "CARTAO_CREDITO" && (
-								<div>
-									<FieldLabel className="mb-1 text-xs">
-										Parcelas no Cartão
-									</FieldLabel>
-									<Select
-										value={String(cardInstallments1)}
-										onValueChange={(val) => setCardInstallments1(Number(val))}
+						<div className="space-y-1.5">
+							<div className="flex items-center justify-between">
+								<FieldLabel className="text-xs font-semibold">
+									Desconto Comercial
+								</FieldLabel>
+								<div className="flex items-center rounded-md border bg-muted/50 p-0.5 text-[11px] font-bold">
+									<button
+										type="button"
+										onClick={() => setDiscountMode("BRL")}
+										className={`px-2 py-0.5 rounded cursor-pointer transition-colors ${
+											discountMode === "BRL"
+												? "bg-primary text-primary-foreground shadow-2xs"
+												: "text-muted-foreground hover:text-foreground"
+										}`}
 									>
-										<SelectTrigger className="h-8 text-xs font-medium">
-											<SelectValue />
-										</SelectTrigger>
-										<SelectContent>
-											{[1, 2, 3, 4, 5, 6, 10, 12].map((num) => (
-												<SelectItem key={num} value={String(num)}>
-													{num}x{" "}
-													{num === 1
-														? "(À vista)"
-														: `de R$ ${(paidAmount / num).toFixed(2)}`}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
+										R$ Reais
+									</button>
+									<button
+										type="button"
+										onClick={() => setDiscountMode("PCT")}
+										className={`px-2 py-0.5 rounded cursor-pointer transition-colors ${
+											discountMode === "PCT"
+												? "bg-primary text-primary-foreground shadow-2xs"
+												: "text-muted-foreground hover:text-foreground"
+										}`}
+									>
+										% Porcento
+									</button>
 								</div>
-							)}
-
-							<div className="space-y-1.5">
-								<div className="flex items-center justify-between">
-									<FieldLabel className="text-xs font-semibold">
-										Desconto Comercial
-									</FieldLabel>
-									<div className="flex items-center rounded-md border bg-muted/50 p-0.5 text-[11px] font-bold">
-										<button
-											type="button"
-											onClick={() => setDiscountMode("BRL")}
-											className={`px-2 py-0.5 rounded cursor-pointer transition-colors ${
-												discountMode === "BRL"
-													? "bg-primary text-primary-foreground shadow-2xs"
-													: "text-muted-foreground hover:text-foreground"
-											}`}
-										>
-											R$ Reais
-										</button>
-										<button
-											type="button"
-											onClick={() => setDiscountMode("PCT")}
-											className={`px-2 py-0.5 rounded cursor-pointer transition-colors ${
-												discountMode === "PCT"
-													? "bg-primary text-primary-foreground shadow-2xs"
-													: "text-muted-foreground hover:text-foreground"
-											}`}
-										>
-											% Porcento
-										</button>
-									</div>
-								</div>
-								<div className="relative">
-									<Input
-										type="number"
-										step={discountMode === "BRL" ? "10" : "1"}
-										max={discountMode === "PCT" ? 100 : undefined}
-										value={discountValue || ""}
-										onChange={(e) => {
-											setDiscountValue(Number(e.target.value) || 0);
-											setIsDiscountManagerApproved(false);
-										}}
-										placeholder={discountMode === "BRL" ? "0,00" : "0%"}
-										className="h-8 text-xs font-semibold pr-20"
-									/>
-									<span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-mono text-muted-foreground">
-										{discountMode === "BRL"
-											? `${effectiveDiscountPct.toFixed(1)}%`
-											: `R$ ${effectiveDiscountBrl.toFixed(2)}`}
-									</span>
-								</div>
-
-								{/* Indicador de Alçada / Delegação ao Gerente */}
-								{exceedsSellerLimit && (
-									<div className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-2 flex items-center justify-between gap-2 mt-1.5">
-										<div className="flex items-center gap-1.5 text-[11px] text-amber-800 dark:text-amber-300 font-medium">
-											<Icon icon={Locked} className="size-3.5 text-amber-600 shrink-0" />
-											<span>
-												{effectiveDiscountPct.toFixed(1)}% excede o teto ({discountAudit.maxAllowed}%).
-											</span>
-										</div>
-										<Button
-											type="button"
-											size="sm"
-											onClick={() => setManagerPasswordModalOpen(true)}
-											className="h-6 px-2 text-[10px] font-bold bg-amber-600 hover:bg-amber-700 text-white cursor-pointer gap-1 shrink-0"
-										>
-											<Icon icon={Locked} className="size-3" />
-											Delegar ao Gerente
-										</Button>
-									</div>
-								)}
-
-								{isDiscountManagerApproved && (
-									<div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-1.5 px-2.5 flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-400 font-bold mt-1">
-										<Icon icon={Checkmark} className="size-3.5" />
-										<span>Desconto autorizado pelo Gerente de Loja ({effectiveDiscountPct.toFixed(1)}%).</span>
-									</div>
-								)}
+							</div>
+							<div className="relative">
+								<Input
+									type="number"
+									step={discountMode === "BRL" ? "10" : "1"}
+									max={discountMode === "PCT" ? 100 : undefined}
+									value={discountValue || ""}
+									onChange={(e) => {
+										setDiscountValue(Number(e.target.value) || 0);
+										setIsDiscountManagerApproved(false);
+									}}
+									placeholder={discountMode === "BRL" ? "0,00" : "0%"}
+									className="h-8 text-xs font-semibold pr-20"
+								/>
+								<span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-mono text-muted-foreground">
+									{discountMode === "BRL"
+										? `${effectiveDiscountPct.toFixed(1)}%`
+										: `R$ ${effectiveDiscountBrl.toFixed(2)}`}
+								</span>
 							</div>
 
-							{paymentMode === "SINAL" && (
-								<div>
-									<FieldLabel className="mb-1 text-xs font-semibold text-primary">
-										Valor Pago na Entrada (Sinal)
-									</FieldLabel>
-									<Input
-										type="number"
-										step="10"
-										value={manualPaidAmount}
-										onChange={(e) => setManualPaidAmount(e.target.value)}
-										placeholder="R$ Entrada"
-										className="h-8 text-xs font-bold text-primary"
-									/>
-								</div>
-							)}
-						</div>
-
-						{/* Totalizer Box */}
-						<div className="mt-5 rounded-lg border bg-muted/40 p-4">
-							<div className="flex flex-col gap-1.5 text-xs">
-								<div className="flex justify-between text-muted-foreground">
-									<span>Armações (Aro 1 + Aro 2):</span>
-									<span className="font-mono">
-										R$ {subtotalFrames.toFixed(2)}
-									</span>
-								</div>
-								<div className="flex justify-between text-muted-foreground">
-									<span>Lentes:</span>
-									<span className="font-mono">
-										R$ {subtotalLenses.toFixed(2)}
-									</span>
-								</div>
-								<div className="flex justify-between text-muted-foreground">
-									<span>Tratamentos:</span>
-									<span className="font-mono">
-										R$ {subtotalTreatments.toFixed(2)}
-									</span>
-								</div>
-								{effectiveDiscountBrl > 0 && (
-									<div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
-										<span>Desconto Concedido ({effectiveDiscountPct.toFixed(1)}%):</span>
-										<span className="font-mono">
-											- R$ {effectiveDiscountBrl.toFixed(2)}
+							{/* Indicador de Alçada / Delegação ao Gerente */}
+							{exceedsSellerLimit && (
+								<div className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-2 flex items-center justify-between gap-2 mt-1.5">
+									<div className="flex items-center gap-1.5 text-[11px] text-amber-800 dark:text-amber-300 font-medium">
+										<Icon icon={Locked} className="size-3.5 text-amber-600 shrink-0" />
+										<span>
+											{effectiveDiscountPct.toFixed(1)}% excede o teto ({discountAudit.maxAllowed}%).
 										</span>
 									</div>
-								)}
-								<Separator className="my-1.5" />
-								<div className="flex justify-between text-sm font-bold text-foreground">
-									<span>Total da Venda:</span>
-									<span className="font-mono text-base text-primary">
-										R$ {totalAmount.toFixed(2)}
-									</span>
+									<Button
+										type="button"
+										size="sm"
+										onClick={() => setManagerPasswordModalOpen(true)}
+										className="h-6 px-2 text-[10px] font-bold bg-amber-600 hover:bg-amber-700 text-white cursor-pointer gap-1 shrink-0"
+									>
+										<Icon icon={Locked} className="size-3" />
+										Delegar ao Gerente
+									</Button>
 								</div>
-								<div className="flex justify-between text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-									<span>Valor Pago no Caixa (Entrada/Total):</span>
-									<span className="font-mono font-bold">
-										R$ {paidAmount.toFixed(2)}
-									</span>
+							)}
+
+							{isDiscountManagerApproved && (
+								<div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-1.5 px-2.5 flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-400 font-bold mt-1">
+									<Icon icon={Checkmark} className="size-3.5" />
+									<span>Desconto autorizado pelo Gerente de Loja ({effectiveDiscountPct.toFixed(1)}%).</span>
 								</div>
-								<div
-									className={`flex justify-between text-sm font-bold p-2 rounded-md mt-1 ${
-										residualAmount > 0
-											? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30"
-											: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-									}`}
-								>
-									<span className="flex items-center gap-1.5">
-										Saldo Residual a Receber:
-										{residualAmount > 0 && (
-											<span className="text-[10px] font-normal text-muted-foreground">
-												(Cobrar na retirada)
-											</span>
-										)}
-									</span>
-									<span className="font-mono text-base font-extrabold">
-										R$ {residualAmount.toFixed(2)}
-									</span>
-								</div>
-							</div>
+							)}
 						</div>
 
-						{/* Nota Fiscal (NF feita ou não) */}
-						<div className="mt-4 flex items-center justify-between p-3 rounded-lg border bg-background">
+						{paymentMode === "SINAL" && (
 							<div>
-								<span className="text-xs font-semibold text-foreground block">
-									Nota Fiscal (NF) Emitida?
-								</span>
-								<span className="text-[10px] text-muted-foreground">
-									Assinalar se a nota fiscal da venda já foi emitida
-								</span>
-							</div>
-							<div className="flex items-center gap-2.5">
-								{invoiceIssued && (
-									<Input
-										placeholder="Nº da NF"
-										value={invoiceNumber}
-										onChange={(e) => setInvoiceNumber(e.target.value)}
-										className="h-7 text-xs font-mono w-32"
-									/>
-								)}
-								<Switch
-									checked={invoiceIssued}
-									onCheckedChange={(checked) => {
-										setInvoiceIssued(checked);
-										if (checked && !invoiceNumber) {
-											setInvoiceNumber(`NF-${Math.floor(100000 + Math.random() * 900000)}`);
-										}
-									}}
+								<FieldLabel className="mb-1 text-xs font-semibold text-primary">
+									Valor Pago na Entrada (Sinal)
+								</FieldLabel>
+								<Input
+									type="number"
+									step="10"
+									value={manualPaidAmount}
+									onChange={(e) => setManualPaidAmount(e.target.value)}
+									placeholder="R$ Entrada"
+									className="h-8 text-xs font-bold text-primary"
 								/>
 							</div>
-						</div>
+						)}
+					</div>
 
-						{/* Observações & Botões de Ação */}
-						<div className="mt-3">
-							<Input
-								value={notes}
-								onChange={(e) => setNotes(e.target.value)}
-								placeholder="Observações adicionais do pedido ou instruções ao laboratório..."
-								className="h-8 text-xs"
+					{/* Totalizer Box */}
+					<div className="mt-5 rounded-lg border bg-muted/40 p-4">
+						<div className="flex flex-col gap-1.5 text-xs">
+							<div className="flex justify-between text-muted-foreground">
+								<span>Armações (Aro 1 + Aro 2):</span>
+								<span className="font-mono">
+									R$ {subtotalFrames.toFixed(2)}
+								</span>
+							</div>
+							<div className="flex justify-between text-muted-foreground">
+								<span>Lentes:</span>
+								<span className="font-mono">
+									R$ {subtotalLenses.toFixed(2)}
+								</span>
+							</div>
+							<div className="flex justify-between text-muted-foreground">
+								<span>Tratamentos:</span>
+								<span className="font-mono">
+									R$ {subtotalTreatments.toFixed(2)}
+								</span>
+							</div>
+							{effectiveDiscountBrl > 0 && (
+								<div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
+									<span>Desconto Concedido ({effectiveDiscountPct.toFixed(1)}%):</span>
+									<span className="font-mono">
+										- R$ {effectiveDiscountBrl.toFixed(2)}
+									</span>
+								</div>
+							)}
+							<Separator className="my-1.5" />
+							<div className="flex justify-between text-sm font-bold text-foreground">
+								<span>Total da Venda:</span>
+								<span className="font-mono text-base text-primary">
+									R$ {totalAmount.toFixed(2)}
+								</span>
+							</div>
+							<div className="flex justify-between text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+								<span>Valor Pago no Caixa (Entrada/Total):</span>
+								<span className="font-mono font-bold">
+									R$ {paidAmount.toFixed(2)}
+								</span>
+							</div>
+							<div
+								className={`flex justify-between text-sm font-bold p-2.5 rounded-md mt-1 ${
+									residualAmount > 0
+										? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30"
+										: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+								}`}
+							>
+								<span className="flex items-center gap-1.5">
+									Saldo Residual a Receber:
+									{residualAmount > 0 && (
+										<span className="text-[10px] font-normal text-muted-foreground">
+											(Cobrar na retirada do óculos)
+										</span>
+									)}
+								</span>
+								<span className="font-mono text-base font-extrabold">
+									R$ {residualAmount.toFixed(2)}
+								</span>
+							</div>
+						</div>
+					</div>
+
+					{/* Nota Fiscal (NF feita ou não) */}
+					<div className="mt-4 flex items-center justify-between p-3 rounded-lg border bg-background">
+						<div>
+							<span className="text-xs font-semibold text-foreground block">
+								Nota Fiscal (NFC-e / NF-e) Emitida?
+							</span>
+							<span className="text-[10px] text-muted-foreground">
+								Assinalar se a nota fiscal da venda já foi emitida na SEFAZ
+							</span>
+						</div>
+						<div className="flex items-center gap-2.5">
+							{invoiceIssued && (
+								<Input
+									placeholder="Nº da NF"
+									value={invoiceNumber}
+									onChange={(e) => setInvoiceNumber(e.target.value)}
+									className="h-7 text-xs font-mono w-32"
+								/>
+							)}
+							<Switch
+								checked={invoiceIssued}
+								onCheckedChange={(checked) => {
+									setInvoiceIssued(checked);
+									if (checked && !invoiceNumber) {
+										setInvoiceNumber(`NF-${Math.floor(100000 + Math.random() * 900000)}`);
+									}
+								}}
 							/>
 						</div>
+					</div>
 
-						<div className="mt-5 flex items-center justify-end gap-3 border-t pt-4">
-							{onCancel && (
+					{/* Observações & Botões de Ação */}
+					<div className="mt-3">
+						<Input
+							value={notes}
+							onChange={(e) => setNotes(e.target.value)}
+							placeholder="Observações adicionais do pedido ou instruções ao laboratório..."
+							className="h-8 text-xs"
+						/>
+					</div>
+
+					<div className="mt-5 flex items-center justify-end gap-3 border-t pt-4">
+						{onCancel && (
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								disabled={isSubmitting}
+								onClick={onCancel}
+								aria-label="Cancelar emissão de Ordem de Serviço"
+								className="cursor-pointer"
+							>
+								Cancelar
+							</Button>
+						)}
+						<Button
+							type="submit"
+							size="default"
+							disabled={isSubmitting}
+							className="h-10 px-6 font-semibold shadow-sm focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-hidden cursor-pointer"
+							aria-label={isSubmitting ? "Emitindo Ordem de Serviço..." : "Gravar e emitir Ordem de Serviço"}
+						>
+							{isSubmitting ? (
+								<>
+									<Spinner className="mr-2 size-4" />
+									Emitindo OS...
+								</>
+							) : (
+								<>
+									<Icon icon={Checkmark} className="mr-2 size-4" />
+									Gravar e Emitir Ordem de Serviço
+								</>
+							)}
+						</Button>
+					</div>
+				</div>
+			</div>
+
+			{/* MODAL RÁPIDO DE CADASTRO DE NOVO MÉDICO */}
+			{isNewDocModalOpen && (
+				<Dialog
+					open={true}
+					onOpenChange={(open) => {
+						if (!open) {
+							setIsNewDocModalOpen(false);
+							setNewDocError("");
+						}
+					}}
+				>
+					<DialogContent className="sm:max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl">
+						<DialogHeader>
+							<DialogTitle className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+								<Icon icon={Receipt} className="size-4 text-primary" />
+								Cadastro Rápido de Médico Oftalmologista
+							</DialogTitle>
+							<DialogDescription className="text-xs text-muted-foreground">
+								Cadastre o médico com validação de CRM pelo CFM para vincular à OS.
+							</DialogDescription>
+						</DialogHeader>
+
+						<div className="space-y-3.5 py-2 text-xs">
+							{newDocError && (
+								<div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 font-medium text-xs">
+									⚠️ {newDocError}
+								</div>
+							)}
+
+							<div className="space-y-1">
+								<label className="font-semibold text-foreground">
+									Nome Completo do Médico *
+								</label>
+								<Input
+									value={newDocNome}
+									onChange={(e) => setNewDocNome(e.target.value)}
+									placeholder="Ex: Dr. Roberto Alencar"
+									className="h-8 text-xs"
+									autoFocus
+								/>
+							</div>
+
+							<div className="grid grid-cols-2 gap-2">
+								<div className="space-y-1">
+									<label className="font-semibold text-foreground">
+										CRM com UF *
+									</label>
+									<Input
+										value={newDocCrm}
+										onChange={(e) => setNewDocCrm(e.target.value.toUpperCase())}
+										placeholder="Ex: 123456/SP"
+										className="h-8 text-xs font-mono uppercase"
+									/>
+								</div>
+								<div className="space-y-1">
+									<label className="font-semibold text-foreground">
+										Clínica / Consultório
+									</label>
+									<Input
+										value={newDocClinica}
+										onChange={(e) => setNewDocClinica(e.target.value)}
+										placeholder="Ex: Clínica Visão"
+										className="h-8 text-xs"
+									/>
+								</div>
+							</div>
+
+							<div className="flex items-center justify-end gap-2 pt-3 border-t">
 								<Button
 									type="button"
-									variant="ghost"
+									variant="outline"
 									size="sm"
-									disabled={isSubmitting}
-									onClick={onCancel}
-									aria-label="Cancelar emissão de Ordem de Serviço"
+									onClick={() => {
+										setIsNewDocModalOpen(false);
+										setNewDocError("");
+									}}
+									className="h-8 text-xs cursor-pointer"
 								>
 									Cancelar
 								</Button>
-							)}
-							<Button
-								type="submit"
-								size="default"
-								disabled={isSubmitting}
-								className="h-10 px-6 font-semibold shadow-sm focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-hidden"
-								aria-label={isSubmitting ? "Emitindo Ordem de Serviço..." : "Gravar e emitir Ordem de Serviço"}
-							>
-								{isSubmitting ? (
-									<>
-										<Spinner className="mr-2 size-4" />
-										Emitindo OS...
-									</>
-								) : (
-									<>
-										<Icon icon={Checkmark} className="mr-2 size-4" />
-										Gravar e Emitir Ordem de Serviço
-									</>
-								)}
-							</Button>
+								<Button
+									type="button"
+									size="sm"
+									onClick={handleCreateQuickDoctor}
+									className="h-8 text-xs font-bold cursor-pointer gap-1.5"
+								>
+									<Icon icon={Checkmark} className="size-3.5" />
+									Salvar e Vincular à OS
+								</Button>
+							</div>
 						</div>
-				</div>
-			</div>
+					</DialogContent>
+				</Dialog>
+			)}
 
 			{/* MODAL DELEGAÇÃO AO GERENTE PARA AUTORIZAÇÃO DE DESCONTO */}
 			{managerPasswordModalOpen && (
