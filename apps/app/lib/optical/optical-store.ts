@@ -7,6 +7,24 @@ import type { OpticalOrder, OpticalOrderStatus, DiscountPolicy } from "./optical
 
 export const CURRENT_STORAGE_KEY = "mnocx_optical_orders_v2";
 export const LEGACY_STORAGE_KEY = "compai_optical_orders_v1";
+export const ZEROED_STORAGE_KEY = "mnocx_db_zeroed";
+
+export function isDatabaseZeroed(): boolean {
+	const storage = getStorage();
+	if (!storage) return false;
+	return storage.getItem(ZEROED_STORAGE_KEY) === "true";
+}
+
+export function setDatabaseZeroed(zeroed: boolean): void {
+	const storage = getStorage();
+	if (storage) {
+		if (zeroed) {
+			storage.setItem(ZEROED_STORAGE_KEY, "true");
+		} else {
+			storage.removeItem(ZEROED_STORAGE_KEY);
+		}
+	}
+}
 
 const fallbackAIAudit = {
 	ocrConfidence: 0.98,
@@ -238,6 +256,24 @@ export function sanitizeOrder(raw: any, index = 0): OpticalOrder {
 	};
 }
 
+const memoryStorage = new Map<string, string>();
+const fallbackStorage: Storage = {
+	getItem: (key: string) => memoryStorage.get(key) ?? null,
+	setItem: (key: string, val: string) => {
+		memoryStorage.set(key, String(val));
+	},
+	removeItem: (key: string) => {
+		memoryStorage.delete(key);
+	},
+	clear: () => {
+		memoryStorage.clear();
+	},
+	key: (index: number) => Array.from(memoryStorage.keys())[index] ?? null,
+	get length() {
+		return memoryStorage.size;
+	},
+};
+
 function getStorage(): Storage | null {
 	if (typeof window !== "undefined" && window.localStorage) {
 		return window.localStorage;
@@ -245,16 +281,28 @@ function getStorage(): Storage | null {
 	if (typeof globalThis !== "undefined" && (globalThis as any).localStorage) {
 		return (globalThis as any).localStorage;
 	}
-	return null;
+	return fallbackStorage;
 }
 
-function loadSavedOrders(): OpticalOrder[] {
+export function loadSavedOrders(): OpticalOrder[] {
 	const storage = getStorage();
 	if (!storage) {
 		return INITIAL_OPTICAL_ORDERS.map((o, idx) => sanitizeOrder(o, idx));
 	}
 
 	try {
+		// Se o banco foi expressamente zerado pelo usuário para testes limpos
+		if (storage.getItem(ZEROED_STORAGE_KEY) === "true") {
+			const saved = storage.getItem(CURRENT_STORAGE_KEY);
+			if (saved) {
+				const parsed = JSON.parse(saved);
+				if (Array.isArray(parsed)) {
+					return parsed.map((o, idx) => sanitizeOrder(o, idx));
+				}
+			}
+			return [];
+		}
+
 		const saved = storage.getItem(CURRENT_STORAGE_KEY);
 		if (saved) {
 			const parsed = JSON.parse(saved);
@@ -282,7 +330,7 @@ function loadSavedOrders(): OpticalOrder[] {
 	return INITIAL_OPTICAL_ORDERS.map((o, idx) => sanitizeOrder(o, idx));
 }
 
-let globalOrders: OpticalOrder[] = INITIAL_OPTICAL_ORDERS.map((o, idx) => sanitizeOrder(o, idx));
+let globalOrders: OpticalOrder[] = loadSavedOrders();
 let hasLoadedSupabase = false;
 const listeners = new Set<(orders: OpticalOrder[]) => void>();
 
@@ -300,17 +348,39 @@ function notify() {
 	}
 }
 
-export function clearOpticalStorage() {
+export function clearOpticalStorage(mode: "ORDERS_ONLY" | "FULL" | "DEMO" = "ORDERS_ONLY") {
 	const storage = getStorage();
+	if (mode === "DEMO") {
+		if (storage) {
+			try {
+				storage.removeItem(ZEROED_STORAGE_KEY);
+			} catch (e) {
+				console.warn("Error clearing zeroed flag", e);
+			}
+		}
+		globalOrders = INITIAL_OPTICAL_ORDERS.map((o, idx) => sanitizeOrder(o, idx));
+		notify();
+		return;
+	}
+
 	if (storage) {
 		try {
-			storage.removeItem(CURRENT_STORAGE_KEY);
+			storage.setItem(ZEROED_STORAGE_KEY, "true");
+			storage.setItem(CURRENT_STORAGE_KEY, JSON.stringify([]));
 			storage.removeItem(LEGACY_STORAGE_KEY);
+			// Também zera conferências e pós-venda se for ORDERS_ONLY ou FULL
+			storage.setItem("mnocx_conferencias_v1", JSON.stringify([]));
+			storage.setItem("mnocx_warranties_v1", JSON.stringify([]));
+			if (mode === "FULL") {
+				storage.removeItem("mnocx_lens_catalog_v1");
+				storage.removeItem("mnocx_frame_catalog_v1");
+				storage.removeItem("mnocx_doctors_v1");
+			}
 		} catch (e) {
 			console.warn("Error clearing optical storage", e);
 		}
 	}
-	globalOrders = INITIAL_OPTICAL_ORDERS.map((o, idx) => sanitizeOrder(o, idx));
+	globalOrders = [];
 	notify();
 }
 
