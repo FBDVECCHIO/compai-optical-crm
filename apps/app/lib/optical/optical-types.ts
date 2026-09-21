@@ -104,6 +104,11 @@ export interface AroItem {
 	treatmentPrice: number;
 	diopters: EyePrescription;
 
+	// Códigos Mandatórios de Rastreabilidade ("CPF do Produto")
+	lensCode?: string;
+	treatmentCode?: string;
+	serviceCode?: string;
+
 	// Suporte a variação por olho (OD e OE) a partir do catálogo
 	differentLensesPerEye?: boolean;
 	lensOd?: string;
@@ -266,6 +271,7 @@ export interface PostSalesRecord {
 
 export interface LensCatalogItem {
 	id: string;
+	codigo: string; // Código Mandatório Único do Produto ("CPF do Produto", ex: LEN-10001)
 	tipo: LensCategory;
 	familia: string;
 	produto: string;
@@ -286,6 +292,7 @@ export interface LensCatalogItem {
 
 export interface FrameCatalogItem {
 	id: string;
+	codigo: string; // Código Mandatório Único do Produto ("CPF do Produto", ex: ARM-10001 ou SOL-10001)
 	tipo: FrameCategory;
 	tipoArmacao?: string; // Vinculado aos Tipos de Armação em Configurações (ex: Nylon, Metal, Acetato, Parafusado, Fio de Aço)
 	familia: string;
@@ -297,6 +304,38 @@ export interface FrameCatalogItem {
 	fotoUrl?: string;
 	estoque: number;
 	preco: number;
+	ativo: boolean;
+	origem?: "PLANILHA" | "SISTEMA";
+}
+
+// -------------------------------------------------------------
+// CATÁLOGO DE TRATAMENTOS (CRIZAL, DURAVISION, BLUECONTROL, ETC.)
+// -------------------------------------------------------------
+
+export interface TreatmentCatalogItem {
+	id: string;
+	codigo: string; // Código Mandatório Único (ex: TRAT-10001)
+	nome: string;
+	marcaOuLab?: string;
+	preco: number;
+	custo?: number;
+	descricao?: string;
+	ativo: boolean;
+	origem?: "PLANILHA" | "SISTEMA";
+}
+
+// -------------------------------------------------------------
+// CATÁLOGO DE SERVIÇOS ÓPTICOS (MONTAGEM, SURFAÇAGEM, ADAPTAÇÃO)
+// -------------------------------------------------------------
+
+export interface OpticalServiceItem {
+	id: string;
+	codigo: string; // Código Mandatório Único (ex: SRV-10001)
+	nome: string;
+	categoria: "MONTAGEM" | "SURFACAGEM" | "ADAPTACAO" | "COLORACAO" | "OUTRO";
+	preco: number;
+	custo?: number;
+	descricao?: string;
 	ativo: boolean;
 	origem?: "PLANILHA" | "SISTEMA";
 }

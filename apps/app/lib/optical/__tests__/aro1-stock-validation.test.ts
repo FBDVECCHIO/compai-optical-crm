@@ -46,6 +46,7 @@ describe("Aro 1 Product Code & Stock Validation Shield", () => {
 	const mockCatalog: FrameCatalogItem[] = [
 		{
 			id: "frm_1",
+			codigo: "ARM-10001",
 			produto: "Ray-Ban RB5228 Acetato Clássico",
 			marca: "Ray-Ban",
 			fabricante: "Luxottica",
@@ -59,6 +60,7 @@ describe("Aro 1 Product Code & Stock Validation Shield", () => {
 		},
 		{
 			id: "frm_2",
+			codigo: "ARM-10002",
 			produto: "Oakley OX8156 Holbrook RX",
 			marca: "Oakley",
 			fabricante: "Luxottica",

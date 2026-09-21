@@ -303,16 +303,16 @@ export function generateOrderPrintHtml(order: OpticalOrder, options: PrintOrderO
 			<span class="field-value">${aro1?.frameBrand || "Armação"} ${aro1?.frameModel || ""}</span>
 		</div>
 		<div class="field-group">
-			<span class="field-label">Cód. Peça / Tamanho</span>
-			<span class="field-value">${aro1?.frameCode || "—"} (Aro ${aro1?.frameAro || "—"}/Ponte ${aro1?.framePonte || "—"})</span>
+			<span class="field-label">Cód. Peça / Tam.</span>
+			<span class="field-value">${aro1?.frameCode ? `<strong>[${aro1.frameCode}]</strong>` : "—"} (Aro ${aro1?.frameAro || "—"}/Ponte ${aro1?.framePonte || "—"})</span>
 		</div>
 		<div class="field-group">
 			<span class="field-label">Lente / Laboratório</span>
-			<span class="field-value">${aro1?.lensName || "—"} (${aro1?.lab || "—"})</span>
+			<span class="field-value">${aro1?.lensCode ? `[${aro1.lensCode}] ` : ""}${aro1?.lensName || "—"} (${aro1?.lab || "—"})</span>
 		</div>
 		<div class="field-group">
 			<span class="field-label">Tratamento</span>
-			<span class="field-value">${aro1?.noTreatment ? "Sem Tratamento" : aro1?.treatment || "Padrão"}</span>
+			<span class="field-value">${aro1?.treatmentCode ? `[${aro1.treatmentCode}] ` : ""}${aro1?.noTreatment ? "Sem Tratamento" : aro1?.treatment || "Padrão"}</span>
 		</div>
 	</div>
 
@@ -325,16 +325,16 @@ export function generateOrderPrintHtml(order: OpticalOrder, options: PrintOrderO
 			<span class="field-value">${aro2?.frameBrand || "Armação"} ${aro2?.frameModel || ""}</span>
 		</div>
 		<div class="field-group">
-			<span class="field-label">Cód. Peça</span>
-			<span class="field-value">${aro2?.frameCode || "—"} (Aro ${aro2?.frameAro || "—"}/Ponte ${aro2?.framePonte || "—"})</span>
+			<span class="field-label">Cód. Peça Aro 2</span>
+			<span class="field-value">${aro2?.frameCode ? `<strong>[${aro2.frameCode}]</strong>` : "—"} (Aro ${aro2?.frameAro || "—"}/Ponte ${aro2?.framePonte || "—"})</span>
 		</div>
 		<div class="field-group">
 			<span class="field-label">Lente Aro 2</span>
-			<span class="field-value">${aro2?.lensName || "—"} (${aro2?.lab || "—"})</span>
+			<span class="field-value">${aro2?.lensCode ? `[${aro2.lensCode}] ` : ""}${aro2?.lensName || "—"} (${aro2?.lab || "—"})</span>
 		</div>
 		<div class="field-group">
 			<span class="field-label">Tratamento Aro 2</span>
-			<span class="field-value">${aro2?.noTreatment ? "Sem Tratamento" : aro2?.treatment || "Padrão"}</span>
+			<span class="field-value">${aro2?.treatmentCode ? `[${aro2.treatmentCode}] ` : ""}${aro2?.noTreatment ? "Sem Tratamento" : aro2?.treatment || "Padrão"}</span>
 		</div>
 	</div>
 	<div style="font-size: 10px; color: #52525b; margin-top: 4px;">

@@ -121,6 +121,7 @@ describe("Tipos de Armação Parametrizáveis & Unificação de Usuários/Descon
 		it("deve permitir vincular tipo de armação (Nylon, Metal, Acetato, Parafusado, Fio de Aço) a itens do catálogo", () => {
 			const item: import("../optical-types").FrameCatalogItem = {
 				id: "FRAME-TEST-01",
+				codigo: "ARM-10001",
 				marca: "Ray-Ban",
 				produto: "Clubmaster Classic",
 				familia: "Receituário Geral",

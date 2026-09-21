@@ -46,6 +46,7 @@ import { checkDiscountLimit, useOpticalOrders } from "@/lib/optical/optical-stor
 import {
 	fetchLensCatalog,
 	fetchFrameCatalog,
+	fetchSupabaseTreatments,
 	decrementFrameStock,
 	fetchSupabaseStores,
 	fetchSupabaseSellers,
@@ -66,6 +67,7 @@ import type {
 	FrameCatalogItem,
 	FrameCustomerData,
 	LensCatalogItem,
+	TreatmentCatalogItem,
 	OpticalCaptador,
 	OpticalFrameShape,
 	OpticalOrder,
@@ -93,9 +95,9 @@ const DEFAULT_DIOPTERS: EyePrescription = {
 };
 
 const DEFAULT_ARO_1: AroItem = {
-	frameCode: "RB5228",
+	frameCode: "ARM-10001",
 	frameBrand: "Ray-Ban",
-	frameModel: "Acetato Preto Clássico",
+	frameModel: "Ray-Ban RX5228 Retangular",
 	framePrice: 590,
 	frameType: "RECEITUARIO",
 	frameFamily: "Wayfarer",
@@ -103,13 +105,15 @@ const DEFAULT_ARO_1: AroItem = {
 	frameAro: "52",
 	framePonte: "18",
 	lab: "Essilor",
-	lensName: "Varilux Comfort Max 1.50",
+	lensCode: "LEN-10006",
+	lensName: "Varilux Comfort Max 1.50 Crizal Sapphire",
 	quantity: 1,
 	lensPrice: 1890,
 	lensType: "MULTIFOCAL",
 	lensFamily: "Varilux",
 	lensIndex: "1.50",
 	lensTech: "Freeform",
+	treatmentCode: "TRAT-10001",
 	treatment: "Crizal Rock",
 	noTreatment: false,
 	treatmentPrice: 390,
@@ -197,24 +201,26 @@ export function OpticalOrderForm({
 	const [hasAro2, setHasAro2] = useState(false);
 	const [isAro2Copy, setIsAro2Copy] = useState(false);
 	const [aro2, setAro2] = useState<AroItem>({
-		frameCode: "VO5322",
-		frameBrand: "Vogue Eyewear",
-		frameModel: "Tartaruga Solar",
+		frameCode: "SOL-10001",
+		frameBrand: "Oakley",
+		frameModel: "Oakley Holbrook Matte Black OO9102",
 		framePrice: 420,
 		frameType: "SOLAR",
-		frameFamily: "Gigi",
+		frameFamily: "Active Sport",
 		frameManufacturer: "Luxottica",
-		frameAro: "54",
-		framePonte: "19",
+		frameAro: "55",
+		framePonte: "18",
 		lab: "Essilor",
-		lensName: "Varilux Comfort Max 1.50",
+		lensCode: "LEN-10007",
+		lensName: "Varilux Physio 3.0 Airwear Poli Crizal Rock",
 		quantity: 1,
 		lensPrice: 1400,
 		lensType: "MULTIFOCAL",
 		lensFamily: "Varilux",
 		lensIndex: "1.50",
 		lensTech: "Freeform",
-		treatment: "Crizal Sun UV",
+		treatmentCode: "TRAT-10002",
+		treatment: "Crizal Prevencia / Blue UV",
 		noTreatment: false,
 		treatmentPrice: 280,
 		diopters: DEFAULT_DIOPTERS,
@@ -238,6 +244,7 @@ export function OpticalOrderForm({
 	const [invoiceNumber, setInvoiceNumber] = useState("");
 	const [lensCatalog, setLensCatalog] = useState<LensCatalogItem[]>([]);
 	const [frameCatalog, setFrameCatalog] = useState<FrameCatalogItem[]>([]);
+	const [treatmentsCatalog, setTreatmentsCatalog] = useState<TreatmentCatalogItem[]>([]);
 
 	// Filtros avançados de Lentes (Tipo, IR, Busca) - Aro 1
 	const [lensTypeFilter1, setLensTypeFilter1] = useState<string>("ALL");
@@ -257,15 +264,17 @@ export function OpticalOrderForm({
 			fetchSupabaseDoctors(),
 			fetchLensCatalog(),
 			fetchFrameCatalog(),
+			fetchSupabaseTreatments(),
 			fetchSupabaseCaptadores(),
 			fetchSupabaseFrameShapes(),
 			fetchSupabaseFrameTypes(),
-		]).then(([loadedStores, loadedSellers, loadedDoctors, loadedLenses, loadedFrames, loadedCaptadores, loadedShapes, loadedFrameTypes]) => {
+		]).then(([loadedStores, loadedSellers, loadedDoctors, loadedLenses, loadedFrames, loadedTreatments, loadedCaptadores, loadedShapes, loadedFrameTypes]) => {
 			setStores(loadedStores);
 			setSellers(loadedSellers);
 			setDoctors(loadedDoctors);
 			setLensCatalog(loadedLenses);
 			setFrameCatalog(loadedFrames);
+			setTreatmentsCatalog(loadedTreatments);
 			setCaptadores(loadedCaptadores);
 			setFrameShapes(loadedShapes);
 			setAvailableFrameTypes(loadedFrameTypes);
@@ -295,7 +304,7 @@ export function OpticalOrderForm({
 				const f = loadedFrames[0]!;
 				setAro1((a) => ({
 					...a,
-					frameCode: f.produto.split(" ")[1] || f.produto.slice(0, 8),
+					frameCode: f.codigo || f.produto.split(" ")[1] || f.produto.slice(0, 8),
 					frameBrand: f.marca,
 					frameModel: f.produto,
 					framePrice: f.preco,
@@ -325,10 +334,11 @@ export function OpticalOrderForm({
 			if (lensIndexFilter1 !== "ALL" && l.indiceRefrativo !== lensIndexFilter1) return false;
 			if (lensSearchQuery1.trim()) {
 				const q = lensSearchQuery1.toLowerCase();
+				const matchCode = (l.codigo || "").toLowerCase().includes(q);
 				const matchName = l.produto.toLowerCase().includes(q);
 				const matchFamily = (l.familia || "").toLowerCase().includes(q);
 				const matchTech = (l.tecnologia || "").toLowerCase().includes(q);
-				if (!matchName && !matchFamily && !matchTech) return false;
+				if (!matchCode && !matchName && !matchFamily && !matchTech) return false;
 			}
 			return true;
 		});
@@ -342,10 +352,11 @@ export function OpticalOrderForm({
 			if (lensIndexFilter2 !== "ALL" && l.indiceRefrativo !== lensIndexFilter2) return false;
 			if (lensSearchQuery2.trim()) {
 				const q = lensSearchQuery2.toLowerCase();
+				const matchCode = (l.codigo || "").toLowerCase().includes(q);
 				const matchName = l.produto.toLowerCase().includes(q);
 				const matchFamily = (l.familia || "").toLowerCase().includes(q);
 				const matchTech = (l.tecnologia || "").toLowerCase().includes(q);
-				if (!matchName && !matchFamily && !matchTech) return false;
+				if (!matchCode && !matchName && !matchFamily && !matchTech) return false;
 			}
 			return true;
 		});
@@ -396,12 +407,14 @@ export function OpticalOrderForm({
 			...prev,
 			diopters: JSON.parse(JSON.stringify(aro1.diopters)),
 			lab: aro1.lab,
+			lensCode: aro1.lensCode,
 			lensName: aro1.lensName,
 			lensPrice: Math.round(aro1.lensPrice * 0.7), // 30% desc 2º par
 			lensType: aro1.lensType,
 			lensFamily: aro1.lensFamily,
 			lensIndex: aro1.lensIndex,
 			lensTech: aro1.lensTech,
+			treatmentCode: aro1.treatmentCode,
 			treatment: aro1.treatment,
 			treatmentPrice: Math.round(aro1.treatmentPrice * 0.7),
 			noTreatment: aro1.noTreatment,
@@ -1459,6 +1472,7 @@ export function OpticalOrderForm({
 											value={
 												frameCatalog.find(
 													(f) =>
+														(f.codigo && f.codigo === aro1.frameCode) ||
 														f.produto === aro1.frameModel ||
 														(f.marca === aro1.frameBrand &&
 															f.produto.includes(aro1.frameCode)),
@@ -1469,7 +1483,7 @@ export function OpticalOrderForm({
 													(f) => f.id === e.target.value,
 												);
 												if (selected) {
-													const code = selected.produto.split(" ")[1] || selected.produto.slice(0, 8);
+													const code = selected.codigo || selected.produto.split(" ")[1] || selected.produto.slice(0, 8);
 													setAro1((a) => ({
 														...a,
 														frameCode: code,
@@ -1490,17 +1504,17 @@ export function OpticalOrderForm({
 											<option value="">Selecione pelo código ou modelo...</option>
 											{frameCatalog.map((f) => (
 												<option key={f.id} value={f.id}>
-													[{f.marca}] {f.produto} ({f.tipo}) — R$ {f.preco} (Estoque: {f.estoque} un.)
+													[{f.codigo}] [{f.marca}] {f.produto} ({f.tipo}) — R$ {f.preco} (Estoque: {f.estoque} un.)
 												</option>
 											))}
 										</select>
 									</div>
 
-									{/* Campo Mandatório: Código do Produto com Busca Automática */}
+									{/* Campo Mandatório: Código do Produto com Busca Automática / Leitor de Barras */}
 									<div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
 										<div className="sm:col-span-2">
 											<FieldLabel className="text-xs font-bold text-primary flex items-center gap-1">
-												<span>Código do Produto *</span>
+												<span>Código Mandatório ("CPF do Produto") *</span>
 												<Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-primary text-primary">
 													Obrigatório
 												</Badge>
@@ -1509,17 +1523,19 @@ export function OpticalOrderForm({
 												value={aro1.frameCode}
 												required
 												onChange={(e) => {
-													const val = e.target.value;
+													const val = e.target.value.trim();
 													setAro1((a) => ({ ...a, frameCode: val }));
 													const matched = frameCatalog.find(
 														(f) =>
+															(f.codigo && f.codigo.toLowerCase() === val.toLowerCase()) ||
+															f.id.toLowerCase() === val.toLowerCase() ||
 															f.produto.toLowerCase().includes(val.toLowerCase()) ||
 															(f.marca.toLowerCase().includes(val.toLowerCase()))
 													);
-													if (matched && val.length >= 3) {
+													if (matched) {
 														setAro1((a) => ({
 															...a,
-															frameCode: val,
+															frameCode: matched.codigo || val,
 															frameBrand: matched.marca,
 															frameModel: matched.produto,
 															framePrice: matched.preco,
@@ -1531,7 +1547,7 @@ export function OpticalOrderForm({
 														}));
 													}
 												}}
-												placeholder="Digite o código da peça (ex: RB5228)"
+												placeholder="Digite o código ou bipe o código de barras (ex: ARM-10001)"
 												className="h-8 text-xs font-mono font-bold border-primary focus:ring-primary"
 											/>
 										</div>
@@ -2299,6 +2315,7 @@ export function OpticalOrderForm({
 											if (selected) {
 												setAro1((a) => ({
 													...a,
+													lensCode: selected.codigo,
 													lensName: selected.produto,
 													lab: selected.laboratorio,
 													lensPrice: selected.preco,
@@ -2314,7 +2331,7 @@ export function OpticalOrderForm({
 										<option value="">Selecione uma lente do catálogo...</option>
 										{filteredLensesAro1.map((l) => (
 											<option key={l.id} value={l.id}>
-												[{l.laboratorio}] {l.produto} — {l.tipo} (IR {l.indiceRefrativo}) — R$ {l.preco}
+												[{l.codigo}] [{l.laboratorio}] {l.produto} — {l.tipo} (IR {l.indiceRefrativo}) — R$ {l.preco}
 											</option>
 										))}
 									</select>
@@ -2466,18 +2483,19 @@ export function OpticalOrderForm({
 											<select
 												disabled={aro1.noTreatment}
 												value={
-													TREATMENT_OPTIONS.find((t) => t.name === aro1.treatment)?.name ||
+													treatmentsCatalog.find((t) => t.nome === aro1.treatment)?.id ||
 													(aro1.treatment ? "CUSTOM" : "")
 												}
 												onChange={(e) => {
 													const val = e.target.value;
 													if (val !== "CUSTOM") {
-														const selected = TREATMENT_OPTIONS.find((t) => t.name === val);
+														const selected = treatmentsCatalog.find((t) => t.id === val || t.nome === val);
 														if (selected) {
 															setAro1((a) => ({
 																...a,
-																treatment: selected.name,
-																treatmentPrice: selected.price,
+																treatmentCode: selected.codigo,
+																treatment: selected.nome,
+																treatmentPrice: selected.preco,
 															}));
 														}
 													}
@@ -2485,9 +2503,9 @@ export function OpticalOrderForm({
 												className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs disabled:opacity-50 cursor-pointer"
 											>
 												<option value="">Selecione o Tratamento...</option>
-												{TREATMENT_OPTIONS.map((t) => (
-													<option key={t.name} value={t.name}>
-														[{t.lab}] {t.name} — R$ {t.price}
+												{treatmentsCatalog.map((t) => (
+													<option key={t.id} value={t.id}>
+														[{t.codigo}] [{t.marcaOuLab}] {t.nome} — R$ {t.preco}
 													</option>
 												))}
 												<option value="CUSTOM">Outro (Digitar ao lado)...</option>
@@ -2667,6 +2685,7 @@ export function OpticalOrderForm({
 											value={
 												frameCatalog.find(
 													(f) =>
+														(f.codigo && f.codigo === aro2.frameCode) ||
 														f.produto === aro2.frameModel ||
 														(f.marca === aro2.frameBrand &&
 															f.produto.includes(aro2.frameCode)),
@@ -2680,6 +2699,7 @@ export function OpticalOrderForm({
 													setAro2((a) => ({
 														...a,
 														frameCode:
+															selected.codigo ||
 															selected.produto.split(" ")[1] ||
 															selected.produto.slice(0, 8),
 														frameBrand: selected.marca,
@@ -2698,7 +2718,7 @@ export function OpticalOrderForm({
 											<option value="">Selecione uma armação do estoque para o 2º par...</option>
 											{frameCatalog.map((f) => (
 												<option key={f.id} value={f.id}>
-													[{f.marca}] {f.produto} ({f.tipo}) — Aro {f.tamanhoAro}/{f.tamanhoPonte} — R$ {f.preco} (Estoque: {f.estoque} un.)
+													[{f.codigo}] [{f.marca}] {f.produto} ({f.tipo}) — Aro {f.tamanhoAro}/{f.tamanhoPonte} — R$ {f.preco} (Estoque: {f.estoque} un.)
 												</option>
 											))}
 										</select>
@@ -2712,14 +2732,35 @@ export function OpticalOrderForm({
 
 								<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
 									<Field>
-										<FieldLabel>Cód. Armação</FieldLabel>
+										<FieldLabel>Cód. Mandatório ("CPF")</FieldLabel>
 										<Input
 											value={aro2.frameCode}
-											onChange={(e) =>
-												setAro2((a) => ({ ...a, frameCode: e.target.value }))
-											}
-											placeholder="VO5322"
-											className="h-8 text-xs font-mono"
+											onChange={(e) => {
+												const val = e.target.value.trim();
+												setAro2((a) => ({ ...a, frameCode: val }));
+												const matched = frameCatalog.find(
+													(f) =>
+														(f.codigo && f.codigo.toLowerCase() === val.toLowerCase()) ||
+														f.id.toLowerCase() === val.toLowerCase() ||
+														f.produto.toLowerCase().includes(val.toLowerCase())
+												);
+												if (matched) {
+													setAro2((a) => ({
+														...a,
+														frameCode: matched.codigo || val,
+														frameBrand: matched.marca,
+														frameModel: matched.produto,
+														framePrice: matched.preco,
+														frameType: matched.tipo,
+														frameFamily: matched.familia,
+														frameManufacturer: matched.fabricante,
+														frameAro: matched.tamanhoAro,
+														framePonte: matched.tamanhoPonte,
+													}));
+												}
+											}}
+											placeholder="SOL-10001"
+											className="h-8 text-xs font-mono font-bold"
 										/>
 									</Field>
 									<Field>
@@ -2862,6 +2903,7 @@ export function OpticalOrderForm({
 												if (selected) {
 													setAro2((a) => ({
 														...a,
+														lensCode: selected.codigo,
 														lensName: selected.produto,
 														lab: selected.laboratorio,
 														lensPrice: Math.round(selected.preco * 0.7), // 30% desc
@@ -2877,7 +2919,7 @@ export function OpticalOrderForm({
 											<option value="">Selecione uma lente para o 2º par...</option>
 											{filteredLensesAro2.map((l) => (
 												<option key={l.id} value={l.id}>
-													[{l.laboratorio}] {l.produto} — {l.tipo} (IR {l.indiceRefrativo}) — R$ {l.preco}
+													[{l.codigo}] [{l.laboratorio}] {l.produto} — {l.tipo} (IR {l.indiceRefrativo}) — R$ {l.preco}
 												</option>
 											))}
 										</select>
@@ -2967,18 +3009,19 @@ export function OpticalOrderForm({
 												<select
 													disabled={aro2.noTreatment}
 													value={
-														TREATMENT_OPTIONS.find((t) => t.name === aro2.treatment)?.name ||
+														treatmentsCatalog.find((t) => t.nome === aro2.treatment)?.id ||
 														(aro2.treatment ? "CUSTOM" : "")
 													}
 													onChange={(e) => {
 														const val = e.target.value;
 														if (val !== "CUSTOM") {
-															const selected = TREATMENT_OPTIONS.find((t) => t.name === val);
+															const selected = treatmentsCatalog.find((t) => t.id === val || t.nome === val);
 															if (selected) {
 																setAro2((a) => ({
 																	...a,
-																	treatment: selected.name,
-																	treatmentPrice: Math.round(selected.price * 0.7),
+																	treatmentCode: selected.codigo,
+																	treatment: selected.nome,
+																	treatmentPrice: Math.round(selected.preco * 0.7),
 																}));
 															}
 														}
@@ -2986,9 +3029,9 @@ export function OpticalOrderForm({
 													className="w-full h-8 px-2.5 rounded-lg border border-input bg-background text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs disabled:opacity-50 cursor-pointer"
 												>
 													<option value="">Selecione o Tratamento...</option>
-													{TREATMENT_OPTIONS.map((t) => (
-														<option key={t.name} value={t.name}>
-															[{t.lab}] {t.name} — R$ {Math.round(t.price * 0.7)} (Desc. 2º par)
+													{treatmentsCatalog.map((t) => (
+														<option key={t.id} value={t.id}>
+															[{t.codigo}] [{t.marcaOuLab}] {t.nome} — R$ {Math.round(t.preco * 0.7)} (Desc. 2º par)
 														</option>
 													))}
 													<option value="CUSTOM">Outro (Digitar ao lado)...</option>

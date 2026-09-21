@@ -2,6 +2,8 @@ import type {
 	FrameCatalogItem,
 	FrameTypeItem,
 	LensCatalogItem,
+	TreatmentCatalogItem,
+	OpticalServiceItem,
 	MessageTemplateItem,
 	OpticalOrder,
 	OpticalOrderStatus,
@@ -12,9 +14,18 @@ import type {
 import {
 	INITIAL_FRAME_CATALOG,
 	INITIAL_LENS_CATALOG,
+	INITIAL_TREATMENT_CATALOG,
+	INITIAL_SERVICE_CATALOG,
 	INITIAL_MESSAGE_TEMPLATES,
 	INITIAL_POST_SALES,
 } from "./optical-mock-data";
+import {
+	ensureProductCode,
+	generateUniqueProductCode,
+	validateProductCodeUniqueness,
+	batchProcessProductCodes,
+	resolveCategoryPrefix,
+} from "./product-code-engine";
 import {
 	appLentesShield,
 	assertAppLentesMutationAllowed,
@@ -1539,29 +1550,54 @@ export async function saveAssistenciaTemplates(
 const LENS_STORAGE_KEY = "mnocx_lens_catalog_v1";
 
 export async function fetchLensCatalog(): Promise<LensCatalogItem[]> {
+	let list: LensCatalogItem[] = INITIAL_LENS_CATALOG;
 	if (typeof window !== "undefined") {
 		try {
 			const saved = localStorage.getItem(LENS_STORAGE_KEY);
 			if (saved) {
 				const parsed = JSON.parse(saved);
-				if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+				if (Array.isArray(parsed) && parsed.length > 0) list = parsed;
 			}
 		} catch (e) {
 			console.warn("Erro ao ler catálogo de lentes local:", e);
 		}
 	}
-	return INITIAL_LENS_CATALOG;
+
+	// Migração automática: garante que toda lente tenha código único ("CPF do Produto")
+	let needsSave = false;
+	const existingCodes = new Set<string>();
+	const validatedList = list.map((item) => {
+		if (!item.codigo || existingCodes.has(item.codigo)) {
+			needsSave = true;
+			return ensureProductCode(item, "LEN", existingCodes);
+		}
+		existingCodes.add(item.codigo);
+		return item;
+	});
+
+	if (needsSave && typeof window !== "undefined") {
+		try {
+			localStorage.setItem(LENS_STORAGE_KEY, JSON.stringify(validatedList));
+		} catch (e) {
+			console.warn("Erro ao persistir migração de códigos de lentes:", e);
+		}
+	}
+
+	return validatedList;
 }
 
 export async function saveLensCatalogItem(item: LensCatalogItem): Promise<LensCatalogItem[]> {
 	const current = await fetchLensCatalog();
-	const existingIndex = current.findIndex((l) => l.id === item.id);
+	const existingCodes = new Set(current.filter((l) => l.id !== item.id).map((l) => l.codigo));
+	const itemWithCode = ensureProductCode(item, "LEN", existingCodes);
+
+	const existingIndex = current.findIndex((l) => l.id === itemWithCode.id);
 	let updated: LensCatalogItem[];
 	if (existingIndex >= 0) {
 		updated = [...current];
-		updated[existingIndex] = item;
+		updated[existingIndex] = itemWithCode;
 	} else {
-		updated = [item, ...current];
+		updated = [itemWithCode, ...current];
 	}
 	if (typeof window !== "undefined") {
 		try {
@@ -1575,7 +1611,9 @@ export async function saveLensCatalogItem(item: LensCatalogItem): Promise<LensCa
 
 export async function importLensCatalogBatch(items: LensCatalogItem[]): Promise<LensCatalogItem[]> {
 	const current = await fetchLensCatalog();
-	const updated = [...items, ...current];
+	const existingCodes = current.map((l) => l.codigo);
+	const processed = batchProcessProductCodes(items, "LEN", existingCodes);
+	const updated = [...processed, ...current];
 	if (typeof window !== "undefined") {
 		try {
 			localStorage.setItem(LENS_STORAGE_KEY, JSON.stringify(updated));
@@ -1592,29 +1630,56 @@ export async function importLensCatalogBatch(items: LensCatalogItem[]): Promise<
 const FRAME_STORAGE_KEY = "mnocx_frame_catalog_v1";
 
 export async function fetchFrameCatalog(): Promise<FrameCatalogItem[]> {
+	let list: FrameCatalogItem[] = INITIAL_FRAME_CATALOG;
 	if (typeof window !== "undefined") {
 		try {
 			const saved = localStorage.getItem(FRAME_STORAGE_KEY);
 			if (saved) {
 				const parsed = JSON.parse(saved);
-				if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+				if (Array.isArray(parsed) && parsed.length > 0) list = parsed;
 			}
 		} catch (e) {
 			console.warn("Erro ao ler catálogo de peças local:", e);
 		}
 	}
-	return INITIAL_FRAME_CATALOG;
+
+	// Migração automática: garante que toda armação e solar tenha código único ("CPF do Produto")
+	let needsSave = false;
+	const existingCodes = new Set<string>();
+	const validatedList = list.map((item) => {
+		const prefix = item.tipo === "SOLAR" ? "SOL" : "ARM";
+		if (!item.codigo || existingCodes.has(item.codigo)) {
+			needsSave = true;
+			return ensureProductCode(item, prefix, existingCodes);
+		}
+		existingCodes.add(item.codigo);
+		return item;
+	});
+
+	if (needsSave && typeof window !== "undefined") {
+		try {
+			localStorage.setItem(FRAME_STORAGE_KEY, JSON.stringify(validatedList));
+		} catch (e) {
+			console.warn("Erro ao persistir migração de códigos de armações:", e);
+		}
+	}
+
+	return validatedList;
 }
 
 export async function saveFrameCatalogItem(item: FrameCatalogItem): Promise<FrameCatalogItem[]> {
 	const current = await fetchFrameCatalog();
-	const existingIndex = current.findIndex((f) => f.id === item.id);
+	const existingCodes = new Set(current.filter((f) => f.id !== item.id).map((f) => f.codigo));
+	const prefix = item.tipo === "SOLAR" ? "SOL" : "ARM";
+	const itemWithCode = ensureProductCode(item, prefix, existingCodes);
+
+	const existingIndex = current.findIndex((f) => f.id === itemWithCode.id);
 	let updated: FrameCatalogItem[];
 	if (existingIndex >= 0) {
 		updated = [...current];
-		updated[existingIndex] = item;
+		updated[existingIndex] = itemWithCode;
 	} else {
-		updated = [item, ...current];
+		updated = [itemWithCode, ...current];
 	}
 	if (typeof window !== "undefined") {
 		try {
@@ -1628,7 +1693,9 @@ export async function saveFrameCatalogItem(item: FrameCatalogItem): Promise<Fram
 
 export async function importFrameCatalogBatch(items: FrameCatalogItem[]): Promise<FrameCatalogItem[]> {
 	const current = await fetchFrameCatalog();
-	const updated = [...items, ...current];
+	const existingCodes = current.map((f) => f.codigo);
+	const processed = batchProcessProductCodes(items, "ARM", existingCodes);
+	const updated = [...processed, ...current];
 	if (typeof window !== "undefined") {
 		try {
 			localStorage.setItem(FRAME_STORAGE_KEY, JSON.stringify(updated));
@@ -1645,6 +1712,7 @@ export async function decrementFrameStock(frameCodeOrId: string, quantity = 1): 
 	const targetLower = frameCodeOrId.toLowerCase().trim();
 	const idx = current.findIndex(
 		(f) =>
+			(f.codigo && f.codigo.toLowerCase() === targetLower) ||
 			f.id.toLowerCase() === targetLower ||
 			f.produto.toLowerCase().includes(targetLower) ||
 			(f.marca && f.marca.toLowerCase().includes(targetLower) && f.produto.toLowerCase().includes(targetLower))
@@ -1659,6 +1727,116 @@ export async function decrementFrameStock(frameCodeOrId: string, quantity = 1): 
 		return await saveFrameCatalogItem(updatedItem);
 	}
 	return null;
+}
+
+// -------------------------------------------------------------
+// MNOC-X: CATÁLOGO DE TRATAMENTOS E SERVIÇOS ÓPTICOS
+// -------------------------------------------------------------
+const TREATMENT_STORAGE_KEY = "mnocx_treatment_catalog_v1";
+const SERVICE_STORAGE_KEY = "mnocx_service_catalog_v1";
+
+export async function fetchSupabaseTreatments(): Promise<TreatmentCatalogItem[]> {
+	let list: TreatmentCatalogItem[] = INITIAL_TREATMENT_CATALOG;
+	if (typeof window !== "undefined") {
+		try {
+			const saved = localStorage.getItem(TREATMENT_STORAGE_KEY);
+			if (saved) {
+				const parsed = JSON.parse(saved);
+				if (Array.isArray(parsed) && parsed.length > 0) list = parsed;
+			}
+		} catch (e) {
+			console.warn("Erro ao ler tratamentos locais:", e);
+		}
+	}
+	let needsSave = false;
+	const existingCodes = new Set<string>();
+	const validated = list.map((item) => {
+		if (!item.codigo || existingCodes.has(item.codigo)) {
+			needsSave = true;
+			return ensureProductCode(item, "TRAT", existingCodes);
+		}
+		existingCodes.add(item.codigo);
+		return item;
+	});
+	if (needsSave && typeof window !== "undefined") {
+		try {
+			localStorage.setItem(TREATMENT_STORAGE_KEY, JSON.stringify(validated));
+		} catch (e) {
+			console.warn("Erro ao salvar tratamentos:", e);
+		}
+	}
+	return validated;
+}
+
+export async function saveSupabaseTreatment(item: TreatmentCatalogItem): Promise<TreatmentCatalogItem[]> {
+	const current = await fetchSupabaseTreatments();
+	const existingCodes = new Set(current.filter((t) => t.id !== item.id).map((t) => t.codigo));
+	const itemWithCode = ensureProductCode(item, "TRAT", existingCodes);
+	const existingIndex = current.findIndex((t) => t.id === itemWithCode.id);
+	const updated = existingIndex >= 0
+		? current.map((t) => (t.id === itemWithCode.id ? itemWithCode : t))
+		: [itemWithCode, ...current];
+
+	if (typeof window !== "undefined") {
+		try {
+			localStorage.setItem(TREATMENT_STORAGE_KEY, JSON.stringify(updated));
+		} catch (e) {
+			console.warn("Erro ao persistir tratamento:", e);
+		}
+	}
+	return updated;
+}
+
+export async function fetchSupabaseServices(): Promise<OpticalServiceItem[]> {
+	let list: OpticalServiceItem[] = INITIAL_SERVICE_CATALOG;
+	if (typeof window !== "undefined") {
+		try {
+			const saved = localStorage.getItem(SERVICE_STORAGE_KEY);
+			if (saved) {
+				const parsed = JSON.parse(saved);
+				if (Array.isArray(parsed) && parsed.length > 0) list = parsed;
+			}
+		} catch (e) {
+			console.warn("Erro ao ler serviços locais:", e);
+		}
+	}
+	let needsSave = false;
+	const existingCodes = new Set<string>();
+	const validated = list.map((item) => {
+		if (!item.codigo || existingCodes.has(item.codigo)) {
+			needsSave = true;
+			return ensureProductCode(item, "SRV", existingCodes);
+		}
+		existingCodes.add(item.codigo);
+		return item;
+	});
+	if (needsSave && typeof window !== "undefined") {
+		try {
+			localStorage.setItem(SERVICE_STORAGE_KEY, JSON.stringify(validated));
+		} catch (e) {
+			console.warn("Erro ao salvar serviços:", e);
+		}
+	}
+	return validated;
+}
+
+export async function saveSupabaseService(item: OpticalServiceItem): Promise<OpticalServiceItem[]> {
+	const current = await fetchSupabaseServices();
+	const existingCodes = new Set(current.filter((s) => s.id !== item.id).map((s) => s.codigo));
+	const itemWithCode = ensureProductCode(item, "SRV", existingCodes);
+	const existingIndex = current.findIndex((s) => s.id === itemWithCode.id);
+	const updated = existingIndex >= 0
+		? current.map((s) => (s.id === itemWithCode.id ? itemWithCode : s))
+		: [itemWithCode, ...current];
+
+	if (typeof window !== "undefined") {
+		try {
+			localStorage.setItem(SERVICE_STORAGE_KEY, JSON.stringify(updated));
+		} catch (e) {
+			console.warn("Erro ao persistir serviço:", e);
+		}
+	}
+	return updated;
 }
 
 

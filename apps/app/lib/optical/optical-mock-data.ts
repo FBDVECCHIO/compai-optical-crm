@@ -718,6 +718,7 @@ export function generateWhatsAppLink(order: OpticalOrder): string {
 export const INITIAL_LENS_CATALOG: LensCatalogItem[] = [
 	{
 		id: "lens_1",
+		codigo: "LEN-10001",
 		tipo: "MONOFOCAL",
 		familia: "Visão Simples HD",
 		produto: "Monofocal Digital HD 1.50 Crizal",
@@ -732,6 +733,7 @@ export const INITIAL_LENS_CATALOG: LensCatalogItem[] = [
 	},
 	{
 		id: "lens_2",
+		codigo: "LEN-10002",
 		tipo: "MONOFOCAL",
 		familia: "Single Vision ClearView",
 		produto: "Zeiss ClearView Poli 1.59 BlueProtect",
@@ -746,6 +748,7 @@ export const INITIAL_LENS_CATALOG: LensCatalogItem[] = [
 	},
 	{
 		id: "lens_3",
+		codigo: "LEN-10003",
 		tipo: "MONOFOCAL",
 		familia: "Nulux High Index",
 		produto: "Hoya Nulux 1.67 Asférica Hi-Vision",
@@ -760,6 +763,7 @@ export const INITIAL_LENS_CATALOG: LensCatalogItem[] = [
 	},
 	{
 		id: "lens_4",
+		codigo: "LEN-10004",
 		tipo: "MONOFOCAL",
 		familia: "Ultra Thin 1.74",
 		produto: "Zeiss Single Vision 1.74 DuraVision",
@@ -774,6 +778,7 @@ export const INITIAL_LENS_CATALOG: LensCatalogItem[] = [
 	},
 	{
 		id: "lens_5",
+		codigo: "LEN-10005",
 		tipo: "MULTIFOCAL",
 		familia: "Advance Digital",
 		produto: "Multifocal Advance Freeform 1.50",
@@ -788,6 +793,7 @@ export const INITIAL_LENS_CATALOG: LensCatalogItem[] = [
 	},
 	{
 		id: "lens_6",
+		codigo: "LEN-10006",
 		tipo: "MULTIFOCAL",
 		familia: "Varilux Comfort",
 		produto: "Varilux Comfort Max 1.50 Crizal Sapphire",
@@ -802,6 +808,7 @@ export const INITIAL_LENS_CATALOG: LensCatalogItem[] = [
 	},
 	{
 		id: "lens_7",
+		codigo: "LEN-10007",
 		tipo: "MULTIFOCAL",
 		familia: "Varilux Physio",
 		produto: "Varilux Physio 3.0 Airwear Poli Crizal Rock",
@@ -816,6 +823,7 @@ export const INITIAL_LENS_CATALOG: LensCatalogItem[] = [
 	},
 	{
 		id: "lens_8",
+		codigo: "LEN-10008",
 		tipo: "MULTIFOCAL",
 		familia: "Hoyalux Balansis",
 		produto: "Hoyalux Balansis 1.60 LongLife",
@@ -830,6 +838,7 @@ export const INITIAL_LENS_CATALOG: LensCatalogItem[] = [
 	},
 	{
 		id: "lens_9",
+		codigo: "LEN-10009",
 		tipo: "MULTIFOCAL",
 		familia: "Hoyalux Myself",
 		produto: "Hoyalux iD Myself 1.67 Personalizada",
@@ -844,6 +853,7 @@ export const INITIAL_LENS_CATALOG: LensCatalogItem[] = [
 	},
 	{
 		id: "lens_10",
+		codigo: "LEN-10010",
 		tipo: "OCUPACIONAL",
 		familia: "Desk & Office",
 		produto: "Ocupacional Office Pro 1.50",
@@ -864,7 +874,9 @@ export const INITIAL_LENS_CATALOG: LensCatalogItem[] = [
 export const INITIAL_FRAME_CATALOG: FrameCatalogItem[] = [
 	{
 		id: "frame_1",
+		codigo: "ARM-10001",
 		tipo: "RECEITUARIO",
+		tipoArmacao: "Acetato",
 		familia: "Acetato Bold",
 		produto: "Ray-Ban RX5228 Retangular",
 		marca: "Ray-Ban",
@@ -878,7 +890,9 @@ export const INITIAL_FRAME_CATALOG: FrameCatalogItem[] = [
 	},
 	{
 		id: "frame_2",
+		codigo: "ARM-10002",
 		tipo: "RECEITUARIO",
+		tipoArmacao: "Nylon",
 		familia: "Clubmaster Optics",
 		produto: "Ray-Ban RX5154 Clubmaster Meio-Aro",
 		marca: "Ray-Ban",
@@ -892,7 +906,9 @@ export const INITIAL_FRAME_CATALOG: FrameCatalogItem[] = [
 	},
 	{
 		id: "frame_3",
+		codigo: "SOL-10001",
 		tipo: "SOLAR",
+		tipoArmacao: "Acetato",
 		familia: "Active Sport",
 		produto: "Oakley Holbrook Matte Black OO9102",
 		marca: "Oakley",
@@ -906,7 +922,9 @@ export const INITIAL_FRAME_CATALOG: FrameCatalogItem[] = [
 	},
 	{
 		id: "frame_4",
+		codigo: "ARM-10003",
 		tipo: "RECEITUARIO",
+		tipoArmacao: "Acetato",
 		familia: "Elegance Cat-Eye",
 		produto: "Vogue VO5352G Tartaruga",
 		marca: "Vogue Eyewear",
@@ -920,7 +938,9 @@ export const INITIAL_FRAME_CATALOG: FrameCatalogItem[] = [
 	},
 	{
 		id: "frame_5",
+		codigo: "ARM-10004",
 		tipo: "RECEITUARIO",
+		tipoArmacao: "Metal",
 		familia: "Titanium Metal",
 		produto: "HB Metal Flex 0103 Grafite",
 		marca: "HB - Hot Buttered",
@@ -934,7 +954,9 @@ export const INITIAL_FRAME_CATALOG: FrameCatalogItem[] = [
 	},
 	{
 		id: "frame_6",
+		codigo: "ARM-10005",
 		tipo: "CLIP_ON",
+		tipoArmacao: "Fio de Aço",
 		familia: "Urban Versatile",
 		produto: "Colcci Clip-On Magnético C6120",
 		marca: "Colcci",
@@ -948,7 +970,9 @@ export const INITIAL_FRAME_CATALOG: FrameCatalogItem[] = [
 	},
 	{
 		id: "frame_7",
+		codigo: "ARM-10006",
 		tipo: "RECEITUARIO",
+		tipoArmacao: "Parafusado",
 		familia: "Delicate Nude",
 		produto: "Grazi Massafera GZ3074 Cristal Rose",
 		marca: "Grazi Massafera",
@@ -958,6 +982,128 @@ export const INITIAL_FRAME_CATALOG: FrameCatalogItem[] = [
 		fotoUrl: "https://images.unsplash.com/photo-1582142407894-ec85a1260a46?w=300&q=80",
 		estoque: 8,
 		preco: 490,
+		ativo: true,
+	},
+];
+
+// -------------------------------------------------------------
+// CATÁLOGO INICIAL DE TRATAMENTOS
+// -------------------------------------------------------------
+export const INITIAL_TREATMENT_CATALOG: import("./optical-types").TreatmentCatalogItem[] = [
+	{
+		id: "trat_1",
+		codigo: "TRAT-10001",
+		nome: "Crizal Rock",
+		marcaOuLab: "Essilor",
+		preco: 390,
+		custo: 160,
+		descricao: "Antirreflexo de máxima resistência a riscos e manchas",
+		ativo: true,
+	},
+	{
+		id: "trat_2",
+		codigo: "TRAT-10002",
+		nome: "Crizal Prevencia / Blue UV",
+		marcaOuLab: "Essilor",
+		preco: 450,
+		custo: 190,
+		descricao: "Filtro seletivo de luz azul-violeta nociva e proteção UV",
+		ativo: true,
+	},
+	{
+		id: "trat_3",
+		codigo: "TRAT-10003",
+		nome: "Hi-Vision LongLife BlueControl",
+		marcaOuLab: "Hoya",
+		preco: 440,
+		custo: 180,
+		descricao: "Tratamento ultradurável contra riscos com bloqueio de luz azul",
+		ativo: true,
+	},
+	{
+		id: "trat_4",
+		codigo: "TRAT-10004",
+		nome: "DuraVision Platinum",
+		marcaOuLab: "Zeiss",
+		preco: 480,
+		custo: 210,
+		descricao: "Tratamento de alta precisão com propriedades antiestáticas e hidrofóbicas",
+		ativo: true,
+	},
+	{
+		id: "trat_5",
+		codigo: "TRAT-10005",
+		nome: "Super Antirreflexo Hidrofóbico",
+		marcaOuLab: "Sorolab",
+		preco: 180,
+		custo: 60,
+		descricao: "Antirreflexo multicamadas com repelência a água e poeira",
+		ativo: true,
+	},
+	{
+		id: "trat_6",
+		codigo: "TRAT-10006",
+		nome: "Filtro Luz Azul Premium",
+		marcaOuLab: "Personality",
+		preco: 150,
+		custo: 50,
+		descricao: "Conforto visual para telas digitais e smartphones",
+		ativo: true,
+	},
+];
+
+// -------------------------------------------------------------
+// CATÁLOGO INICIAL DE SERVIÇOS ÓPTICOS
+// -------------------------------------------------------------
+export const INITIAL_SERVICE_CATALOG: import("./optical-types").OpticalServiceItem[] = [
+	{
+		id: "srv_1",
+		codigo: "SRV-10001",
+		nome: "Montagem Computadorizada em Aro Fechado",
+		categoria: "MONTAGEM",
+		preco: 60,
+		custo: 20,
+		descricao: "Corte e montagem biselada em faceta para armações de metal e acetato",
+		ativo: true,
+	},
+	{
+		id: "srv_2",
+		codigo: "SRV-10002",
+		nome: "Montagem Fio de Nylon (Ranho Especial)",
+		categoria: "MONTAGEM",
+		preco: 80,
+		custo: 30,
+		descricao: "Abertura de canalete e fixação com fio de nylon de alta tenacidade",
+		ativo: true,
+	},
+	{
+		id: "srv_3",
+		codigo: "SRV-10003",
+		nome: "Montagem Parafusada 3 Peças (Balgriff)",
+		categoria: "MONTAGEM",
+		preco: 120,
+		custo: 45,
+		descricao: "Furação de precisão milimétrica e buchas de fixação sem aro",
+		ativo: true,
+	},
+	{
+		id: "srv_4",
+		codigo: "SRV-10004",
+		nome: "Surfaçagem Digital Freeform",
+		categoria: "SURFACAGEM",
+		preco: 140,
+		custo: 55,
+		descricao: "Gerador digital ponto a ponto para curvas especiais e altas dioptrias",
+		ativo: true,
+	},
+	{
+		id: "srv_5",
+		codigo: "SRV-10005",
+		nome: "Coloração e Tonalização Solar UV400",
+		categoria: "COLORACAO",
+		preco: 90,
+		custo: 35,
+		descricao: "Banho térmico para tonalidade total ou degradê com proteção UVA/UVB",
 		ativo: true,
 	},
 ];

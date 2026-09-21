@@ -15,6 +15,7 @@ import Table from "@carbon/icons-react/es/Table";
 import Grid from "@carbon/icons-react/es/Grid";
 import ChevronLeft from "@carbon/icons-react/es/ChevronLeft";
 import ChevronRight from "@carbon/icons-react/es/ChevronRight";
+import MagicWand from "@carbon/icons-react/es/MagicWand";
 import { toast } from "sonner";
 import Glasses from "@crm/ui/components/icons/glasses";
 import {
@@ -30,6 +31,13 @@ import {
 } from "@/lib/optical/supabase-optical";
 import { MnocxCard } from "./mnocx-card";
 import { MnocxButton } from "./mnocx-button";
+import { Badge } from "@crm/ui/components/badge";
+import {
+	generateUniqueProductCode,
+	validateProductCodeUniqueness,
+	batchProcessProductCodes,
+	resolveCategoryPrefix,
+} from "@/lib/optical/product-code-engine";
 
 function parseDelimitedLine(line: string): string[] {
 	let delimiter = "\t";
@@ -92,7 +100,8 @@ export function OpticalFramesCatalogView() {
 	const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
 	const [editingItem, setEditingItem] = useState<FrameCatalogItem | null>(null);
 
-	// Formulário Manual
+	// Formulário Manual com Código Mandatório ("CPF do Produto")
+	const [formCodigo, setFormCodigo] = useState("");
 	const [formTipo, setFormTipo] = useState<FrameCategory>("RECEITUARIO");
 	const [formTipoArmacao, setFormTipoArmacao] = useState<string>("Metal");
 	const [formFamilia, setFormFamilia] = useState("");
@@ -142,6 +151,7 @@ export function OpticalFramesCatalogView() {
 		return frames.filter((item) => {
 			const matchesQuery =
 				!searchQuery ||
+				(item.codigo && item.codigo.toLowerCase().includes(searchQuery.toLowerCase())) ||
 				item.produto.toLowerCase().includes(searchQuery.toLowerCase()) ||
 				item.marca.toLowerCase().includes(searchQuery.toLowerCase()) ||
 				item.familia.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -171,6 +181,9 @@ export function OpticalFramesCatalogView() {
 
 	const handleOpenNew = () => {
 		setEditingItem(null);
+		const prefix = formTipo === "SOLAR" ? "SOL" : "ARM";
+		const autoCode = generateUniqueProductCode(prefix, frames.map((f) => f.codigo));
+		setFormCodigo(autoCode);
 		setFormTipo("RECEITUARIO");
 		setFormTipoArmacao(frameTypes.find((t) => t.ativo)?.nome || "Metal");
 		setFormFamilia("");
@@ -187,6 +200,7 @@ export function OpticalFramesCatalogView() {
 
 	const handleOpenEdit = (item: FrameCatalogItem) => {
 		setEditingItem(item);
+		setFormCodigo(item.codigo || "");
 		setFormTipo(item.tipo);
 		setFormTipoArmacao(item.tipoArmacao || frameTypes.find((t) => t.ativo)?.nome || "Metal");
 		setFormFamilia(item.familia);
@@ -203,8 +217,19 @@ export function OpticalFramesCatalogView() {
 
 	const handleSaveManual = async (e: React.FormEvent) => {
 		e.preventDefault();
+		const validation = validateProductCodeUniqueness(
+			formCodigo,
+			frames.map((f) => f.codigo),
+			editingItem?.codigo
+		);
+		if (!validation.isValid) {
+			toast.error(validation.error);
+			return;
+		}
+
 		const itemToSave: FrameCatalogItem = {
 			id: editingItem ? editingItem.id : `frame_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+			codigo: validation.normalizedCode,
 			tipo: formTipo,
 			tipoArmacao: formTipoArmacao,
 			familia: formFamilia.trim(),
@@ -254,40 +279,75 @@ export function OpticalFramesCatalogView() {
 				const parts = parseDelimitedLine(line);
 
 				if (parts.length >= 3) {
-					const rawTipo = (parts[0] || "RECEITUARIO").trim().toUpperCase();
+					let providedCode = "";
+					let rawTipo = "";
+					let familia = "";
+					let produto = "";
+					let marca = "";
+					let fabricante = "";
+					let aro = "52";
+					let ponte = "18";
+					let pPriceIdx = 7;
+					let pStockIdx = 8;
+					let pFotoIdx = 9;
+
+					const part0Upper = (parts[0] || "").trim().toUpperCase();
+					const part1Upper = (parts[1] || "").trim().toUpperCase();
+					const isPart0Type = part0Upper.includes("RECEIT") || part0Upper.includes("SOLAR") || part0Upper.includes("CLIP");
+					const isPart1Type = part1Upper.includes("RECEIT") || part1Upper.includes("SOLAR") || part1Upper.includes("CLIP");
+
+					if (!isPart0Type && isPart1Type) {
+						// Formato com Código: Código;Tipo;Família;Produto;Marca;Fabricante;Aro;Ponte;Preço;Estoque;Foto URL
+						providedCode = (parts[0] || "").trim().toUpperCase();
+						rawTipo = part1Upper;
+						familia = (parts[2] || "Geral").trim();
+						produto = (parts[3] || `Peça ${i + 1}`).trim();
+						marca = (parts[4] || "Nacional").trim();
+						fabricante = (parts[5] || marca).trim();
+						aro = (parts[6] || "52").trim();
+						ponte = (parts[7] || "18").trim();
+						pPriceIdx = 8;
+						pStockIdx = 9;
+						pFotoIdx = 10;
+					} else {
+						// Formato sem Código: Tipo;Família;Produto;Marca;Fabricante;Aro;Ponte;Preço;Estoque;Foto URL
+						rawTipo = part0Upper || "RECEITUARIO";
+						familia = (parts[1] || "Geral").trim();
+						produto = (parts[2] || `Peça ${i + 1}`).trim();
+						marca = (parts[3] || "Nacional").trim();
+						fabricante = (parts[4] || marca).trim();
+						aro = (parts[5] || "52").trim();
+						ponte = (parts[6] || "18").trim();
+						pPriceIdx = 7;
+						pStockIdx = 8;
+						pFotoIdx = 9;
+					}
+
 					let validTipo: FrameCategory = "RECEITUARIO";
 					if (rawTipo.includes("SOL")) validTipo = "SOLAR";
 					else if (rawTipo.includes("CLIP")) validTipo = "CLIP_ON";
-
-					const familia = (parts[1] || "Geral").trim();
-					const produto = (parts[2] || `Peça ${i + 1}`).trim();
-					const marca = (parts[3] || "Nacional").trim();
-					const fabricante = (parts[4] || marca).trim();
-					const aro = (parts[5] || "52").trim();
-					const ponte = (parts[6] || "18").trim();
 
 					let preco = 250;
 					let estoque = 1;
 					let fotoUrl: string | undefined = undefined;
 
-					const p7 = parts[7];
-					const p8 = parts[8];
-					const p9 = parts[9];
+					const pPreco = parts[pPriceIdx];
+					const pEstoque = parts[pStockIdx];
+					const pFoto = parts[pFotoIdx];
 
-					if (p7 && p7.startsWith("http")) {
-						// Ordem legada: FotoUrl na col 7, Estoque na 8, Preço na 9
-						fotoUrl = p7.trim();
-						estoque = p8 ? parseInt(p8.trim(), 10) || 1 : 1;
-						preco = parseNumericField(p9, 250);
+					if (pPreco && pPreco.startsWith("http")) {
+						fotoUrl = pPreco.trim();
+						estoque = pEstoque ? parseInt(pEstoque.trim(), 10) || 1 : 1;
+						preco = parseNumericField(pFoto, 250);
 					} else {
-						// Ordem padrão: Preço na col 7, Estoque na 8, FotoUrl na 9
-						preco = parseNumericField(p7, 250);
-						estoque = p8 ? parseInt(p8.trim(), 10) || 1 : 1;
-						fotoUrl = p9 && p9.trim() ? p9.trim() : undefined;
+						preco = parseNumericField(pPreco, 250);
+						estoque = pEstoque ? parseInt(pEstoque.trim(), 10) || 1 : 1;
+						fotoUrl = pFoto && pFoto.trim() ? pFoto.trim() : undefined;
 					}
 
 					parsed.push({
 						id: `bframe_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 5)}`,
+						codigo: providedCode,
 						tipo: validTipo,
 						familia,
 						produto,
@@ -304,10 +364,11 @@ export function OpticalFramesCatalogView() {
 				}
 			}
 
-			if (parsed.length === 0) {
+			const withCodes = batchProcessProductCodes(parsed, "ARM", frames.map((f) => f.codigo));
+			if (withCodes.length === 0) {
 				setBatchError("Nenhuma linha de armação válida detectada no arquivo ou texto.");
 			}
-			setBatchPreview(parsed);
+			setBatchPreview(withCodes);
 		} catch (err: any) {
 			setBatchError("Erro ao interpretar texto/CSV: " + (err.message || String(err)));
 		}
@@ -341,13 +402,13 @@ export function OpticalFramesCatalogView() {
 	};
 
 	const handleDownloadFrameTemplate = () => {
-		const headers = "Tipo;Família;Produto;Marca;Fabricante;Aro;Ponte;Preço;Estoque;Foto URL\n";
+		const headers = "Código;Tipo;Família;Produto;Marca;Fabricante;Aro;Ponte;Preço;Estoque;Foto URL\n";
 		const rows = [
-			"RECEITUARIO;Acetato Classic;RB5228 Wayfarer;Ray-Ban;Luxottica;53;18;790;12;https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=300",
-			"SOLAR;Metal Aviator;RB3025 Polarized;Ray-Ban;Luxottica;58;14;950;8;https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=300",
-			"RECEITUARIO;Titanium Tech;OAK-8025 Titanium;Oakley;Luxottica;55;17;890;5;https://images.unsplash.com/photo-1591076482161-42ce6da69f67?w=300",
-			"RECEITUARIO;Fashion CatEye;MK-3015 Rose Gold;Michael Kors;Marchon;52;16;720;7;https://images.unsplash.com/photo-1577803645773-f96470509666?w=300",
-			"SOLAR;Sport Wrap;Flak 2.0 XL Prizm;Oakley;Luxottica;59;12;820;15;https://images.unsplash.com/photo-1508296695146-257a814070b4?w=300",
+			"ARM-10001;RECEITUARIO;Acetato Classic;RB5228 Wayfarer;Ray-Ban;Luxottica;53;18;790;12;https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=300",
+			"SOL-10001;SOLAR;Metal Aviator;RB3025 Polarized;Ray-Ban;Luxottica;58;14;950;8;https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=300",
+			"ARM-10002;RECEITUARIO;Titanium Tech;OAK-8025 Titanium;Oakley;Luxottica;55;17;890;5;https://images.unsplash.com/photo-1591076482161-42ce6da69f67?w=300",
+			"ARM-10003;RECEITUARIO;Fashion CatEye;MK-3015 Rose Gold;Michael Kors;Marchon;52;16;720;7;https://images.unsplash.com/photo-1577803645773-f96470509666?w=300",
+			"SOL-10002;SOLAR;Sport Wrap;Flak 2.0 XL Prizm;Oakley;Luxottica;59;12;820;15;https://images.unsplash.com/photo-1508296695146-257a814070b4?w=300",
 		].join("\n");
 
 		const csvContent = "\uFEFF" + headers + rows;
@@ -600,6 +661,7 @@ export function OpticalFramesCatalogView() {
 							<thead>
 								<tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-800/40 text-zinc-500 dark:text-zinc-400 font-semibold">
 									<th className="py-2.5 px-3 text-left w-14">Foto</th>
+									<th className="py-2.5 px-3 text-left font-mono">Código (CPF)</th>
 									<th className="py-2.5 px-3 text-left">Produto / Modelo</th>
 									<th className="py-2.5 px-3 text-left">Marca / Fabricante</th>
 									<th className="py-2.5 px-3 text-left">Tipo</th>
@@ -613,7 +675,7 @@ export function OpticalFramesCatalogView() {
 							<tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
 								{paginatedFrames.length === 0 ? (
 									<tr>
-										<td colSpan={9} className="py-8 text-center text-zinc-400">
+										<td colSpan={10} className="py-8 text-center text-zinc-400">
 											Nenhuma peça encontrada com os filtros selecionados.
 										</td>
 									</tr>
@@ -640,6 +702,13 @@ export function OpticalFramesCatalogView() {
 														)}
 													</div>
 												)}
+											</td>
+
+											{/* Código Mandatório ("CPF do Produto") */}
+											<td className="py-2 px-3 text-left">
+												<span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800 tracking-wider">
+													{frame.codigo}
+												</span>
 											</td>
 
 											{/* Produto / Modelo */}
@@ -867,8 +936,13 @@ export function OpticalFramesCatalogView() {
 
 									<div className="p-4 space-y-3">
 										<div>
-											<div className="text-[11px] font-semibold tracking-wide uppercase text-zinc-400">
-												{frame.marca} &bull; {frame.fabricante}
+											<div className="flex items-center justify-between gap-1 mb-1">
+												<span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800">
+													{frame.codigo}
+												</span>
+												<div className="text-[11px] font-semibold tracking-wide uppercase text-zinc-400 truncate">
+													{frame.marca} &bull; {frame.fabricante}
+												</div>
 											</div>
 											<h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 leading-snug">
 												{frame.produto}
@@ -1008,6 +1082,42 @@ export function OpticalFramesCatalogView() {
 						</div>
 
 						<form onSubmit={handleSaveManual} className="p-5 space-y-4">
+							{/* Código Mandatório do Produto ("CPF do Produto") */}
+							<div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 space-y-1.5">
+								<div className="flex items-center justify-between">
+									<label className="text-xs font-bold text-blue-900 dark:text-blue-100 flex items-center gap-1.5">
+										<span>Código Mandatório ("CPF do Produto") *</span>
+										<span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-200/70 dark:bg-blue-900 text-blue-800 dark:text-blue-200 uppercase font-semibold">
+											Único & Anti-Duplicidade
+										</span>
+									</label>
+									<button
+										type="button"
+										onClick={() => {
+											const prefix = formTipo === "SOLAR" ? "SOL" : "ARM";
+											const autoCode = generateUniqueProductCode(prefix, frames.map((f) => f.codigo));
+											setFormCodigo(autoCode);
+											toast.info(`Código único ${autoCode} gerado pelo sistema!`);
+										}}
+										className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 dark:text-blue-300 hover:underline cursor-pointer"
+									>
+										<MagicWand className="size-3" />
+										Gerar Código
+									</button>
+								</div>
+								<input
+									type="text"
+									required
+									placeholder="Ex: ARM-10001 ou código de barras/SKU"
+									value={formCodigo}
+									onChange={(e) => setFormCodigo(e.target.value.toUpperCase())}
+									className="w-full text-xs p-2 rounded-xl bg-white dark:bg-zinc-800 border border-blue-300 dark:border-blue-700 text-blue-900 dark:text-blue-100 font-mono font-bold tracking-wider uppercase focus:outline-none focus:ring-2 focus:ring-blue-500"
+								/>
+								<p className="text-[10px] text-blue-600 dark:text-blue-400">
+									Identificador único mandatório. Não pode se repetir em nenhum produto do sistema.
+								</p>
+							</div>
+
 							<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
 								<div>
 									<label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-400 mb-1">
@@ -1278,6 +1388,7 @@ export function OpticalFramesCatalogView() {
 										<table className="w-full text-left text-[11px]">
 											<thead className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 sticky top-0">
 												<tr>
+													<th className="p-2 font-mono">Código (CPF)</th>
 													<th className="p-2">Produto</th>
 													<th className="p-2">Marca</th>
 													<th className="p-2">Tipo</th>
@@ -1290,6 +1401,9 @@ export function OpticalFramesCatalogView() {
 											<tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
 												{batchPreview.map((item, idx) => (
 													<tr key={idx}>
+														<td className="p-2 font-mono font-bold text-blue-600 dark:text-blue-400">
+															{item.codigo}
+														</td>
 														<td className="p-2 font-medium">{item.produto}</td>
 														<td className="p-2">{item.marca}</td>
 														<td className="p-2">{item.tipo}</td>

@@ -478,8 +478,8 @@ export function OpticalSalesPerformanceView() {
 						</div>
 					</div>
 
-				{/* Cards de Vendedores: Todos em layout horizontal contínuo de ponta a ponta na mesma linha */}
-				<div className="flex flex-col gap-3.5 w-full">
+				{/* Cards de Vendedores: Todos os cards alinhados rigorosamente lado a lado na mesma linha horizontal */}
+				<div className="flex flex-row overflow-x-auto gap-3.5 w-full items-stretch pb-2.5 scrollbar-thin">
 					{sellerPerformance.map((seller) => {
 						// Salesforce Status colors & badge
 						const isAhead = seller.pacePct >= 105;
@@ -491,173 +491,141 @@ export function OpticalSalesPerformanceView() {
 								key={seller.id}
 								variant="info"
 								padding="sm"
-								className="relative overflow-hidden w-full shadow-xs bg-white dark:bg-zinc-850 border border-zinc-200/90 dark:border-zinc-800"
+								className="relative overflow-hidden flex-1 min-w-[310px] max-w-[400px] shrink-0 xl:shrink shadow-xs bg-white dark:bg-zinc-850 border border-zinc-200/90 dark:border-zinc-800 flex flex-col justify-between"
 							>
-								{/* Linha Contínua Horizontal de Ponta a Ponta em Grid de 12 Colunas */}
-								<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 items-stretch p-2.5 w-full">
-									{/* Bloco 1: Perfil do Vendedor, Loja e Ação de Edição (2 colunas) */}
-									<div className="lg:col-span-2 min-w-0 flex items-center justify-between gap-2 bg-zinc-50/90 dark:bg-zinc-900/70 p-2.5 rounded-xl border border-zinc-200/80 dark:border-zinc-800">
-										<div className="flex items-center gap-2 min-w-0">
-											<div className="flex size-8 items-center justify-center rounded-lg bg-zinc-800 text-white font-bold shrink-0 shadow-xs">
-												<Icon icon={UserAvatar} className="size-4" />
-											</div>
-											<div className="min-w-0">
-												<h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
-													{seller.nome}
-												</h3>
-												<span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono block truncate">
-													{seller.osCount} OSs • {seller.loja}
-												</span>
-											</div>
+								{/* 1. Topo: Identificação do Vendedor + Badge de Ritmo + Botão Editar */}
+								<div className="flex items-center justify-between gap-2 bg-zinc-50/90 dark:bg-zinc-900/70 p-2.5 rounded-xl border border-zinc-200/80 dark:border-zinc-800">
+									<div className="flex items-center gap-2 min-w-0">
+										<div className="flex size-7 items-center justify-center rounded-lg bg-zinc-800 text-white font-bold shrink-0 shadow-xs">
+											<Icon icon={UserAvatar} className="size-3.5" />
 										</div>
+										<div className="min-w-0">
+											<h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
+												{seller.nome}
+											</h3>
+											<span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono block truncate">
+												{seller.osCount} OSs • {seller.loja}
+											</span>
+										</div>
+									</div>
 
+									<div className="flex items-center gap-1 shrink-0">
+										{isAhead && (
+											<span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 whitespace-nowrap">
+												🚀 {seller.paceMultiplier.toFixed(1)}x
+											</span>
+										)}
+										{isOnTrack && (
+											<span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20 whitespace-nowrap">
+												🎯 {seller.paceMultiplier.toFixed(1)}x
+											</span>
+										)}
+										{isBehind && (
+											<span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20 whitespace-nowrap">
+												⚠️ {seller.paceMultiplier.toFixed(1)}x
+											</span>
+										)}
 										<button
 											type="button"
 											onClick={() => handleOpenEditSeller(seller)}
-											className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 cursor-pointer transition-colors shrink-0"
+											className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
 											title="Editar metas do vendedor"
 										>
 											<Icon icon={Edit} className="size-3.5" />
 										</button>
 									</div>
+								</div>
 
-									{/* Bloco 2: Velocímetro Power BI Compacto + Badge de Pace (2 colunas) */}
-									<div className="lg:col-span-2 min-w-0 flex flex-col items-center justify-center bg-zinc-50/60 dark:bg-zinc-900/40 p-2 rounded-xl border border-zinc-200/60 dark:border-zinc-800/80">
-										<div className="scale-95 origin-center -my-1">
-											<SpeedometerGauge
-												size="xs"
-												value={seller.totalRealizado}
-												max={seller.metaMes}
-												target={seller.metaEsperadaHoje}
-											/>
+								{/* 2. Centro: Velocímetro Power BI Compacto */}
+								<div className="my-2 flex flex-col items-center justify-center bg-zinc-50/60 dark:bg-zinc-900/40 py-1 px-2 rounded-xl border border-zinc-200/60 dark:border-zinc-800/80">
+									<div className="scale-90 origin-center -my-2">
+										<SpeedometerGauge
+											size="xs"
+											value={seller.totalRealizado}
+											max={seller.metaMes}
+											target={seller.metaEsperadaHoje}
+										/>
+									</div>
+								</div>
+
+								{/* 3. Faturamento Mês vs Meta com Barra de Progresso */}
+								<div className="p-2.5 rounded-xl bg-zinc-50/70 dark:bg-zinc-900/50 border border-zinc-200/80 dark:border-zinc-800 flex flex-col gap-1 mb-2">
+									<div className="flex items-center justify-between text-xs">
+										<span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+											Faturamento Mês
+										</span>
+										<Badge
+											variant="outline"
+											className={`text-[9px] font-bold font-mono px-1.5 py-0 ${
+												seller.pctAtingidoMes >= 100
+													? "text-emerald-700 bg-emerald-50 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-400"
+													: "text-zinc-700 bg-zinc-100 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300"
+											}`}
+										>
+											{seller.pctAtingidoMes.toFixed(1)}%
+										</Badge>
+									</div>
+									<div className="flex items-baseline justify-between">
+										<span className="text-base font-bold font-mono text-zinc-900 dark:text-zinc-100 truncate">
+											{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(seller.totalRealizado)}
+										</span>
+										<span className="text-[10px] text-zinc-500 font-mono shrink-0">
+											Meta: {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(seller.metaMes)}
+										</span>
+									</div>
+									<div className="w-full bg-zinc-200 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+										<div
+											className={`h-full rounded-full transition-all duration-300 ${
+												seller.pctAtingidoMes >= 100
+													? "bg-emerald-500"
+													: isAhead
+														? "bg-blue-500"
+														: isBehind
+															? "bg-amber-500"
+															: "bg-primary"
+											}`}
+											style={{ width: `${Math.min(100, seller.pctAtingidoMes)}%` }}
+										/>
+									</div>
+								</div>
+
+								{/* 4. Base: Tripla métrica compacta em grid de 3 colunas */}
+								<div className="grid grid-cols-3 gap-1.5">
+									{/* Meta Diária */}
+									<div className="p-2 rounded-xl bg-zinc-50/70 dark:bg-zinc-900/50 border border-zinc-200/80 dark:border-zinc-800 flex flex-col justify-between">
+										<span className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider">Diária</span>
+										<div className="text-xs font-bold font-mono text-blue-700 dark:text-blue-400 truncate">
+											{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(seller.metaDiariaNecessaria)}
 										</div>
-										<div className="mt-1">
-											{isAhead && (
-												<span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 whitespace-nowrap">
-													🚀 {seller.paceMultiplier.toFixed(1)}x Acima
-												</span>
-											)}
-											{isOnTrack && (
-												<span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20 whitespace-nowrap">
-													🎯 {seller.paceMultiplier.toFixed(1)}x No Ritmo
-												</span>
-											)}
-											{isBehind && (
-												<span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20 whitespace-nowrap">
-													⚠️ {seller.paceMultiplier.toFixed(1)}x Abaixo
-												</span>
-											)}
-										</div>
+										<span className="text-[8px] text-zinc-400 font-mono">{diasRestantes}d úteis</span>
 									</div>
 
-									{/* Bloco 3: Faturamento do Mês vs Meta com Barra de Progresso Horizontal Ampla (3 colunas) */}
-									<div className="lg:col-span-3 min-w-0 p-2.5 rounded-xl bg-zinc-50/70 dark:bg-zinc-900/50 border border-zinc-200/80 dark:border-zinc-800 flex flex-col justify-between">
-										<div className="flex items-center justify-between gap-2 text-xs">
-											<span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-												Faturamento no Mês
-											</span>
-											<Badge
-												variant="outline"
-												className={`text-[9px] font-bold font-mono px-1.5 py-0 ${
-													seller.pctAtingidoMes >= 100
-														? "text-emerald-700 bg-emerald-50 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-400"
-														: "text-zinc-700 bg-zinc-100 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300"
-												}`}
-											>
-												{seller.pctAtingidoMes.toFixed(1)}% da Meta
-											</Badge>
+									{/* Meta Semana */}
+									<div className="p-2 rounded-xl bg-zinc-50/70 dark:bg-zinc-900/50 border border-zinc-200/80 dark:border-zinc-800 flex flex-col justify-between">
+										<span className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider truncate">Semana</span>
+										<div className="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 truncate">
+											{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(seller.vendasSemana)}
 										</div>
-										<div className="flex items-baseline justify-between mt-1">
-											<span className="text-lg font-bold font-mono text-zinc-900 dark:text-zinc-100 truncate">
-												{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(seller.totalRealizado)}
-											</span>
-											<span className="text-[11px] text-zinc-500 font-mono shrink-0">
-												Meta: {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(seller.metaMes)}
-											</span>
-										</div>
-										{/* Barra de Progresso */}
-										<div className="w-full bg-zinc-200 dark:bg-zinc-800 h-1.5 rounded-full mt-1.5 overflow-hidden">
-											<div
-												className={`h-full rounded-full transition-all duration-300 ${
-													seller.pctAtingidoMes >= 100
-														? "bg-emerald-500"
-														: isAhead
-															? "bg-blue-500"
-															: isBehind
-																? "bg-amber-500"
-																: "bg-primary"
-												}`}
-												style={{ width: `${Math.min(100, seller.pctAtingidoMes)}%` }}
-											/>
-										</div>
+										<span className="text-[8px] text-zinc-400 font-mono truncate">
+											/ {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(seller.metaSemana)}
+										</span>
 									</div>
 
-									{/* Bloco 4: Meta Diária Necessária (2 colunas) */}
-									<div className="lg:col-span-2 min-w-0 p-2.5 rounded-xl bg-zinc-50/70 dark:bg-zinc-900/50 border border-zinc-200/80 dark:border-zinc-800 flex flex-col justify-between">
-										<div className="flex items-center justify-between text-[10px] text-zinc-500">
-											<span className="font-semibold uppercase tracking-wider">Meta Diária</span>
-											<span className="text-[9px] text-zinc-400 font-medium">{diasRestantes}d úteis</span>
-										</div>
-										<div className="text-sm font-bold font-mono text-blue-700 dark:text-blue-400 my-0.5 truncate">
-											{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(seller.metaDiariaNecessaria)}
-											<span className="text-xs font-normal text-zinc-400">/dia</span>
-										</div>
-										<div className="text-[9px] text-zinc-500 font-mono pt-1 border-t border-zinc-200 dark:border-zinc-800 flex justify-between">
-											<span>Falta:</span>
-											<span className="font-semibold text-zinc-700 dark:text-zinc-300">
-												{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Math.max(0, seller.metaMes - seller.totalRealizado))}
-											</span>
-										</div>
-									</div>
-
-									{/* Bloco 5: Meta da Semana (1 coluna) */}
-									<div className="lg:col-span-1 min-w-0 p-2.5 rounded-xl bg-zinc-50/70 dark:bg-zinc-900/50 border border-zinc-200/80 dark:border-zinc-800 flex flex-col justify-between">
-										<div className="flex items-center justify-between text-[10px] text-zinc-500">
-											<span className="font-semibold uppercase tracking-wider truncate">Semana</span>
-											<span className="text-[9px] text-zinc-400 font-medium shrink-0">6d</span>
-										</div>
-										<div className="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 my-0.5 truncate">
-											{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(seller.metaSemana)}
-										</div>
-										<div className="text-[9px] text-zinc-500 font-mono pt-1 border-t border-zinc-200 dark:border-zinc-800 flex justify-between">
-											<span>Vendas:</span>
-											<span className="font-semibold text-zinc-700 dark:text-zinc-300 truncate">
-												{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(seller.vendasSemana)}
-											</span>
-										</div>
-									</div>
-
-									{/* Bloco 6: Prêmio da Semana (2 colunas) */}
+									{/* Prêmio Semana */}
 									<div
-										className={`lg:col-span-2 min-w-0 p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-colors ${
+										className={`p-2 rounded-xl border flex flex-col justify-between transition-colors ${
 											seller.atingiuPremioSemana
 												? "bg-amber-500/10 border-amber-500/30 text-amber-950 dark:text-amber-200"
 												: "bg-zinc-50/70 dark:bg-zinc-900/50 border-zinc-200/80 dark:border-zinc-800"
 										}`}
 									>
-										<div className="flex items-center gap-2 min-w-0">
-											<div className={`p-1.5 rounded-lg shrink-0 ${seller.atingiuPremioSemana ? "bg-amber-500/20 text-amber-600" : "bg-zinc-200/70 dark:bg-zinc-800 text-zinc-400"}`}>
-												<Icon icon={Trophy} className="size-3.5" />
-											</div>
-											<div className="min-w-0">
-												<span className="text-[9px] font-bold uppercase tracking-wider block text-zinc-500 dark:text-zinc-400 truncate">
-													Prêmio Semana
-												</span>
-												<span className="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 block truncate">
-													{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(seller.premioSemana)}
-												</span>
-												<Badge
-													variant={seller.atingiuPremioSemana ? "default" : "outline"}
-													className={`text-[8px] font-bold px-1 py-0 mt-0.5 ${
-														seller.atingiuPremioSemana
-															? "bg-emerald-600 text-white"
-															: "text-zinc-500 border-zinc-300 dark:border-zinc-700"
-													}`}
-												>
-													{seller.atingiuPremioSemana ? "✓ Qualificado" : "Em disputa"}
-												</Badge>
-											</div>
+										<span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 truncate">Prêmio</span>
+										<div className="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 truncate">
+											{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(seller.premioSemana)}
 										</div>
+										<span className="text-[8px] font-bold">
+											{seller.atingiuPremioSemana ? "✓ Ganho" : "Pendente"}
+										</span>
 									</div>
 								</div>
 							</MnocxCard>

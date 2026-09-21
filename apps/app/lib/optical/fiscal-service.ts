@@ -66,6 +66,20 @@ export interface ExportBatchOptions {
 	includePending?: boolean;
 }
 
+export interface FiscalProductItem {
+	itemIndex: number;
+	cProd: string; // Código Mandatório do Produto ("CPF do Produto")
+	cEAN: string; // Código de barras EAN ou "SEM GTIN"
+	xProd: string; // Descrição dos produtos / serviços
+	ncm: string; // NCM Fiscal
+	cfop: FiscalCFOP;
+	uCom: string; // UN, PAR
+	qCom: number; // Quantidade
+	vUnCom: number; // Valor Unitário
+	vProd: number; // Valor Total do Item
+	category: "ARMACAO" | "LENTE" | "TRATAMENTO" | "SERVICO";
+}
+
 // ----------------------------------------------------------------------
 // TABELA IBGE DE CÓDIGOS DE UF (SEFAZ)
 // ----------------------------------------------------------------------
@@ -583,7 +597,175 @@ export function exportMonthlyAccountingCsv(
 }
 
 /**
- * Exporta lote mensal no formato XML contábil padrão.
+ * Extrai todos os itens de produtos e serviços de uma OS para escrituração e emissão fiscal SEFAZ.
+ * Mapeia o código mandatório ("CPF do Produto") de armações, solares, lentes e tratamentos
+ * diretamente para a tag obrigatória <cProd> da NF-e / NFC-e.
+ */
+export function extractFiscalProductItems(
+	order: OpticalOrder,
+	cfop: FiscalCFOP = "5.102",
+): FiscalProductItem[] {
+	const items: FiscalProductItem[] = [];
+	let index = 1;
+
+	// Aro 1 - Armação
+	if (order.aro1 && (Number(order.aro1.framePrice) > 0 || order.aro1.frameCode)) {
+		items.push({
+			itemIndex: index++,
+			cProd: order.aro1.frameCode || "ARM-10001",
+			cEAN: "SEM GTIN",
+			xProd: `ARMACAO ${order.aro1.frameBrand || ""} ${order.aro1.frameModel || ""}`.trim(),
+			ncm: "9003.11.00",
+			cfop,
+			uCom: "UN",
+			qCom: 1,
+			vUnCom: Number(order.aro1.framePrice) || 0,
+			vProd: Number(order.aro1.framePrice) || 0,
+			category: "ARMACAO",
+		});
+	}
+
+	// Aro 1 - Lente
+	if (order.aro1 && (Number(order.aro1.lensPrice) > 0 || order.aro1.lensCode)) {
+		items.push({
+			itemIndex: index++,
+			cProd: order.aro1.lensCode || "LEN-10001",
+			cEAN: "SEM GTIN",
+			xProd: `LENTE ${order.aro1.lensName || "OFTALMICA"} ${order.aro1.lab ? `(${order.aro1.lab})` : ""}`.trim(),
+			ncm: "9001.50.00",
+			cfop,
+			uCom: "PAR",
+			qCom: order.aro1.quantity || 1,
+			vUnCom: Number(order.aro1.lensPrice) || 0,
+			vProd: Number(order.aro1.lensPrice) || 0,
+			category: "LENTE",
+		});
+	}
+
+	// Aro 1 - Tratamento
+	if (order.aro1 && !order.aro1.noTreatment && (Number(order.aro1.treatmentPrice) > 0 || order.aro1.treatmentCode)) {
+		items.push({
+			itemIndex: index++,
+			cProd: order.aro1.treatmentCode || "TRAT-10001",
+			cEAN: "SEM GTIN",
+			xProd: `TRATAMENTO ${order.aro1.treatment || "ANTIRREFLEXO"}`.trim(),
+			ncm: "9001.50.00",
+			cfop,
+			uCom: "UN",
+			qCom: 1,
+			vUnCom: Number(order.aro1.treatmentPrice) || 0,
+			vProd: Number(order.aro1.treatmentPrice) || 0,
+			category: "TRATAMENTO",
+		});
+	}
+
+	// Aro 2 - Armação
+	if (order.hasAro2 && order.aro2 && (Number(order.aro2.framePrice) > 0 || order.aro2.frameCode)) {
+		items.push({
+			itemIndex: index++,
+			cProd: order.aro2.frameCode || "ARM-10002",
+			cEAN: "SEM GTIN",
+			xProd: `ARMACAO 2 ${order.aro2.frameBrand || ""} ${order.aro2.frameModel || ""}`.trim(),
+			ncm: "9003.11.00",
+			cfop,
+			uCom: "UN",
+			qCom: 1,
+			vUnCom: Number(order.aro2.framePrice) || 0,
+			vProd: Number(order.aro2.framePrice) || 0,
+			category: "ARMACAO",
+		});
+	}
+
+	// Aro 2 - Lente
+	if (order.hasAro2 && order.aro2 && (Number(order.aro2.lensPrice) > 0 || order.aro2.lensCode)) {
+		items.push({
+			itemIndex: index++,
+			cProd: order.aro2.lensCode || "LEN-10002",
+			cEAN: "SEM GTIN",
+			xProd: `LENTE 2 ${order.aro2.lensName || "OFTALMICA"} ${order.aro2.lab ? `(${order.aro2.lab})` : ""}`.trim(),
+			ncm: "9001.50.00",
+			cfop,
+			uCom: "PAR",
+			qCom: order.aro2.quantity || 1,
+			vUnCom: Number(order.aro2.lensPrice) || 0,
+			vProd: Number(order.aro2.lensPrice) || 0,
+			category: "LENTE",
+		});
+	}
+
+	// Aro 2 - Tratamento
+	if (order.hasAro2 && order.aro2 && !order.aro2.noTreatment && (Number(order.aro2.treatmentPrice) > 0 || order.aro2.treatmentCode)) {
+		items.push({
+			itemIndex: index++,
+			cProd: order.aro2.treatmentCode || "TRAT-10002",
+			cEAN: "SEM GTIN",
+			xProd: `TRATAMENTO 2 ${order.aro2.treatment || "ANTIRREFLEXO"}`.trim(),
+			ncm: "9001.50.00",
+			cfop,
+			uCom: "UN",
+			qCom: 1,
+			vUnCom: Number(order.aro2.treatmentPrice) || 0,
+			vProd: Number(order.aro2.treatmentPrice) || 0,
+			category: "TRATAMENTO",
+		});
+	}
+
+	// Fallback genérico se nada estiver preenchido
+	if (items.length === 0) {
+		const total = Number(order.financials?.totalAmount || 0);
+		items.push({
+			itemIndex: 1,
+			cProd: "SRV-10001",
+			cEAN: "SEM GTIN",
+			xProd: `PRODUTOS E SERVICOS OPTICOS - OS ${order.orderNumber || order.id}`,
+			ncm: "9001.50.00",
+			cfop,
+			uCom: "UN",
+			qCom: 1,
+			vUnCom: total,
+			vProd: total,
+			category: "SERVICO",
+		});
+	}
+
+	return items;
+}
+
+/**
+ * Gera os blocos <det> XML da NF-e / NFC-e no layout oficial SEFAZ,
+ * mapeando o código mandatório do produto para a tag <cProd>.
+ */
+export function generateSefazDetXml(
+	order: OpticalOrder,
+	cfop: FiscalCFOP = "5.102",
+): string {
+	const items = extractFiscalProductItems(order, cfop);
+	return items
+		.map((it) => {
+			return `      <det nItem="${it.itemIndex}">
+        <prod>
+          <cProd>${it.cProd}</cProd>
+          <cEAN>${it.cEAN}</cEAN>
+          <xProd>${it.xProd}</xProd>
+          <NCM>${it.ncm}</NCM>
+          <CFOP>${it.cfop}</CFOP>
+          <uCom>${it.uCom}</uCom>
+          <qCom>${it.qCom.toFixed(4)}</qCom>
+          <vUnCom>${it.vUnCom.toFixed(2)}</vUnCom>
+          <vProd>${it.vProd.toFixed(2)}</vProd>
+          <cEANTrib>${it.cEAN}</cEANTrib>
+          <uTrib>${it.uCom}</uTrib>
+          <qTrib>${it.qCom.toFixed(4)}</qTrib>
+          <vUnTrib>${it.vUnCom.toFixed(2)}</vUnTrib>
+          <indTot>1</indTot>
+        </prod>
+      </det>`;
+		})
+		.join("\n");
+}
+
+/**
+ * Exporta lote mensal no formato XML contábil padrão com blocos de itens SEFAZ.
  */
 export function exportMonthlyAccountingXml(
 	orders: OpticalOrder[],
@@ -596,6 +778,7 @@ export function exportMonthlyAccountingXml(
 	const itemsXml = filtered
 		.map((order) => {
 			const rec = toAccountingRecord(order);
+			const detXml = generateSefazDetXml(order, rec.cfop as FiscalCFOP);
 			return `  <notaFiscal>
     <data>${rec.data}</data>
     <os>${rec.os}</os>
@@ -610,6 +793,9 @@ export function exportMonthlyAccountingXml(
     <cofins>${rec.cofins}</cofins>
     <cfop>${rec.cfop}</cfop>
     <status>${rec.status}</status>
+    <itens>
+${detXml}
+    </itens>
   </notaFiscal>`;
 		})
 		.join("\n");

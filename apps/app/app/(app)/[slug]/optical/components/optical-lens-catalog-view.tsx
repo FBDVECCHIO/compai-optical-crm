@@ -23,6 +23,11 @@ import {
 	saveLensCatalogItem,
 	importLensCatalogBatch,
 } from "@/lib/optical/supabase-optical";
+import {
+	generateUniqueProductCode,
+	validateProductCodeUniqueness,
+	batchProcessProductCodes,
+} from "@/lib/optical/product-code-engine";
 import { MnocxCard } from "./mnocx-card";
 import { MnocxButton } from "./mnocx-button";
 
@@ -84,7 +89,8 @@ export function OpticalLensCatalogView() {
 	const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
 	const [editingItem, setEditingItem] = useState<LensCatalogItem | null>(null);
 
-	// Formulário Manual
+	// Formulário Manual com Código Mandatório ("CPF do Produto")
+	const [formCodigo, setFormCodigo] = useState("");
 	const [formTipo, setFormTipo] = useState<LensCategory>("MULTIFOCAL");
 	const [formFamilia, setFormFamilia] = useState("");
 	const [formProduto, setFormProduto] = useState("");
@@ -136,6 +142,7 @@ export function OpticalLensCatalogView() {
 		return lenses.filter((item) => {
 			const matchesQuery =
 				!searchQuery ||
+				(item.codigo && item.codigo.toLowerCase().includes(searchQuery.toLowerCase())) ||
 				item.produto.toLowerCase().includes(searchQuery.toLowerCase()) ||
 				item.familia.toLowerCase().includes(searchQuery.toLowerCase()) ||
 				item.laboratorio.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -159,6 +166,8 @@ export function OpticalLensCatalogView() {
 
 	const handleOpenNew = () => {
 		setEditingItem(null);
+		const autoCode = generateUniqueProductCode("LEN", lenses.map((l) => l.codigo));
+		setFormCodigo(autoCode);
 		setFormTipo("MULTIFOCAL");
 		setFormFamilia("");
 		setFormProduto("");
@@ -173,6 +182,7 @@ export function OpticalLensCatalogView() {
 
 	const handleOpenEdit = (item: LensCatalogItem) => {
 		setEditingItem(item);
+		setFormCodigo(item.codigo || generateUniqueProductCode("LEN", lenses.map((l) => l.codigo)));
 		setFormTipo(item.tipo);
 		setFormFamilia(item.familia);
 		setFormProduto(item.produto);
@@ -187,8 +197,19 @@ export function OpticalLensCatalogView() {
 
 	const handleSaveManual = async (e: React.FormEvent) => {
 		e.preventDefault();
+		const validation = validateProductCodeUniqueness(
+			formCodigo,
+			lenses.map((l) => l.codigo),
+			editingItem?.codigo
+		);
+		if (!validation.isValid) {
+			toast.error(validation.error);
+			return;
+		}
+
 		const itemToSave: LensCatalogItem = {
 			id: editingItem ? editingItem.id : `lens_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+			codigo: validation.normalizedCode,
 			tipo: formTipo,
 			familia: formFamilia.trim(),
 			produto: formProduto.trim(),
@@ -236,23 +257,55 @@ export function OpticalLensCatalogView() {
 				const parts = parseDelimitedLine(line);
 
 				if (parts.length >= 3) {
-					const rawTipo = (parts[0] || "MULTIFOCAL").trim().toUpperCase();
+					let providedCode = "";
+					let rawTipo = "";
+					let familia = "";
+					let produto = "";
+					let custo = 0;
+					let preco = 500;
+					let ir = "1.50";
+					let tec = "Digital";
+					let lab = "Geral";
+					let valorPeca = 250;
+
+					const part0Upper = (parts[0] || "").trim().toUpperCase();
+					const part1Upper = (parts[1] || "").trim().toUpperCase();
+					const isPart0Type = part0Upper.includes("MONO") || part0Upper.includes("MULTI") || part0Upper.includes("BI") || part0Upper.includes("OCUP");
+					const isPart1Type = part1Upper.includes("MONO") || part1Upper.includes("MULTI") || part1Upper.includes("BI") || part1Upper.includes("OCUP");
+
+					if (!isPart0Type && isPart1Type) {
+						// Formato com Código: Código;Tipo;Família;Produto;Custo;Preço Par;Índice Refrativo;Tecnologia;Laboratório;Valor Peça
+						providedCode = (parts[0] || "").trim().toUpperCase();
+						rawTipo = part1Upper;
+						familia = (parts[2] || "Geral").trim();
+						produto = (parts[3] || `Lente ${i + 1}`).trim();
+						custo = parseNumericField(parts[4], 0);
+						preco = parseNumericField(parts[5], custo > 0 ? custo * 3 : 500);
+						ir = (parts[6] || "1.50").trim();
+						tec = (parts[7] || "Digital").trim();
+						lab = (parts[8] || "Geral").trim();
+						valorPeca = parseNumericField(parts[9], preco / 2);
+					} else {
+						// Formato sem Código: Tipo;Família;Produto;Custo;Preço Par;Índice Refrativo;Tecnologia;Laboratório;Valor Peça
+						rawTipo = part0Upper || "MULTIFOCAL";
+						familia = (parts[1] || "Geral").trim();
+						produto = (parts[2] || `Lente ${i + 1}`).trim();
+						custo = parseNumericField(parts[3], 0);
+						preco = parseNumericField(parts[4], custo > 0 ? custo * 3 : 500);
+						ir = (parts[5] || "1.50").trim();
+						tec = (parts[6] || "Digital").trim();
+						lab = (parts[7] || "Geral").trim();
+						valorPeca = parseNumericField(parts[8], preco / 2);
+					}
+
 					let validTipo: LensCategory = "MULTIFOCAL";
 					if (rawTipo.includes("MONO")) validTipo = "MONOFOCAL";
 					else if (rawTipo.includes("BI")) validTipo = "BIFOCAL";
 					else if (rawTipo.includes("OCUP")) validTipo = "OCUPACIONAL";
 
-					const familia = (parts[1] || "Geral").trim();
-					const produto = (parts[2] || `Lente ${i + 1}`).trim();
-					const custo = parseNumericField(parts[3], 0);
-					const preco = parseNumericField(parts[4], custo > 0 ? custo * 3 : 500);
-					const ir = (parts[5] || "1.50").trim();
-					const tec = (parts[6] || "Digital").trim();
-					const lab = (parts[7] || "Geral").trim();
-					const valorPeca = parseNumericField(parts[8], preco / 2);
-
 					parsed.push({
 						id: `batch_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 5)}`,
+						codigo: providedCode,
 						tipo: validTipo,
 						familia,
 						produto,
@@ -268,10 +321,11 @@ export function OpticalLensCatalogView() {
 				}
 			}
 
-			if (parsed.length === 0) {
+			const withCodes = batchProcessProductCodes(parsed, "LEN", lenses.map((l) => l.codigo));
+			if (withCodes.length === 0) {
 				setBatchError("Nenhuma linha válida detectada. Use colunas separadas por ponto-e-vírgula ou tabulação.");
 			}
-			setBatchPreview(parsed);
+			setBatchPreview(withCodes);
 		} catch (err: any) {
 			setBatchError("Erro ao interpretar texto: " + (err.message || String(err)));
 		}
@@ -305,13 +359,13 @@ export function OpticalLensCatalogView() {
 	};
 
 	const handleDownloadLensTemplate = () => {
-		const headers = "Tipo;Família;Produto;Custo;Preço Par;Índice Refrativo;Tecnologia;Laboratório;Valor Peça\n";
+		const headers = "Código;Tipo;Família;Produto;Custo;Preço Par;Índice Refrativo;Tecnologia;Laboratório;Valor Peça\n";
 		const rows = [
-			"MULTIFOCAL;Varilux;Varilux Physio 3.0;320;1400;1.59;Digital HD;Essilor;700",
-			"MULTIFOCAL;Hoyalux;Hoyalux ID Myself;450;2200;1.67;Freeform 3D;Hoya;1100",
-			"MONOFOCAL;Zeiss Single;ClearView 1.56;120;550;1.56;Freeform;Zeiss;275",
-			"MONOFOCAL;Personality;Poly Antirreflexo;60;320;1.59;Convencional;Personality;160",
-			"MULTIFOCAL;Space;Space Advanced 1.50;150;680;1.50;Digital;Sorolab;340",
+			"LEN-10001;MULTIFOCAL;Varilux;Varilux Physio 3.0;320;1400;1.59;Digital HD;Essilor;700",
+			"LEN-10002;MULTIFOCAL;Hoyalux;Hoyalux ID Myself;450;2200;1.67;Freeform 3D;Hoya;1100",
+			"LEN-10003;MONOFOCAL;Zeiss Single;ClearView 1.56;120;550;1.56;Freeform;Zeiss;275",
+			"LEN-10004;MONOFOCAL;Personality;Poly Antirreflexo;60;320;1.59;Convencional;Personality;160",
+			"LEN-10005;MULTIFOCAL;Space;Space Advanced 1.50;150;680;1.50;Digital;Sorolab;340",
 		].join("\n");
 
 		const csvContent = "\uFEFF" + headers + rows;
@@ -523,6 +577,7 @@ export function OpticalLensCatalogView() {
 					<table className="w-full text-left text-xs border-collapse">
 						<thead>
 							<tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-800/40 text-zinc-500 dark:text-zinc-400 font-semibold">
+								<th className="py-3 px-3 font-mono">Código (CPF)</th>
 								<th className="py-3 px-4">Produto / Família</th>
 								<th className="py-3 px-3">Tipo</th>
 								<th className="py-3 px-3">Laboratório</th>
@@ -539,7 +594,7 @@ export function OpticalLensCatalogView() {
 						<tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
 							{paginatedLenses.length === 0 ? (
 								<tr>
-									<td colSpan={11} className="py-8 text-center text-zinc-400">
+									<td colSpan={12} className="py-8 text-center text-zinc-400">
 										Nenhuma lente encontrada com os filtros selecionados.
 									</td>
 								</tr>
@@ -551,6 +606,11 @@ export function OpticalLensCatalogView() {
 											key={lens.id}
 											className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30 transition-colors"
 										>
+											<td className="py-3 px-3">
+												<span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800 tracking-wider">
+													{lens.codigo}
+												</span>
+											</td>
 											<td className="py-3 px-4">
 												<div className="font-medium text-zinc-900 dark:text-zinc-100">
 													{lens.produto}
@@ -710,6 +770,41 @@ export function OpticalLensCatalogView() {
 						</div>
 
 						<form onSubmit={handleSaveManual} className="p-5 space-y-4">
+							{/* Código Mandatório do Produto ("CPF do Produto") */}
+							<div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 space-y-1.5">
+								<div className="flex items-center justify-between">
+									<label className="text-xs font-bold text-blue-900 dark:text-blue-100 flex items-center gap-1.5">
+										<span>Código Mandatório ("CPF da Lente") *</span>
+										<span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-200/70 dark:bg-blue-900 text-blue-800 dark:text-blue-200 uppercase font-semibold">
+											Único & Anti-Duplicidade
+										</span>
+									</label>
+									<button
+										type="button"
+										onClick={() => {
+											const autoCode = generateUniqueProductCode("LEN", lenses.map((l) => l.codigo));
+											setFormCodigo(autoCode);
+											toast.info(`Código único ${autoCode} gerado pelo sistema!`);
+										}}
+										className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 dark:text-blue-300 hover:underline cursor-pointer"
+									>
+										<MagicWand className="size-3" />
+										Gerar Código
+									</button>
+								</div>
+								<input
+									type="text"
+									required
+									placeholder="Ex: LEN-10001 ou código/EAN da lente"
+									value={formCodigo}
+									onChange={(e) => setFormCodigo(e.target.value.toUpperCase())}
+									className="w-full text-xs p-2 rounded-xl bg-white dark:bg-zinc-800 border border-blue-300 dark:border-blue-700 text-blue-900 dark:text-blue-100 font-mono font-bold tracking-wider uppercase focus:outline-none focus:ring-2 focus:ring-blue-500"
+								/>
+								<p className="text-[10px] text-blue-600 dark:text-blue-400">
+									Identificador único mandatório. Não pode se repetir em nenhum produto do sistema.
+								</p>
+							</div>
+
 							<div className="grid grid-cols-2 gap-3">
 								<div>
 									<label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-400 mb-1">
@@ -922,10 +1017,10 @@ export function OpticalLensCatalogView() {
 									</div>
 								</div>
 								<div className="font-mono text-zinc-600 dark:text-zinc-300 text-[10px]">
-									Tipo;Família;Produto;Custo;Preço Par;Índice Refrativo;Tecnologia;Laboratório;Valor Peça
+									Código;Tipo;Família;Produto;Custo;Preço Par;Índice Refrativo;Tecnologia;Laboratório;Valor Peça
 								</div>
 								<div className="text-[10px] text-zinc-400">
-									Exemplo: MULTIFOCAL;Varilux;Physio 3.0;320;1400;1.59;Digital;Essilor;700
+									Exemplo: LEN-10001;MULTIFOCAL;Varilux;Physio 3.0;320;1400;1.59;Digital;Essilor;700
 								</div>
 							</div>
 
@@ -961,6 +1056,7 @@ export function OpticalLensCatalogView() {
 										<table className="w-full text-left text-[11px]">
 											<thead className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 sticky top-0">
 												<tr>
+													<th className="p-2 font-mono">Código (CPF)</th>
 													<th className="p-2">Produto</th>
 													<th className="p-2">Tipo</th>
 													<th className="p-2">Lab</th>
@@ -973,6 +1069,9 @@ export function OpticalLensCatalogView() {
 											<tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
 												{batchPreview.map((item, idx) => (
 													<tr key={idx}>
+														<td className="p-2 font-mono font-bold text-blue-600 dark:text-blue-400">
+															{item.codigo}
+														</td>
 														<td className="p-2 font-medium">{item.produto}</td>
 														<td className="p-2">{item.tipo}</td>
 														<td className="p-2">{item.laboratorio}</td>

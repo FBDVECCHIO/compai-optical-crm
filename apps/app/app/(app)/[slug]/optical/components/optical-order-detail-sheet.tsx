@@ -433,9 +433,16 @@ export function OpticalOrderDetailSheet({
 										<span className="font-bold text-sm text-foreground block">
 											{order.aro1?.frameBrand || "Armação"}
 										</span>
-										<span className="text-muted-foreground font-mono">
-											Código: {order.aro1?.frameCode || "—"} • Modelo: {order.aro1?.frameModel || "—"}
-										</span>
+										<div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+											{order.aro1?.frameCode && (
+												<Badge variant="secondary" className="font-mono text-[10px] font-bold">
+													{order.aro1.frameCode}
+												</Badge>
+											)}
+											<span className="text-muted-foreground text-xs">
+												{order.aro1?.frameModel || "—"}
+											</span>
+										</div>
 									</div>
 									{(order.aro1?.frameAro || order.aro1?.frameFamily) && (
 										<div className="flex flex-wrap gap-1 pt-1 border-t border-muted">
@@ -467,9 +474,16 @@ export function OpticalOrderDetailSheet({
 										<span className="font-bold text-sm text-foreground block">
 											{order.aro1?.lensName || "Lente"}
 										</span>
-										<span className="text-muted-foreground">
-											{order.aro1?.lensType || "Padrão"}
-										</span>
+										<div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+											{order.aro1?.lensCode && (
+												<Badge variant="secondary" className="font-mono text-[10px] font-bold">
+													{order.aro1.lensCode}
+												</Badge>
+											)}
+											<span className="text-muted-foreground text-xs">
+												{order.aro1?.lensType || "Padrão"}
+											</span>
+										</div>
 									</div>
 									{(order.aro1?.lensIndex || order.aro1?.lensTech) && (
 										<div className="flex flex-wrap gap-1 pt-1 border-t border-muted">
@@ -501,9 +515,16 @@ export function OpticalOrderDetailSheet({
 										<span className="font-bold text-sm text-foreground block">
 											{order.aro1?.noTreatment ? "Sem Tratamento Adicional" : order.aro1?.treatment || "Incolor"}
 										</span>
-										<span className="text-muted-foreground text-xs">
-											{order.aro1?.noTreatment ? "Lentes naturais" : "Proteção antirreflexo"}
-										</span>
+										<div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+											{order.aro1?.treatmentCode && (
+												<Badge variant="secondary" className="font-mono text-[10px] font-bold">
+													{order.aro1.treatmentCode}
+												</Badge>
+											)}
+											<span className="text-muted-foreground text-xs">
+												{order.aro1?.noTreatment ? "Lentes naturais" : "Proteção antirreflexo"}
+											</span>
+										</div>
 									</div>
 								</div>
 							</div>
@@ -547,9 +568,16 @@ export function OpticalOrderDetailSheet({
 											<span className="font-bold text-sm text-foreground block">
 												{order.aro2.frameBrand || "Armação 2"}
 											</span>
-											<span className="text-muted-foreground font-mono">
-												Código: {order.aro2.frameCode || "—"} • Modelo: {order.aro2.frameModel || "—"}
-											</span>
+											<div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+												{order.aro2.frameCode && (
+													<Badge variant="secondary" className="font-mono text-[10px] font-bold">
+														{order.aro2.frameCode}
+													</Badge>
+												)}
+												<span className="text-muted-foreground text-xs">
+													{order.aro2.frameModel || "—"}
+												</span>
+											</div>
 										</div>
 									</div>
 
@@ -567,6 +595,13 @@ export function OpticalOrderDetailSheet({
 											<span className="font-bold text-sm text-foreground block">
 												{order.aro2.lensName || "Lente 2"}
 											</span>
+											{order.aro2.lensCode && (
+												<div className="pt-0.5">
+													<Badge variant="secondary" className="font-mono text-[10px] font-bold">
+														{order.aro2.lensCode}
+													</Badge>
+												</div>
+											)}
 										</div>
 									</div>
 
@@ -584,6 +619,13 @@ export function OpticalOrderDetailSheet({
 											<span className="font-bold text-sm text-foreground block">
 												{order.aro2.noTreatment ? "Sem Tratamento" : order.aro2.treatment || "Padrão"}
 											</span>
+											{order.aro2.treatmentCode && (
+												<div className="pt-0.5">
+													<Badge variant="secondary" className="font-mono text-[10px] font-bold">
+														{order.aro2.treatmentCode}
+													</Badge>
+												</div>
+											)}
 										</div>
 									</div>
 								</div>

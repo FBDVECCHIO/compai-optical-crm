@@ -7,7 +7,9 @@ import {
 	exportMonthlyAccountingBatch,
 	exportMonthlyAccountingCsv,
 	exportMonthlyAccountingXml,
+	extractFiscalProductItems,
 	generateSefazAccessKey,
+	generateSefazDetXml,
 	validateSefazAccessKey,
 } from "../fiscal-service";
 import type { OpticalOrder } from "../optical-types";
@@ -406,6 +408,140 @@ describe("Serviço Fiscal MNOC-X - fiscal-service", () => {
 			const csv = exportMonthlyAccountingCsv([order], { delimiter: ";" });
 			expect(csv).toContain("Data;OS;Número NF;Série;Modelo;Chave de Acesso;Valor Total;Base ICMS;ICMS;PIS;COFINS;CFOP;Status");
 			expect(csv).toContain(";OS-2026-1045A;");
+		});
+	});
+
+	// =========================================================================
+	// 6. ITENS FISCAIS SEFAZ & CÓDIGO MANDATÓRIO DE PRODUTO (<cProd>)
+	// =========================================================================
+	describe("extractFiscalProductItems & generateSefazDetXml", () => {
+		const dummyDiopters = {
+			od: { esf: "-1.50", cil: "-0.50", eixo: "180" },
+			oe: { esf: "-1.75", cil: "-0.75", eixo: "175" },
+		};
+
+		it("extrai armação, lente e tratamento mapeando o código único para cProd", () => {
+			const order = createMockOrder({
+				aro1: {
+					frameCode: "ARM-10001",
+					frameBrand: "Ray-Ban",
+					frameModel: "RX5228 Acetato",
+					framePrice: 650,
+					lab: "Essilor",
+					lensCode: "LEN-10006",
+					lensName: "Varilux Comfort Max",
+					quantity: 1,
+					lensPrice: 1890,
+					treatmentCode: "TRAT-10001",
+					treatment: "Crizal Rock",
+					noTreatment: false,
+					treatmentPrice: 390,
+					diopters: dummyDiopters,
+				},
+			});
+
+			const items = extractFiscalProductItems(order, "5.102");
+			expect(items.length).toBe(3);
+
+			// Item 1: Armação
+			expect(items[0]?.cProd).toBe("ARM-10001");
+			expect(items[0]?.category).toBe("ARMACAO");
+			expect(items[0]?.ncm).toBe("9003.11.00");
+			expect(items[0]?.vProd).toBe(650);
+
+			// Item 2: Lente
+			expect(items[1]?.cProd).toBe("LEN-10006");
+			expect(items[1]?.category).toBe("LENTE");
+			expect(items[1]?.ncm).toBe("9001.50.00");
+			expect(items[1]?.vProd).toBe(1890);
+
+			// Item 3: Tratamento
+			expect(items[2]?.cProd).toBe("TRAT-10001");
+			expect(items[2]?.category).toBe("TRATAMENTO");
+			expect(items[2]?.vProd).toBe(390);
+		});
+
+		it("gera blocos <det> XML SEFAZ em conformidade com o Manual de Orientação do Contribuinte", () => {
+			const order = createMockOrder({
+				aro1: {
+					frameCode: "ARM-10005",
+					frameBrand: "Oakley",
+					frameModel: "Holbrook RX",
+					framePrice: 580,
+					lab: "Zeiss",
+					lensCode: "LEN-10004",
+					lensName: "Zeiss SmartLife Individual",
+					quantity: 1,
+					lensPrice: 2400,
+					treatmentCode: "TRAT-10002",
+					treatment: "DuraVision Platinum",
+					noTreatment: false,
+					treatmentPrice: 420,
+					diopters: dummyDiopters,
+				},
+			});
+
+			const xml = generateSefazDetXml(order, "5.102");
+
+			expect(xml).toContain('<det nItem="1">');
+			expect(xml).toContain("<cProd>ARM-10005</cProd>");
+			expect(xml).toContain("<NCM>9003.11.00</NCM>");
+			expect(xml).toContain("<cEAN>SEM GTIN</cEAN>");
+
+			expect(xml).toContain('<det nItem="2">');
+			expect(xml).toContain("<cProd>LEN-10004</cProd>");
+			expect(xml).toContain("<NCM>9001.50.00</NCM>");
+
+			expect(xml).toContain('<det nItem="3">');
+			expect(xml).toContain("<cProd>TRAT-10002</cProd>");
+		});
+
+		it("inclui produtos do Aro 2 no XML com seus respectivos códigos únicos", () => {
+			const order = createMockOrder({
+				aro1: {
+					frameCode: "ARM-10001",
+					frameBrand: "Ray-Ban",
+					frameModel: "RX5228",
+					framePrice: 500,
+					lab: "Essilor",
+					lensCode: "LEN-10001",
+					lensName: "Varilux",
+					quantity: 1,
+					lensPrice: 1000,
+					treatment: "",
+					noTreatment: true,
+					treatmentPrice: 0,
+					diopters: dummyDiopters,
+				},
+				hasAro2: true,
+				aro2: {
+					frameCode: "SOL-10001",
+					frameBrand: "Ray-Ban",
+					frameModel: "Clubmaster Solar",
+					framePrice: 450,
+					lab: "Essilor",
+					lensCode: "LEN-10007",
+					lensName: "Sol Polarizado",
+					quantity: 1,
+					lensPrice: 700,
+					treatment: "",
+					noTreatment: true,
+					treatmentPrice: 0,
+					diopters: dummyDiopters,
+				},
+			});
+
+			const items = extractFiscalProductItems(order);
+			expect(items.length).toBe(4);
+			expect(items[0]?.cProd).toBe("ARM-10001");
+			expect(items[1]?.cProd).toBe("LEN-10001");
+			expect(items[2]?.cProd).toBe("SOL-10001");
+			expect(items[3]?.cProd).toBe("LEN-10007");
+
+			const xml = exportMonthlyAccountingXml([order]);
+			expect(xml).toContain("<cProd>ARM-10001</cProd>");
+			expect(xml).toContain("<cProd>SOL-10001</cProd>");
+			expect(xml).toContain("<cProd>LEN-10007</cProd>");
 		});
 	});
 });

@@ -36,13 +36,20 @@ export function OpticalSalesLogView() {
 			if (filterType === "PAID" && residual > 0) return false;
 			if (filterType === "RESIDUAL" && residual <= 0) return false;
 
-			// Filter by search text (OS, Paciente, Vendedor, Loja)
+			// Filter by search text (OS, Paciente, CPF, Vendedor, Loja, Código de Produto / CPF do Produto)
 			const query = search.toLowerCase();
 			return (
 				(o.orderNumber || "").toLowerCase().includes(query) ||
 				(o.patient?.name || "").toLowerCase().includes(query) ||
+				(o.patient?.cpf || "").toLowerCase().includes(query) ||
 				(o.seller?.name || "").toLowerCase().includes(query) ||
-				(o.store?.name || "").toLowerCase().includes(query)
+				(o.store?.name || "").toLowerCase().includes(query) ||
+				(o.aro1?.frameCode || "").toLowerCase().includes(query) ||
+				(o.aro1?.lensCode || "").toLowerCase().includes(query) ||
+				(o.aro1?.treatmentCode || "").toLowerCase().includes(query) ||
+				(o.aro2?.frameCode || "").toLowerCase().includes(query) ||
+				(o.aro2?.lensCode || "").toLowerCase().includes(query) ||
+				(o.aro2?.treatmentCode || "").toLowerCase().includes(query)
 			);
 		});
 	}, [orders, filterType, search]);
@@ -141,7 +148,7 @@ export function OpticalSalesLogView() {
 						<Input
 							value={search}
 							onChange={(e) => setSearch(e.target.value)}
-							placeholder="Buscar OS, cliente ou vendedor..."
+							placeholder="Buscar OS, cliente, CPF, vendedor ou código do produto..."
 							className="h-9 pl-8 text-xs"
 						/>
 					</div>
@@ -215,10 +222,24 @@ export function OpticalSalesLogView() {
 											</td>
 											<td className="py-3 px-4 max-w-xs">
 												<div className="font-medium truncate">{order.aro1?.frameBrand || "Armação"} ({order.aro1?.lensName || "Lente"})</div>
+												<div className="flex items-center gap-1 mt-0.5 flex-wrap">
+													{order.aro1?.frameCode && (
+														<Badge variant="secondary" className="font-mono text-[9px] px-1 py-0 h-4">
+															{order.aro1.frameCode}
+														</Badge>
+													)}
+													{order.aro1?.lensCode && (
+														<Badge variant="outline" className="font-mono text-[9px] px-1 py-0 h-4 text-primary">
+															{order.aro1.lensCode}
+														</Badge>
+													)}
+												</div>
 												{order.hasAro2 && (
-													<Badge variant="outline" className="text-[10px] mt-0.5">
-														+ 2º Par: {order.aro2?.frameBrand || "Armação 2"}
-													</Badge>
+													<div className="mt-1 flex items-center gap-1 flex-wrap">
+														<Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
+															+ 2º Par: {order.aro2?.frameCode ? `[${order.aro2.frameCode}] ` : ""}{order.aro2?.frameBrand || "Armação 2"}
+														</Badge>
+													</div>
 												)}
 											</td>
 											<td className="py-3 px-4 text-right font-mono font-bold">
